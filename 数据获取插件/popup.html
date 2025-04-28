@@ -22,6 +22,13 @@
     button:hover {
       background-color: #e61e3c;
     }
+    button.secondary {
+      background-color: #f0f0f0;
+      color: #333;
+    }
+    button.secondary:hover {
+      background-color: #e0e0e0;
+    }
     #status {
       margin-top: 10px;
       color: #333;
@@ -65,11 +72,13 @@
   </style>
 </head>
 <body>
-  <h2>小红书通知列表获取</h2>
+  <h2>小红书数据获取</h2>
   
   <div id="modeInfo" class="mode-info">尚未配置API，将下载到本地</div>
   
   <button id="getNotifications">获取通知列表</button>
+  <button id="expandComments" class="secondary">展开所有评论</button>
+  <button id="getComments">获取推文评论</button>
   
   <div id="status"></div>
   
