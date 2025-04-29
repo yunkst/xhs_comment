@@ -362,8 +362,31 @@ function extractNotificationsFromPage() {
 
 // 提取评论函数 (根据实际HTML调整)
 function extractCommentsFromPage() {
+  let noteId = null;
 
-  // --- 内部辅助函数 ---
+  // --- 1. 提取笔记 ID ---
+  try {
+    // 优先尝试从 URL 提取
+    const urlMatch = window.location.href.match(/\/explore\/([^/?]+)/);
+    if (urlMatch && urlMatch[1]) {
+      noteId = urlMatch[1];
+      console.log(`从 URL 中提取到 Note ID: ${noteId}`);
+    } else {
+      // 如果 URL 提取失败，尝试查找 note-id 属性
+      // 尝试几个可能的选择器
+      const noteElement = document.querySelector('[note-id], #noteContainer, .note-detail'); 
+      if (noteElement && noteElement.getAttribute('note-id')) {
+          noteId = noteElement.getAttribute('note-id');
+          console.log(`从 note-id 属性中提取到 Note ID: ${noteId}`);
+      } else {
+          console.warn("无法从 URL 或 note-id 属性中提取 Note ID。");
+      }
+    }
+  } catch(e) {
+      console.error("提取 Note ID 时出错:", e);
+  }
+
+  // --- 2. 内部辅助函数 ---
   function getElementText(element, selector) {
     const child = element?.querySelector(selector);
     return child ? child.textContent.trim() : '';
@@ -374,19 +397,17 @@ function extractCommentsFromPage() {
      return child ? child.getAttribute(attribute) : '';
   }
 
-  // 提取元素的文本内容（处理emoji）
-  function extractContentWithEmoji(element) { // 修改：直接传入内容元素
+  function extractContentWithEmoji(element) {
     if (!element) return '';
     const clone = element.cloneNode(true);
     const emojiImgs = clone.querySelectorAll('img.note-content-emoji');
     emojiImgs.forEach(img => { img.replaceWith('[emoji]'); });
-    // 获取内部span的文本，如果存在
     const innerSpan = clone.querySelector('span');
     return (innerSpan || clone).textContent.trim();
   }
 
-  // 提取单个评论 (包括子评论和回复目标)
-  function extractSingleComment(commentElement, isSubComment = false) {
+  // --- 3. 提取单个评论 ---
+  function extractSingleComment(commentElement, isSubComment = false, currentNoteId) {
     if (!commentElement) return null;
 
     const container = isSubComment ? commentElement : commentElement.querySelector('.comment-item');
@@ -396,25 +417,20 @@ function extractCommentsFromPage() {
       let repliedToUser = null;
       let actualContent = '';
 
-      // 处理评论内容和回复对象
       const contentElement = container.querySelector('.content');
       if (contentElement) {
         const nicknameElement = contentElement.querySelector('span.nickname');
         const noteTextElement = contentElement.querySelector('span.note-text');
 
         if (nicknameElement && noteTextElement) {
-          // 这是对某个用户的回复
           repliedToUser = nicknameElement.textContent.trim();
-          actualContent = extractContentWithEmoji(noteTextElement); // 提取 note-text 部分
+          actualContent = extractContentWithEmoji(noteTextElement);
         } else if (noteTextElement) {
-          // 这是直接评论或无法识别回复对象结构
-          actualContent = extractContentWithEmoji(noteTextElement); // 提取 note-text 部分
+          actualContent = extractContentWithEmoji(noteTextElement);
         } else {
-           // 备用：如果找不到 note-text，尝试提取整个 content (去掉可能的 "回复 " 前缀)
            let fullContent = extractContentWithEmoji(contentElement);
            if(fullContent.startsWith('回复 ')) {
-               // 简单移除前缀，可能不完美
-               fullContent = fullContent.substring(3).trim(); 
+               fullContent = fullContent.substring(3).trim();
            }
            actualContent = fullContent;
         }
@@ -422,11 +438,12 @@ function extractCommentsFromPage() {
 
       const commentData = {
           id: container.id || '',
+          noteId: currentNoteId, // 添加笔记ID
           authorName: getElementText(container, '.author .name'),
           authorUrl: getElementAttribute(container, '.author .name', 'href'),
           authorAvatar: getElementAttribute(container, '.avatar img.avatar-item', 'src'),
-          content: actualContent, // 使用提取/处理后的内容
-          repliedToUser: repliedToUser, // 新增字段
+          content: actualContent,
+          repliedToUser: repliedToUser,
           timestamp: getElementText(container, '.info .date > span:first-child'),
           likeCount: getElementText(container, '.info .interactions .like .count') || '0',
           ipLocation: getElementText(container, '.info .date .location'),
@@ -438,7 +455,7 @@ function extractCommentsFromPage() {
           if (repliesContainer) {
               const replyElements = repliesContainer.querySelectorAll(':scope > .comment-item-sub');
               replyElements.forEach(replyElement => {
-                  const replyData = extractSingleComment(replyElement, true);
+                  const replyData = extractSingleComment(replyElement, true, currentNoteId); // 传递 noteId
                   if (replyData) {
                       commentData.replies.push(replyData);
                   }
@@ -452,7 +469,7 @@ function extractCommentsFromPage() {
     }
   }
 
-  // --- 主逻辑 ---
+  // --- 4. 主逻辑 ---
   const comments = [];
   const commentElements = document.querySelectorAll('.comments-container .parent-comment');
 
@@ -461,7 +478,7 @@ function extractCommentsFromPage() {
   }
 
   commentElements.forEach((commentElement, index) => {
-    const extractedComment = extractSingleComment(commentElement, false);
+    const extractedComment = extractSingleComment(commentElement, false, noteId); // 传递提取到的 noteId
     if(extractedComment) {
         if(!extractedComment.id) {
            extractedComment.id = `comment-parent-${index}`;

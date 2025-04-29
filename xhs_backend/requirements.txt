@@ -1,0 +1,5 @@
+fastapi
+uvicorn[standard]
+motor
+python-dotenv
+pydantic>=1.10,<2.0 # 固定 Pydantic 版本以兼容 Motor 

@@ -69,15 +69,17 @@
 ### 评论数据 (JSON)
 
 包含一个评论对象数组，每个评论对象包含：
-- `id`: 评论ID (如果能获取到)
+- `id`: 评论ID
+- `noteId`: 笔记ID (新增)
 - `authorName`: 评论者昵称
 - `authorUrl`: 评论者主页链接
 - `authorAvatar`: 评论者头像
 - `content`: 评论内容
+- `repliedToUser`: 被回复用户的昵称 (如果是回复)
 - `timestamp`: 评论时间
 - `likeCount`: 点赞数
-- `ipLocation`: IP属地 (如果显示)
-- `replies`: 一个包含该评论下所有回复（子评论）的数组，结构与父评论相同
+- `ipLocation`: IP属地
+- `replies`: 回复数组，结构同父评论
 
 ### 发送到API的数据格式
 

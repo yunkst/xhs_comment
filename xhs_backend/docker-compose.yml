@@ -1,0 +1,46 @@
+services:
+  mongo:
+    image: crpi-v2c8hiamyw0hvcvs.cn-hangzhou.personal.cr.aliyuncs.com/open_ydz/mongo:latest # Use the official MongoDB image
+    container_name: mongodb_service
+    ports:
+      - "27017:27017" # Map host port to container port if external access needed
+    volumes:
+      - mongo_data:/data/db # Persist MongoDB data
+    # Optional: Add environment variables for MongoDB authentication if needed
+    # environment:
+    #   MONGO_INITDB_ROOT_USERNAME: root
+    #   MONGO_INITDB_ROOT_PASSWORD: example
+    networks:
+      - xhs_network
+
+  app:
+    build: 
+      context: . # Build the image from the Dockerfile in the current directory
+      # dockerfile: Dockerfile.dev # Use the Dockerfile.dev file
+    container_name: xhs_backend_app
+    ports:
+      - "8000:8000" # Map host port 8000 to container port 8000
+    volumes:
+      - .:/app # Mount current directory to /app in container for live code changes (dev)
+    environment:
+      # Important: Point to the mongo service name, not localhost
+      MONGODB_URL: mongodb://mongo:27017 
+      DATABASE_NAME: xiaohongshu_data
+      NOTIFICATIONS_COLLECTION: notifications
+      COMMENTS_COLLECTION: comments
+      # Pass the API secret token from your host environment or a .env file
+      # Ensure you have API_SECRET_TOKEN defined in your host .env or environment
+      API_SECRET_TOKEN: ${API_SECRET_TOKEN} 
+    depends_on:
+      - mongo # Ensure mongo starts before the app
+    networks:
+      - xhs_network
+    # env_file:
+    #   - .env # Alternatively, load all variables from .env file
+
+networks:
+  xhs_network:
+    driver: bridge
+
+volumes:
+  mongo_data: # Define the named volume for MongoDB data 
