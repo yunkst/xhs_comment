@@ -8,6 +8,7 @@ from pymongo import MongoClient, UpdateOne
 from pymongo.errors import ConnectionFailure, BulkWriteError
 from datetime import datetime
 import asyncio
+from processing import parse_relative_timestamp
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -23,6 +24,7 @@ NOTIFICATIONS_COLLECTION = os.getenv("NOTIFICATIONS_COLLECTION", "notifications"
 COMMENTS_COLLECTION = os.getenv("COMMENTS_COLLECTION", "comments")
 RAW_COMMENTS_COLLECTION = "raw_comments" # 存放原始合并后的评论数据
 STRUCTURED_COMMENTS_COLLECTION = "structured_comments" # 存放结构化评论数据
+NOTES_COLLECTION = "notes" # 存放笔记数据
 
 client: motor.motor_asyncio.AsyncIOMotorClient = None
 db: motor.motor_asyncio.AsyncIOMotorDatabase = None
@@ -294,3 +296,65 @@ async def save_structured_comments(data: List[Dict[str, Any]]):
         # 假设所有尝试的操作都失败了
         failed_count = len(data) # 所有原始数据都算失败
         return {'upserted': 0, 'matched': 0, 'modified': 0, 'failed': failed_count} 
+
+# --- 保存笔记数据 ---
+async def save_notes(data: List[Dict[str, Any]]):
+    """保存笔记列表，如果笔记已存在则更新"""
+    if not data:
+        logger.info("没有笔记数据需要保存")
+        return {"inserted": 0, "updated": 0}
+
+    database = await get_database()
+    collection = database[NOTES_COLLECTION]
+    inserted_count = 0
+    updated_count = 0
+
+    for note_data in data:
+        note_id = note_data.get("noteId")
+
+        if not note_id:
+            logger.warning(f"跳过笔记，缺少 noteId: {note_data.get('noteContent', '')[:50]}...")
+            continue
+
+        try:
+            # 确保 fetchTimestamp 字段存在且是 datetime 类型
+            if 'fetchTimestamp' not in note_data or not isinstance(note_data['fetchTimestamp'], datetime):
+                note_data['fetchTimestamp'] = datetime.utcnow()
+            
+            # 处理 publishTime 字段，将其转换为 datetime 类型
+            if 'publishTime' in note_data and note_data['publishTime']:
+                # 使用 parse_relative_timestamp 函数解析发布时间
+                publish_time_str = note_data['publishTime']
+                parsed_publish_time = parse_relative_timestamp(publish_time_str)
+                
+                if parsed_publish_time:
+                    note_data['publishTime'] = parsed_publish_time
+                else:
+                    logger.warning(f"无法解析笔记发布时间: {publish_time_str}，维持原始值")
+                
+            # 尝试查找已存在的笔记
+            existing_note = await collection.find_one({"noteId": note_id})
+
+            if existing_note:
+                # 更新现有笔记
+                result = await collection.replace_one({"_id": existing_note["_id"]}, note_data)
+                if result.modified_count > 0:
+                    updated_count += 1
+                    logger.debug(f"更新笔记: noteId={note_id}")
+                else:
+                    logger.warning(f"尝试更新笔记但 modified_count 为 0: noteId={note_id}")
+            else:
+                # 插入新笔记
+                result = await collection.insert_one(note_data)
+                if result.inserted_id:
+                    inserted_count += 1
+                    logger.debug(f"插入新笔记: noteId={note_id}")
+                else:
+                    logger.warning(f"尝试插入新笔记但未获取 inserted_id: noteId={note_id}")
+
+        except Exception as e:
+            logger.error(f"处理笔记 noteId={note_id} 时出错: {e}")
+            # 继续处理下一个
+
+    logger.info(f"笔记保存/更新完成。插入: {inserted_count}, 更新: {updated_count}")
+    return {"inserted": inserted_count, "updated": updated_count} 

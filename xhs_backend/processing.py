@@ -25,16 +25,39 @@ def parse_relative_timestamp(timestamp_str: Optional[str]) -> Optional[datetime]
     if not timestamp_str:
         return None
 
+    # 清理字符串，去除可能的前后空格
+    timestamp_str = timestamp_str.strip()
+    
+    # 处理"N 天前 地区"格式（笔记中的发布时间）
+    # 例如："3 天前 浙江"
+    location_match = re.match(r'(\d+)\s*天前\s+.*', timestamp_str)
+    if location_match:
+        days_ago = int(location_match.group(1))
+        return datetime.now() - timedelta(days=days_ago)
+
     now = datetime.now()
     try:
+        # 格式: YYYY-MM-DD (例如: 2023-01-10)
+        if re.match(r'^\d{4}-\d{1,2}-\d{1,2}$', timestamp_str):
+            year, month, day = map(int, timestamp_str.split('-'))
+            return datetime(year, month, day)
+        
+        # 格式: YYYY年MM月DD日 (例如: 2023年1月10日)
+        match = re.match(r'(\d{4})年(\d{1,2})月(\d{1,2})日', timestamp_str)
+        if match:
+            year, month, day = map(int, match.groups())
+            return datetime(year, month, day)
+        
         # 格式: MM-DD (例如: 01-14)
-        if re.match(r'^\d{2}-\d{2}$', timestamp_str):
-            month, day = map(int, timestamp_str.split('-'))
-            # 假设是今年，如果计算出的日期在未来，则认为是去年
-            parsed_dt = datetime(now.year, month, day)
-            if parsed_dt > now:
-                parsed_dt = datetime(now.year - 1, month, day)
-            return parsed_dt
+        if re.match(r'^\d{1,2}-\d{1,2}$', timestamp_str):
+            parts = timestamp_str.split('-')
+            if len(parts) == 2:
+                month, day = map(int, parts)
+                # 假设是今年，如果计算出的日期在未来，则认为是去年
+                parsed_dt = datetime(now.year, month, day)
+                if parsed_dt > now:
+                    parsed_dt = datetime(now.year - 1, month, day)
+                return parsed_dt
         
         # 格式: 昨天 HH:MM (例如: 昨天 14:09)
         match = re.match(r'昨天\s+(\d{1,2}):(\d{2})', timestamp_str)
@@ -44,7 +67,7 @@ def parse_relative_timestamp(timestamp_str: Optional[str]) -> Optional[datetime]
             return yesterday.replace(hour=hour, minute=minute, second=0, microsecond=0)
         
         # 格式: N天前 (例如: 4天前)
-        match = re.match(r'(\d+)\s*天前', timestamp_str)
+        match = re.match(r'(\d+)\s*天前$', timestamp_str)
         if match:
             days_ago = int(match.group(1))
             return now - timedelta(days=days_ago)
@@ -61,7 +84,7 @@ def parse_relative_timestamp(timestamp_str: Optional[str]) -> Optional[datetime]
             minutes_ago = int(match.group(1))
             return now - timedelta(minutes=minutes_ago)
             
-        # 尝试直接解析日期时间格式 (例如: YYYY-MM-DD HH:MM:SS - 不确定是否存在)
+        # 尝试直接解析日期时间格式 (例如: YYYY-MM-DD HH:MM:SS)
         try:
             return datetime.fromisoformat(timestamp_str)
         except ValueError:
@@ -72,7 +95,7 @@ def parse_relative_timestamp(timestamp_str: Optional[str]) -> Optional[datetime]
         return None
 
     except Exception as e:
-        logger.error(f"解析时间戳 '{timestamp_str}' 时出错: {e}")
+        logger.error(f"解析时间戳 '{timestamp_str}' 时出错: {e}", exc_info=True)
         return None
 
 # --- Transformation Logic ---

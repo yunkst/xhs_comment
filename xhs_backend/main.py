@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
 from models import IncomingPayload # 假设模型在 models.py
-from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION # 假设数据库函数在 database.py
+from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION # 假设数据库函数在 database.py
 from processing import transform_raw_comments_to_structured # 导入转换函数
 
 # 配置日志
@@ -77,7 +77,7 @@ async def read_root():
 
 @app.post("/api/data", tags=["数据接收"], status_code=status.HTTP_201_CREATED)
 async def receive_data(payload: IncomingPayload, token: str = Depends(verify_token)) -> Dict[str, Any]:
-    """接收插件发送的数据（通知或评论）"""
+    """接收插件发送的数据（通知、评论或笔记）"""
     logger.info(f"接收到类型为 '{payload.type}' 的数据，共 {len(payload.data)} 条")
     
     try:
@@ -134,6 +134,20 @@ async def receive_data(payload: IncomingPayload, token: str = Depends(verify_tok
                     "raw_inserted": raw_inserted,
                     "raw_updated": raw_updated
                 }
+        elif payload.type == "笔记":
+            # 保存笔记数据
+            logger.info("开始保存笔记数据...")
+            result = await save_notes(payload.data)
+            inserted = result.get('inserted', 0)
+            updated = result.get('updated', 0)
+            logger.info(f"笔记数据保存完成 - 插入: {inserted}, 更新: {updated}")
+            
+            message = f"成功保存 {inserted + updated} 条笔记数据 (插入: {inserted}, 更新: {updated})"
+            return {
+                "message": message,
+                "inserted": inserted,
+                "updated": updated
+            }
         else:
             logger.error(f"接收到无效的数据类型: {payload.type}")
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="无效的数据类型")

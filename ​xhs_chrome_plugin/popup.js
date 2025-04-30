@@ -110,8 +110,32 @@ document.addEventListener('DOMContentLoaded', function() {
                 updateStatus(`当前页面未找到评论。请先尝试展开所有评论。`, '');
              }
         } else {
-            // 处理数据（发送或下载）
-            processData(currentData, dataTypeLabel);
+            // 如果是评论数据，还需获取笔记内容
+            if (fetchType === 'comments') {
+                // 获取笔记内容
+                chrome.scripting.executeScript({
+                    target: {tabId: currentTab.id},
+                    function: getNoteContent
+                }).then(noteResults => {
+                    if (noteResults && noteResults.length > 0 && noteResults[0].result) {
+                        const noteData = noteResults[0].result;
+                        console.log('获取到笔记内容:', noteData);
+                        
+                        // 处理合并的数据
+                        processDataWithNote(currentData, noteData);
+                    } else {
+                        console.warn('获取笔记内容失败，仅处理评论数据');
+                        processData(currentData, dataTypeLabel);
+                    }
+                }).catch(error => {
+                    console.error('获取笔记内容时出错:', error);
+                    updateStatus('获取笔记内容失败，仅处理评论数据', 'error');
+                    processData(currentData, dataTypeLabel);
+                });
+            } else {
+                // 处理数据（发送或下载）
+                processData(currentData, dataTypeLabel);
+            }
         }
       }).catch(error => {
         console.error(`执行${dataTypeLabel}提取脚本出错:`, error);
@@ -203,58 +227,179 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
+  // 处理带笔记内容的数据
+  function processDataWithNote(commentsData, noteData) {
+    if (!noteData) {
+        // 笔记数据为空，只处理评论数据
+        processData(commentsData, '评论');
+        return;
+    }
+    
+    // 发送评论数据
+    processData(commentsData, '评论');
+    
+    // 处理笔记数据
+    const noteDataArray = [noteData]; // 转为数组，以便API处理
+    
+    if (apiConfig.host && apiConfig.token) {
+        // 发送笔记数据到API
+        sendDataToApi(noteDataArray, '笔记');
+    } else {
+        // 下载笔记数据
+        downloadData(noteDataArray, '笔记');
+    }
+  }
+  
   // 发送数据到API
   function sendDataToApi(data, dataTypeLabel) {
-    updateStatus(`正在发送 ${data.length} 条${dataTypeLabel}数据到API...`, '');
+    updateStatus(`正在将${dataTypeLabel}数据发送到服务器...`, '');
     
+    // 准备要发送的数据
+    const payload = {
+      type: dataTypeLabel,
+      data: data
+    };
+    
+    // 发送请求
     fetch(apiConfig.host, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + apiConfig.token
+        'Authorization': `Bearer ${apiConfig.token}`
       },
-      body: JSON.stringify({ type: dataTypeLabel, data: data })
+      body: JSON.stringify(payload)
     })
     .then(response => {
       if (!response.ok) {
-        return response.text().then(text => {
-           throw new Error(`API响应错误: ${response.status} - ${text || response.statusText}`);
-        });
+        throw new Error(`服务器返回错误状态: ${response.status} ${response.statusText}`);
       }
       return response.json();
     })
     .then(result => {
-      updateStatus(`成功发送 ${data.length} 条${dataTypeLabel}到API`, 'success');
-      console.log('API响应:', result);
+      console.log('数据发送成功:', result);
+      updateStatus(`${dataTypeLabel}数据发送成功: ${result.message || '服务器已接收'}`, 'success');
     })
     .catch(error => {
-      console.error(`发送${dataTypeLabel}数据失败:`, error);
-      updateStatus(`发送${dataTypeLabel}数据失败: ${error.message}`, 'error');
-      
-      if (confirm(`发送到API失败，是否要下载${dataTypeLabel}数据到本地？`)) {
-        downloadData(data, dataTypeLabel);
-      }
+      console.error('发送数据出错:', error);
+      updateStatus(`发送${dataTypeLabel}数据失败: ${error.message || '未知错误'}`, 'error');
     });
   }
   
   // 下载数据
   function downloadData(data, dataTypeLabel) {
-    const dataStr = JSON.stringify(data, null, 2);
-    const dataBlob = new Blob([dataStr], {type: 'application/json'});
-    const url = URL.createObjectURL(dataBlob);
+    updateStatus(`正在准备下载${dataTypeLabel}数据...`, '');
+    
+    // 创建要下载的数据内容
+    const jsonString = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonString], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    
+    // 创建并点击下载链接
+    const timestamp = new Date().toISOString().replace(/[:.-]/g, '_');
+    const filename = `xiaohongshu_${dataTypeLabel}_${timestamp}.json`;
+    
     const downloadLink = document.createElement('a');
     downloadLink.href = url;
-    const filename = dataTypeLabel === '通知'
-        ? 'xiaohongshu_notifications_'
-        : 'xiaohongshu_comments_';
-    downloadLink.download = filename + new Date().toISOString().slice(0, 10) + '.json';
-    document.body.appendChild(downloadLink);
+    downloadLink.download = filename;
     downloadLink.click();
-    document.body.removeChild(downloadLink);
+    
+    // 释放URL对象
     URL.revokeObjectURL(url);
-    updateStatus(`已下载 ${data.length} 条${dataTypeLabel}数据`, 'success');
+    
+    updateStatus(`${dataTypeLabel}数据已下载到本地`, 'success');
   }
 });
+
+// 获取笔记内容
+function getNoteContent() {
+  try {
+    // 从当前URL中提取笔记ID
+    const urlMatch = window.location.href.match(/\/explore\/([^/?]+)/);
+    let noteId = urlMatch ? urlMatch[1] : null;
+    
+    // 提取笔记内容
+    // 尝试从页面元素中获取笔记详细信息
+    const titleElement = document.querySelector('#detail-title, .title');
+    const descElement = document.querySelector('#detail-desc, .desc .note-text');
+    
+    // 提取作者信息
+    const authorElement = document.querySelector('.author-wrapper .info .name');
+    let authorId = null;
+    if (authorElement && authorElement.href) {
+      const authorMatch = authorElement.href.match(/\/user\/profile\/([^/?]+)/);
+      authorId = authorMatch ? authorMatch[1] : null;
+    }
+    
+    // 提取发布时间
+    const dateElement = document.querySelector('.bottom-container .date, .date');
+    const publishTime = dateElement ? dateElement.textContent.trim() : '';
+    
+    // 提取点赞数和评论数
+    const likeElement = document.querySelector('.xg-v2-collect [data-type="like"] .count');
+    const likeCount = likeElement ? extractInteractionCount(likeElement.textContent.trim()) : 0;
+    
+    const commentsElement = document.querySelector('.comments-container .total, .comments-container .comment-title .count');
+    let commentCount = 0;
+    if (commentsElement) {
+      const commentText = commentsElement.textContent.trim();
+      const commentMatch = commentText.match(/共\s*(\d+)\s*条评论/);
+      if (commentMatch && commentMatch[1]) {
+        commentCount = parseInt(commentMatch[1], 10);
+      }
+    }
+    
+    // 构建笔记数据对象
+    const noteData = {
+      noteId: noteId,
+      noteContent: descElement ? extractNoteContent(descElement) : '',
+      noteLike: likeCount,
+      noteCommitCount: commentCount,
+      publishTime: publishTime,
+      authorId: authorId,
+      title: titleElement ? titleElement.textContent.trim() : '',
+      fetchTimestamp: new Date().toISOString()
+    };
+    
+    console.log('提取的笔记内容:', noteData);
+    return noteData;
+  } catch (error) {
+    console.error('提取笔记内容时出错:', error);
+    return null;
+  }
+  
+  // 提取交互数量
+  function extractInteractionCount(text) {
+    if (!text) return 0;
+    
+    try {
+      if (text.includes('k') || text.includes('K')) {
+        return Math.round(parseFloat(text.replace(/[kK]/, '')) * 1000);
+      } else if (text.includes('w') || text.includes('W')) {
+        return Math.round(parseFloat(text.replace(/[wW]/, '')) * 10000);
+      } else {
+        return parseInt(text, 10) || 0;
+      }
+    } catch (e) {
+      return 0;
+    }
+  }
+  
+  // 提取笔记内容
+  function extractNoteContent(element) {
+    if (!element) return '';
+    
+    // 克隆节点以避免修改原始DOM
+    const clone = element.cloneNode(true);
+    
+    // 处理emoji图片
+    const emojiImgs = clone.querySelectorAll('img.note-content-emoji');
+    emojiImgs.forEach(img => {
+      img.replaceWith('[emoji]');
+    });
+    
+    return clone.textContent.trim();
+  }
+}
 
 // 提取通知函数
 function extractNotificationsFromPage() {

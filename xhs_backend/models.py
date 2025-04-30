@@ -54,9 +54,19 @@ class StructuredComment(BaseModel):
     repliedOrder: Optional[int] = None # 在父评论下的回复顺序 (从0开始)
     fetchTimestamp: datetime = Field(default_factory=datetime.utcnow) # 获取时间
 
+# --- 新增：笔记模型 ---
+class Note(BaseModel):
+    noteId: str # 笔记ID
+    noteContent: Optional[str] = None # 笔记内容
+    noteLike: Optional[int] = 0 # 点赞数
+    noteCommitCount: Optional[int] = 0 # 评论数
+    publishTime: Optional[datetime] = None # 发布时间
+    authorId: Optional[str] = None # 作者ID
+    fetchTimestamp: datetime = Field(default_factory=datetime.utcnow) # 获取时间
+
 # --- 传入数据负载模型 ---
 class IncomingPayload(BaseModel):
-    type: Literal["通知", "评论"]
+    type: Literal["通知", "评论", "笔记"]
     data: List[Dict[str, Any]]
 
 # 更新向前引用
