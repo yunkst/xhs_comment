@@ -357,4 +357,138 @@ async def save_notes(data: List[Dict[str, Any]]):
             # 继续处理下一个
 
     logger.info(f"笔记保存/更新完成。插入: {inserted_count}, 更新: {updated_count}")
-    return {"inserted": inserted_count, "updated": updated_count} 
+    return {"inserted": inserted_count, "updated": updated_count}
+
+# --- 获取用户历史评论 ---
+async def get_user_historical_comments(user_id: str):
+    """获取特定用户的所有历史评论及相关笔记信息
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        包含用户评论及相关笔记信息的列表，按时间降序排序
+    """
+    if not user_id:
+        logger.error("获取历史评论时缺少用户ID")
+        return []
+    
+    database = await get_database()
+    
+    # 1. 查询包含该用户评论的结构化评论数据
+    structured_comments_collection = database[STRUCTURED_COMMENTS_COLLECTION]
+    
+    # 查询条件：用户ID匹配 或 回复给该用户的评论
+    # 先获取该用户发表的所有评论ID
+    user_comments_query = {"authorId": user_id}
+    user_comments = await structured_comments_collection.find(user_comments_query, {"commentId": 1}).to_list(length=None)
+    user_comment_ids = [comment.get("commentId") for comment in user_comments if comment.get("commentId")]
+    
+    # 构建组合查询条件
+    query = {
+        "$or": [
+            {"authorId": user_id},  # 用户发表的评论
+            {"repliedId": {"$in": user_comment_ids}} if user_comment_ids else {"repliedId": None}  # 回复给该用户的评论
+        ]
+    }
+    
+    # 执行查询
+    structured_comments = await structured_comments_collection.find(query).to_list(length=None)
+    logger.info(f"找到用户 {user_id} 相关的结构化评论数据 {len(structured_comments)} 条")
+    
+    if not structured_comments:
+        logger.info(f"未找到用户 {user_id} 的任何结构化评论")
+        return []
+    
+    # 2. 提取关联的笔记ID并查询笔记信息
+    note_ids = set(comment.get("noteId") for comment in structured_comments if comment.get("noteId"))
+    
+    # 查询笔记数据
+    notes_collection = database[NOTES_COLLECTION]
+    notes_data = {}
+    
+    if note_ids:
+        notes_query = {"noteId": {"$in": list(note_ids)}}
+        notes_cursor = notes_collection.find(notes_query)
+        
+        async for note in notes_cursor:
+            note_id = note.get("noteId")
+            if note_id:
+                notes_data[note_id] = {
+                    "noteId": note_id,
+                    "publishTime": note.get("publishTime"),
+                    "title": note.get("title", ""),
+                    "noteContent": note.get("noteContent", ""),
+                    "noteLike": note.get("noteLike", 0),
+                    "noteCommitCount": note.get("noteCommitCount", 0),
+                    "authorId": note.get("authorId", "")
+                }
+    
+    # 3. 组织结果数据
+    result = []
+    
+    # 按笔记分组整理评论数据
+    comments_by_note = {}
+    
+    # 收集所有评论，按ID索引，用于处理回复关系
+    comments_map = {}
+    for comment in structured_comments:
+        comment_id = comment.get("commentId")
+        if comment_id:
+            comments_map[comment_id] = comment
+    
+    # 按笔记ID分组评论
+    for comment in structured_comments:
+        note_id = comment.get("noteId")
+        if not note_id:
+            continue
+            
+        if note_id not in comments_by_note:
+            comments_by_note[note_id] = []
+        
+        # 评论数据中添加isTarget标记，表示是否为目标用户的评论
+        is_target_user = comment.get("authorId") == user_id
+        
+        # 准备评论数据
+        comment_data = {
+            "commentId": comment.get("commentId"),
+            "userId": comment.get("authorId"),
+            "userName": comment.get("authorName", ""),
+            "content": comment.get("content", ""),
+            "time": comment.get("timestamp").isoformat() if comment.get("timestamp") else "",
+            "replyToCommentId": comment.get("repliedId"),
+            "isTargetUser": is_target_user
+        }
+        
+        # 添加额外字段：头像
+        if comment.get("authorAvatar"):
+            comment_data["userAvatar"] = comment.get("authorAvatar")
+        
+        comments_by_note[note_id].append(comment_data)
+    
+    # 构建最终结果
+    for note_id, comments in comments_by_note.items():
+        note_info = notes_data.get(note_id, {})
+        
+        # 只有在有笔记信息的情况下才添加到结果中
+        if note_info:
+            # 对评论按时间排序
+            sorted_comments = sorted(
+                comments, 
+                key=lambda x: x.get("time", ""), 
+                reverse=True
+            )
+            
+            result_item = {
+                "noteId": note_id,
+                "publishTime": note_info.get("publishTime"),
+                "title": note_info.get("title", ""),
+                "comments": sorted_comments
+            }
+            result.append(result_item)
+    
+    # 按照笔记发布时间排序（降序）
+    result.sort(key=lambda x: x.get("publishTime") if x.get("publishTime") else datetime.min, reverse=True)
+    
+    logger.info(f"成功生成用户 {user_id} 的历史评论数据，涉及 {len(result)} 条笔记")
+    return result 

@@ -79,15 +79,15 @@
     <h1>数据同步设置</h1>
     
     <div class="form-group">
-      <label for="apiHost">API 接口地址</label>
-      <input type="text" id="apiHost" placeholder="例如: https://api.example.com/notifications">
-      <div class="note">请输入完整的API地址，包括http://或https://前缀</div>
+      <label for="apiHost">后端API地址</label>
+      <input type="text" id="apiHost" placeholder="例如: http://localhost:8000">
+      <div class="note">请输入完整的API地址，包括http://或https://前缀，不包含末尾的斜杠</div>
     </div>
     
     <div class="form-group">
       <label for="apiToken">认证令牌 (Token)</label>
       <input type="text" id="apiToken" placeholder="请输入API访问令牌">
-      <div class="note">用于API请求的认证凭证</div>
+      <div class="note">用于API请求的Bearer认证凭证</div>
     </div>
     
     <button id="saveBtn">保存设置</button>
@@ -95,10 +95,11 @@
     <div id="status" class="status"></div>
     
     <div class="note" style="margin-top: 20px;">
-      <strong>注意：</strong><br>
-      - 配置后，获取的通知数据将自动发送到配置的API接口<br>
-      - 如未配置，数据将以JSON文件形式下载到本地<br>
-      - 您的设置信息只会保存在浏览器本地，不会上传到其他地方
+      <strong>API使用说明：</strong><br>
+      - 获取的通知数据将发送到配置的API接口<br>
+      - 历史评论功能需要配置正确的API地址和令牌<br>
+      - 默认API地址: http://localhost:8000<br>
+      - 访问API需要配置有效的认证令牌
     </div>
   </div>
   

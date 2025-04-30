@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from contextlib import asynccontextmanager
 
 from models import IncomingPayload # 假设模型在 models.py
-from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION # 假设数据库函数在 database.py
+from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, get_user_historical_comments, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION # 假设数据库函数在 database.py
 from processing import transform_raw_comments_to_structured # 导入转换函数
 
 # 配置日志
@@ -155,6 +155,37 @@ async def receive_data(payload: IncomingPayload, token: str = Depends(verify_tok
     except Exception as e:
         logger.exception(f"处理类型为 '{payload.type}' 的数据时发生数据库错误")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"保存数据时出错: {e}")
+
+# --- 添加获取用户历史评论的API端点 ---
+@app.get("/api/user/{user_id}/comments", tags=["数据查询"], response_model=List[Dict[str, Any]])
+async def get_user_comments(user_id: str, token: str = Depends(verify_token)) -> List[Dict[str, Any]]:
+    """获取指定用户ID的所有历史评论
+    
+    Args:
+        user_id: 用户ID
+        token: 认证令牌
+        
+    Returns:
+        包含用户评论及相关笔记信息的列表，按时间降序排序
+    """
+    logger.info(f"查询用户 {user_id} 的历史评论")
+    
+    try:
+        # 调用数据库函数获取历史评论
+        comments = await get_user_historical_comments(user_id)
+        
+        if not comments:
+            logger.info(f"未找到用户 {user_id} 的历史评论")
+            return []
+        
+        logger.info(f"成功获取用户 {user_id} 的历史评论，共 {len(comments)} 条笔记")
+        return comments
+    except Exception as e:
+        logger.exception(f"获取用户 {user_id} 的历史评论时发生错误")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
+            detail=f"获取历史评论时出错: {str(e)}"
+        )
 
 # 如果直接运行此文件，启动 uvicorn 服务器 (主要用于开发)
 if __name__ == "__main__":
