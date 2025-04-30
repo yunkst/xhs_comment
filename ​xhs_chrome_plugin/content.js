@@ -147,11 +147,11 @@ function tryAddButtons() {
       .xhs-plugin-dialog {
         position: fixed;
         top: 50%;
-        left: 50%;
+        left: 20%;
         transform: translate(-50%, -50%);
-        width: 400px;
-        height: 300px;
-        background-color: white;
+        width: 500px;
+        height: 80vh;
+        background-color:rgba(129, 122, 122, 0.45);
         border-radius: 8px;
         box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
         z-index: 10000;
