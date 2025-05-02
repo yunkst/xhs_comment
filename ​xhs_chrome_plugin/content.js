@@ -57,80 +57,125 @@ function addButtonsToNotifications() {
   
   console.log('准备为通知列表添加红色按钮');
   
-  // 立即尝试添加按钮
-  tryAddButtons();
-  
-  // 再延迟执行几次，确保DOM已完全加载
-  setTimeout(tryAddButtons, 500);
-  setTimeout(tryAddButtons, 1000);
-  setTimeout(tryAddButtons, 2000);
-}
-
-// 尝试添加按钮的函数
-function tryAddButtons() {
-  // 获取所有通知容器
-  const containers = document.querySelectorAll('.tabs-content-container .container');
-  console.log(`找到 ${containers.length} 个通知容器`);
-  
-  // 检查是否已经添加过按钮
-  if (document.querySelector('.xhs-plugin-action-btn')) {
-    console.log('已经添加过按钮，不重复添加');
-    return;
-  }
-  
-  if (containers.length === 0) {
-    console.log('未找到通知容器，可能DOM结构有变化或尚未加载完成');
-    // 输出页面结构帮助调试
-    console.log('页面结构:', document.body.innerHTML.substring(0, 500) + '...');
-    return;
-  }
-  
   // 遍历每个通知容器，添加红色按钮
-  containers.forEach((container, index) => {
-    console.log(`为第 ${index+1} 个通知添加按钮`);
-    // 创建按钮元素
-    const button = document.createElement('div');
-    button.className = 'xhs-plugin-action-btn';
-    button.dataset.index = index;
-    button.style.cssText = `
-      width: auto;
-      height: 28px;
-      padding: 0 10px;
-      border-radius: 14px;
-      background-color: #ff2442;
-      color: white;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: absolute;
-      left: -100px;
-      top: 50%;
-      transform: translateY(-50%);
-      cursor: pointer;
-      z-index: 999;
-      font-size: 12px;
-      font-weight: bold;
-      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-    `;
-    button.innerHTML = '历史评论';
+  function addButtonsToContainers(containers) {
+    console.log(`开始为 ${containers.length} 个容器添加按钮`);
     
-    // 添加点击事件，显示弹出框
-    button.addEventListener('click', (event) => {
-      console.log(`点击了第 ${index+1} 个通知的按钮`);
-      event.stopPropagation();
-      showNotificationDialog(index);
+    containers.forEach((container, index) => {
+      // 检查容器是否已经有按钮
+      if (container.querySelector('.xhs-plugin-action-btn')) {
+        console.log(`容器 ${index} 已有按钮，跳过`);
+        return; // 已存在按钮，跳过
+      }
+      
+      console.log(`为通知 ${index} 添加按钮`);
+      // 创建按钮元素
+      const button = document.createElement('div');
+      button.className = 'xhs-plugin-action-btn';
+      button.style.cssText = `
+        width: auto;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 14px;
+        background-color: #ff2442;
+        color: white;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: absolute;
+        left: -100px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: pointer;
+        z-index: 999;
+        font-size: 12px;
+        font-weight: bold;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+      `;
+      button.innerHTML = '历史评论';
+      
+      // 添加点击事件，显示弹出框
+      button.addEventListener('click', (event) => {
+        console.log(`点击了通知按钮 ${index}`);
+        event.stopPropagation();
+        // 从DOM层次结构找到这个容器的索引
+        const allContainers = Array.from(document.querySelectorAll('.tabs-content-container .container'));
+        const containerIndex = allContainers.indexOf(container);
+        console.log(`容器索引: ${containerIndex}`);
+        showNotificationDialog(containerIndex);
+      });
+      
+      // 确保容器是相对定位，这样按钮的绝对定位才能正确显示
+      if (window.getComputedStyle(container).position === 'static') {
+        console.log(`设置容器 ${index} 为相对定位`);
+        container.style.position = 'relative';
+      }
+      
+      // 将按钮添加到容器中
+      container.appendChild(button);
+      console.log(`按钮 ${index} 添加成功`);
     });
     
-    // 确保容器是相对定位，这样按钮的绝对定位才能正确显示
-    if (window.getComputedStyle(container).position === 'static') {
-      console.log('设置容器为相对定位');
-      container.style.position = 'relative';
-    }
+    console.log(`完成按钮添加，共处理 ${containers.length} 个容器`);
+  }
+
+  // 初始添加按钮
+  const initialContainers = document.querySelectorAll('.tabs-content-container .container');
+  console.log(`初始化时发现 ${initialContainers.length} 个容器`);
+  addButtonsToContainers(initialContainers);
+  
+  // 设置DOM变化监听器
+  const observer = new MutationObserver((mutations) => {
+    // 检查是否有新的通知容器被添加
+    const newContainers = document.querySelectorAll('.tabs-content-container .container');
+    console.log(`Observer检测到变化, 当前有 ${newContainers.length} 个容器`);
     
-    // 将按钮添加到容器中
-    container.appendChild(button);
-    console.log(`第 ${index+1} 个按钮添加成功`);
+    // 添加检查以确定是否有无按钮的容器
+    const containersWithoutButtons = Array.from(newContainers).filter(container => 
+      !container.querySelector('.xhs-plugin-action-btn')
+    );
+    
+    if (containersWithoutButtons.length > 0) {
+      console.log(`发现 ${containersWithoutButtons.length} 个无按钮的容器，添加按钮`);
+      addButtonsToContainers(newContainers);
+    }
   });
+  
+  // 开始监听DOM变化
+  const tabsContentContainer = document.querySelector('.tabs-content-container');
+  if (tabsContentContainer) {
+    observer.observe(tabsContentContainer, { 
+      childList: true, // 监听子节点变化
+      subtree: true,   // 监听所有后代节点变化
+      attributes: false
+    });
+    console.log('已设置DOM监听器，将自动为新通知添加按钮');
+    
+    // 每秒检查一次是否有新的通知容器
+    const intervalId = setInterval(() => {
+      const allContainers = document.querySelectorAll('.tabs-content-container .container');
+      const containersWithoutButtons = Array.from(allContainers).filter(container => 
+        !container.querySelector('.xhs-plugin-action-btn')
+      );
+      
+      if (containersWithoutButtons.length > 0) {
+        console.log(`定时检查: 发现 ${containersWithoutButtons.length} 个无按钮的容器，添加按钮`);
+        addButtonsToContainers(allContainers);
+      }
+    }, 1000);
+    
+    // 监听滚动事件，滚动后检查是否需要添加按钮
+    window.addEventListener('scroll', () => {
+      console.log('页面滚动，检查是否有新容器');
+      // 防抖，滚动结束后再检查
+      clearTimeout(window.scrollTimer);
+      window.scrollTimer = setTimeout(() => {
+        const allContainers = document.querySelectorAll('.tabs-content-container .container');
+        console.log(`滚动后检查: 当前有 ${allContainers.length} 个容器`);
+        addButtonsToContainers(allContainers);
+      }, 300);
+    });
+  }
   
   // 添加样式
   if (!document.querySelector('style.xhs-plugin-style')) {
@@ -860,32 +905,28 @@ if (window.location.href.includes('xiaohongshu.com/notification')) {
 }
 
 // DOM 变化监听，处理页面动态加载的情况
-console.log('设置DOM变化监听器');
+console.log('设置全局DOM变化监听器');
 const observer = new MutationObserver((mutations) => {
-  console.log('检测到DOM变化，变化数量:', mutations.length);
   if (window.location.href.includes('xiaohongshu.com/notification')) {
-    // 检查DOM变化是否包含新的通知容器
-    const hasNewContainers = mutations.some(mutation => {
-      return Array.from(mutation.addedNodes).some(node => {
-        const isElement = node.nodeType === 1;
-        const hasContainer = node.classList?.contains('container') || node.querySelector?.('.container');
-        if (isElement && hasContainer) {
-          console.log('检测到新的通知容器:', node);
-          return true;
-        }
-        return false;
-      });
-    });
-    
-    if (hasNewContainers) {
-      console.log('检测到新的通知容器，添加红色按钮');
-      addButtonsToNotifications();
-    }
+    // 延迟执行以确保DOM完全更新
+    setTimeout(() => {
+      // 获取所有容器
+      const allContainers = document.querySelectorAll('.tabs-content-container .container');
+      // 检查无按钮的容器数量
+      const containersWithoutButtons = Array.from(allContainers).filter(container => 
+        !container.querySelector('.xhs-plugin-action-btn')
+      );
+      
+      if (containersWithoutButtons.length > 0) {
+        console.log(`全局Observer检测到 ${containersWithoutButtons.length} 个无按钮的容器`);
+        addButtonsToContainers(allContainers);
+      }
+    }, 100);
   }
 });
 
 // 启动观察器
-console.log('启动DOM观察器');
+console.log('启动全局DOM观察器');
 observer.observe(document.body, { 
   childList: true, 
   subtree: true 
