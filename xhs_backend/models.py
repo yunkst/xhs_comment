@@ -93,5 +93,12 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
 
+# 用户备注模型
+class UserNote(BaseModel):
+    userId: str  # 用户ID
+    notificationHash: str  # 通知的唯一哈希值
+    noteContent: str  # 备注内容
+    updatedAt: datetime = Field(default_factory=datetime.utcnow)  # 更新时间
+
 # 更新向前引用
 CommentItem.update_forward_refs() 

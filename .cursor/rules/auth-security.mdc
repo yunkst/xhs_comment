@@ -1,0 +1,38 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 认证与安全规范
+
+## API 认证机制
+
+本项目使用两种认证方式：
+
+1. **插件到后端通信**：使用 Bearer Token 认证
+   - 在 [main.py](mdc:xhs_backend/main.py) 中的 `verify_token()` 函数实现
+   - 令牌需配置在插件设置界面：[options.js](mdc:xhs_chrome_plugin/options.js)
+   - 所有数据API调用需要在Header中包含：`Authorization: Bearer <API_SECRET_TOKEN>`
+
+2. **用户登录**：使用 JWT + OTP 双重认证
+   - JWT认证在 [main.py](mdc:xhs_backend/main.py) 中的 `create_access_token()` 实现
+   - OTP认证提供动态验证码，增加安全性
+   - 用户相关Model在 [models.py](mdc:xhs_backend/models.py) 中定义
+
+## 安全最佳实践
+
+1. **环境变量保护**：
+   - 不要将 `.env` 文件提交到版本控制
+   - 生产环境使用强随机字符串作为 `API_SECRET_TOKEN` 和 `JWT_SECRET_KEY`
+
+2. **CORS 安全**：
+   - 生产环境应限制 CORS 来源，替换 [main.py](mdc:xhs_backend/main.py) 中的 `origins = ["*"]`
+   - 插件开发时需设置正确的扩展 ID
+
+3. **数据库安全**：
+   - 生产环境中为 MongoDB 启用认证
+   - 限制数据库端口只允许内部网络访问
+
+## 用户注册控制
+
+项目支持通过环境变量 `ALLOW_REGISTER` 控制是否允许新用户注册，可按需设置。

@@ -5,25 +5,57 @@ alwaysApply: false
 ---
 # 项目结构说明
 
-本项目包含两个主要部分：
+本项目是一个小红书评论和通知数据抓取系统，包含两个主要部分：
 
-- [xhs_chrome_plugin](mdc:xhs_chrome_plugin)：浏览器插件，负责抓取小红书网页的通知和评论数据，支持自动展开评论、数据导出和远程API同步。主要文件：
-  - [manifest.json](mdc:xhs_chrome_plugin/manifest.json)：插件配置文件，定义入口、权限等。
-  - [content.js](mdc:xhs_chrome_plugin/content.js)：内容脚本，负责页面数据抓取和交互。
-  - [popup.js](mdc:xhs_chrome_plugin/popup.js)、[popup.html](mdc:xhs_chrome_plugin/popup.html)：插件弹窗界面及逻辑。
-  - [options.js](mdc:xhs_chrome_plugin/options.js)、[options.html](mdc:xhs_chrome_plugin/options.html)：插件设置界面及逻辑。
-  - [background.js](mdc:xhs_chrome_plugin/background.js)：后台脚本，处理持久化和消息通信。
-  - [README.md](mdc:xhs_chrome_plugin/README.md)：插件使用和开发说明。
+## 1. 浏览器插件 [xhs_chrome_plugin](mdc:xhs_chrome_plugin)
 
-- [xhs_backend](mdc:xhs_backend)：后端服务，基于 FastAPI + MongoDB，负责接收、存储和处理插件上传的数据。主要文件：
-  - [main.py](mdc:xhs_backend/main.py)：FastAPI 应用主入口，定义API端点。
-  - [models.py](mdc:xhs_backend/models.py)：Pydantic 数据模型定义。
-  - [database.py](mdc:xhs_backend/database.py)：MongoDB 连接与数据操作。
-  - [processing.py](mdc:xhs_backend/processing.py)：评论数据结构化处理逻辑。
-  - [requirements.txt](mdc:xhs_backend/requirements.txt)：后端依赖列表。
-  - [docker-compose.yml](mdc:xhs_backend/docker-compose.yml)、[Dockerfile](mdc:xhs_backend/Dockerfile)：容器化部署配置。
-  - [README.md](mdc:xhs_backend/README.md)：后端详细说明和API文档。
+Chrome扩展，负责抓取小红书网页的通知和评论数据，支持自动展开评论、数据导出和远程API同步。
 
-根目录下的 [README.md](mdc:README.md) 提供了快速启动和整体使用指南。
+### 核心文件
+- [manifest.json](mdc:xhs_chrome_plugin/manifest.json)：插件配置文件，定义入口、权限等。
+- [content.js](mdc:xhs_chrome_plugin/content.js)：内容脚本，负责页面数据抓取和交互，核心逻辑所在。
+- [popup.js](mdc:xhs_chrome_plugin/popup.js)、[popup.html](mdc:xhs_chrome_plugin/popup.html)：插件弹窗界面及逻辑，用户主要操作入口。
+- [options.js](mdc:xhs_chrome_plugin/options.js)、[options.html](mdc:xhs_chrome_plugin/options.html)：插件设置界面及逻辑，配置API连接等参数。
+- [background.js](mdc:xhs_chrome_plugin/background.js)：后台脚本，处理持久化和消息通信。
 
-图片和资源文件位于 [image/](mdc:image) 目录。
+### 资源目录
+- [js/](mdc:xhs_chrome_plugin/js)：JavaScript辅助库
+- [images/](mdc:xhs_chrome_plugin/images)：插件图标和UI资源
+- [test/](mdc:xhs_chrome_plugin/test)：测试相关资源
+
+### 文档
+- [README.md](mdc:xhs_chrome_plugin/README.md)：插件使用和开发说明。
+- [修改说明.md](mdc:xhs_chrome_plugin/修改说明.md)：版本变更记录。
+
+## 2. 后端服务 [xhs_backend](mdc:xhs_backend)
+
+基于 FastAPI + MongoDB 的后端服务，负责接收、存储和处理插件上传的数据。
+
+### 主要应用文件
+- [main.py](mdc:xhs_backend/main.py)：FastAPI 应用主入口，定义API端点和认证逻辑。
+- [models.py](mdc:xhs_backend/models.py)：Pydantic 数据模型定义，包含所有数据结构。
+- [database.py](mdc:xhs_backend/database.py)：MongoDB 连接与数据操作，包含所有数据库交互逻辑。
+- [processing.py](mdc:xhs_backend/processing.py)：评论数据结构化处理逻辑，转换原始评论为结构化数据。
+
+### 配置文件
+- [requirements.txt](mdc:xhs_backend/requirements.txt)：Python 依赖列表。
+- [docker-compose.yml](mdc:xhs_backend/docker-compose.yml)：定义多容器应用，包括后端、MongoDB和管理界面。
+- [Dockerfile](mdc:xhs_backend/Dockerfile)：生产环境容器构建配置。
+- [Dockerfile.dev](mdc:xhs_backend/Dockerfile.dev)：开发环境容器构建配置。
+
+### 文档
+- [README.md](mdc:xhs_backend/README.md)：后端详细说明和API文档。
+
+## 根目录文件
+
+- [README.md](mdc:README.md)：项目整体说明和快速启动指南。
+- [LICENSE](mdc:LICENSE)：项目许可证。
+- [.gitignore](mdc:.gitignore)：Git忽略配置。
+
+## 资源目录
+
+- [image/](mdc:image)：项目文档使用的图片和资源文件。
+
+## Cursor规则
+
+- [.cursor/rules/](mdc:.cursor/rules)：Cursor AI辅助规则，帮助理解项目结构和开发规范。

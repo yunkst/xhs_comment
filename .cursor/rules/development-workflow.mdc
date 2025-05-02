@@ -1,0 +1,32 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 开发流程与工作规范
+
+## 代码修改流程
+
+1. **后端修改**：
+   - 在 [xhs_backend](mdc:xhs_backend) 修改代码前，先查阅 [models.py](mdc:xhs_backend/models.py) 了解数据模型。
+   - API 更新需在 [main.py](mdc:xhs_backend/main.py) 实现端点，并在 [database.py](mdc:xhs_backend/database.py) 增加相应的数据库操作。
+   - 数据处理逻辑应放在 [processing.py](mdc:xhs_backend/processing.py)。
+
+2. **插件修改**：
+   - 数据抓取逻辑位于 [content.js](mdc:xhs_chrome_plugin/content.js)，修改时需适配小红书网页结构。
+   - UI 修改涉及 [popup.html](mdc:xhs_chrome_plugin/popup.html)、[popup.js](mdc:xhs_chrome_plugin/popup.js) 和 [options.html](mdc:xhs_chrome_plugin/options.html)、[options.js](mdc:xhs_chrome_plugin/options.js)。
+   - 验证插件修改需通过 Chrome 的扩展加载测试。
+
+## 版本控制规范
+
+- 提交信息格式：`[模块] 功能/修复: 详细说明`
+  - 例：`[插件] 修复: 评论抓取时间解析问题`
+  - 例：`[后端] 功能: 添加用户笔记备注API`
+
+- 重要变更应更新 [README.md](mdc:README.md) 和相应组件的说明文档。
+
+## 测试与部署
+
+- 插件测试：在浏览器中以开发者模式加载未打包插件。
+- 后端测试：运行 `docker-compose up -d --build` 启动服务，可通过 API 调试工具验证功能。
+- 生产部署：确保环境变量（特别是 `API_SECRET_TOKEN`）已正确配置。

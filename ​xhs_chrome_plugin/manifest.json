@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "小红书通知列表获取",
+  "name": "小红书通知助手",
   "version": "1.0",
-  "description": "获取小红书的通知列表数据",
+  "description": "小红书通知与评论数据抓取工具",
   "permissions": [
     "storage",
     "activeTab",
@@ -22,13 +22,26 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://*.xiaohongshu.com/*"],
-      "js": ["content.js"],
+      "matches": ["*://*.xiaohongshu.com/*"],
+      "js": [
+        "js/utils.js",
+        "js/api-service.js",
+        "js/note-extractor.js",
+        "js/user-notes.js",
+        "js/dialog-manager.js",
+        "js/notification-handler.js",
+        "content.js"
+      ],
       "run_at": "document_end"
     }
   ],
   "background": {
     "service_worker": "background.js"
   },
-  "options_page": "options.html"
+  "options_page": "options.html",
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  }
 } 

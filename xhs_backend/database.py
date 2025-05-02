@@ -29,6 +29,7 @@ RAW_COMMENTS_COLLECTION = "raw_comments" # 存放原始合并后的评论数据
 STRUCTURED_COMMENTS_COLLECTION = "structured_comments" # 存放结构化评论数据
 NOTES_COLLECTION = "notes" # 存放笔记数据
 USERS_COLLECTION = "users"
+USER_NOTES_COLLECTION = "user_notes" # 存放用户备注数据
 
 client: motor.motor_asyncio.AsyncIOMotorClient = None
 db: motor.motor_asyncio.AsyncIOMotorDatabase = None
@@ -392,7 +393,7 @@ async def get_user_historical_comments(user_id: str):
     query = {
         "$or": [
             {"authorId": user_id},  # 用户发表的评论
-            {"repliedId": {"$in": user_comment_ids}} if user_comment_ids else {"repliedId": None}  # 回复给该用户的评论
+            {"repliedId": {"$in": user_comment_ids}} if user_comment_ids else {"repliedId": "impossible_reply_id"}  # 回复给该用户的评论
         ]
     }
     
@@ -530,3 +531,64 @@ async def verify_user_password(username: str, password: str) -> Optional[dict]:
     if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
         return None
     return user 
+
+# --- 用户备注相关函数 ---
+async def save_user_note(user_id: str, notification_hash: str, note_content: str):
+    """保存或更新用户备注
+    
+    Args:
+        user_id: 用户ID
+        notification_hash: 通知内容的哈希值
+        note_content: 用户备注内容
+        
+    Returns:
+        保存后的备注数据
+    """
+    if not user_id or not notification_hash:
+        logger.error("保存备注时缺少用户ID或通知哈希")
+        return None
+    
+    database = await get_database()
+    collection = database[USER_NOTES_COLLECTION]
+    
+    # 构建备注数据
+    note_data = {
+        "userId": user_id,
+        "notificationHash": notification_hash,
+        "noteContent": note_content,
+        "updatedAt": datetime.utcnow()
+    }
+    
+    # 更新或插入备注
+    result = await collection.update_one(
+        {"userId": user_id, "notificationHash": notification_hash},
+        {"$set": note_data},
+        upsert=True
+    )
+    
+    if result.upserted_id or result.modified_count > 0:
+        logger.info(f"成功保存/更新用户备注: userId={user_id}, hash={notification_hash}")
+        return note_data
+    else:
+        logger.warning(f"备注数据未变化: userId={user_id}, hash={notification_hash}")
+        return note_data
+
+async def get_user_notes(user_id: str):
+    """获取用户的所有备注
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        包含用户所有备注的列表
+    """
+    if not user_id:
+        logger.error("获取备注时缺少用户ID")
+        return []
+    
+    database = await get_database()
+    collection = database[USER_NOTES_COLLECTION]
+    
+    user_notes = await collection.find({"userId": user_id}).to_list(length=None)
+    logger.info(f"获取到用户 {user_id} 的 {len(user_notes)} 条备注")
+    return user_notes 

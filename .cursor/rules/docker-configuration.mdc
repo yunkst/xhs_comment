@@ -1,0 +1,62 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Docker环境配置指南
+
+本项目使用Docker Compose进行容器化管理，主要配置文件包括：
+
+- [docker-compose.yml](mdc:xhs_backend/docker-compose.yml)：定义服务组合
+- [Dockerfile](mdc:xhs_backend/Dockerfile)：生产环境镜像构建
+- [Dockerfile.dev](mdc:xhs_backend/Dockerfile.dev)：开发环境镜像构建
+
+## 环境变量配置
+
+后端服务依赖的环境变量（`.env`文件）包括：
+
+```
+# 必需设置
+API_SECRET_TOKEN="your_secure_api_token_here"
+
+# 可选配置（有默认值）
+MONGODB_CONNECTION_STRING="mongodb://mongodb:27017"
+MONGODB_DATABASE="xhs_data"
+JWT_SECRET_KEY="change_this_secret"
+ALLOW_REGISTER="true"
+```
+
+## 服务构成
+
+Docker Compose环境包含以下服务：
+
+1. **xhs_backend**：FastAPI应用服务（默认端口8000）
+2. **mongodb**：MongoDB数据库，用于数据存储
+3. **mongo-express**：MongoDB管理界面（默认端口8081）
+
+## 常用Docker命令
+
+```
+# 启动所有服务
+docker-compose up -d
+
+# 重建并启动服务
+docker-compose up -d --build
+
+# 查看日志
+docker-compose logs -f xhs_backend
+
+# 停止所有服务
+docker-compose down
+
+# 进入容器Shell
+docker-compose exec xhs_backend bash
+```
+
+## 数据持久化
+
+MongoDB数据存储在命名卷中，确保数据持久化。若需要备份，可以使用：
+
+```
+docker-compose exec mongodb mongodump --out=/backup
+```

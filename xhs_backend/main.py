@@ -11,8 +11,8 @@ import pyotp
 import qrcode
 import io
 from fastapi.responses import StreamingResponse
-from models import IncomingPayload, UserInRegister, UserInLogin, TokenResponse # 假设模型在 models.py
-from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, get_user_historical_comments, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION, get_user_by_username, create_user, verify_user_password # 假设数据库函数在 database.py
+from models import IncomingPayload, UserInRegister, UserInLogin, TokenResponse, UserNote # 导入UserNote模型
+from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, get_user_historical_comments, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION, get_user_by_username, create_user, verify_user_password, save_user_note, get_user_notes # 导入用户备注函数
 from processing import transform_raw_comments_to_structured # 导入转换函数
 from datetime import datetime, timedelta
 # 配置日志
@@ -243,16 +243,122 @@ async def login(user_in: UserInLogin):
 
 @app.get("/api/otp-qrcode", tags=["用户"])
 async def get_otp_qrcode(username: str):
+    # 获取用户信息
     user = await get_user_by_username(username)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
-    otp_secret = user["otp_secret"]
-    otp_uri = pyotp.totp.TOTP(otp_secret).provisioning_uri(name=username, issuer_name="XHSCommentSystem")
-    img = qrcode.make(otp_uri)
+    
+    # 生成OTP URL
+    otp_secret = user.get("otp_secret")
+    if not otp_secret:
+        raise HTTPException(status_code=400, detail="用户OTP密钥未配置")
+    
+    otp_url = pyotp.totp.TOTP(otp_secret).provisioning_uri(name=username, issuer_name="XHS评论系统")
+    
+    # 生成二维码
+    qr = qrcode.QRCode(
+        version=1,
+        error_correction=qrcode.constants.ERROR_CORRECT_L,
+        box_size=10,
+        border=4,
+    )
+    qr.add_data(otp_url)
+    qr.make(fit=True)
+    
+    img = qr.make_image(fill_color="black", back_color="white")
+    
+    # 将图像保存到内存缓冲区
     buf = io.BytesIO()
-    img.save(buf, format="PNG")
+    img.save(buf)
     buf.seek(0)
+    
+    # 返回图像
     return StreamingResponse(buf, media_type="image/png")
+
+# --- 用户备注相关API端点 ---
+@app.post("/api/user-notes", tags=["备注"], status_code=status.HTTP_201_CREATED)
+async def add_user_note(note_data: dict, username: str = Depends(get_current_user)):
+    """保存/更新用户备注"""
+    # 验证数据
+    user_id = note_data.get("userId")
+    notification_hash = note_data.get("notificationHash")
+    note_content = note_data.get("noteContent")
+    
+    if not user_id or not notification_hash:
+        raise HTTPException(status_code=400, detail="用户ID和通知哈希是必需的")
+    
+    # 保存备注
+    saved_note = await save_user_note(user_id, notification_hash, note_content)
+    
+    if saved_note:
+        # 确保返回的数据是可序列化的
+        serializable_note = {
+            "userId": saved_note.get("userId"),
+            "notificationHash": saved_note.get("notificationHash"),
+            "noteContent": saved_note.get("noteContent"),
+            "updatedAt": saved_note.get("updatedAt").isoformat() if saved_note.get("updatedAt") else None
+        }
+        return {"success": True, "data": serializable_note}
+    else:
+        raise HTTPException(status_code=500, detail="保存备注失败")
+
+@app.get("/api/user-notes", tags=["备注"])
+async def get_notes(user_id: str, username: str = Depends(get_current_user)):
+    """获取单个用户的所有备注"""
+    if not user_id:
+        raise HTTPException(status_code=400, detail="用户ID是必需的")
+    
+    # 获取用户备注
+    user_notes = await get_user_notes(user_id)
+    
+    # 将MongoDB文档转换为可JSON序列化的格式
+    serializable_notes = []
+    for note in user_notes:
+        # 创建新字典，排除不可序列化的字段
+        serializable_note = {
+            "userId": note.get("userId"),
+            "notificationHash": note.get("notificationHash"),
+            "noteContent": note.get("noteContent"),
+            "updatedAt": note.get("updatedAt").isoformat() if note.get("updatedAt") else None
+        }
+        serializable_notes.append(serializable_note)
+    
+    return {"success": True, "data": serializable_notes}
+
+@app.get("/api/user-notes/batch", tags=["备注"])
+async def get_notes_batch(user_ids: str, username: str = Depends(get_current_user)):
+    """批量获取多个用户的所有备注
+    
+    Args:
+        user_ids: 以逗号分隔的用户ID列表，例如：user1,user2,user3
+    """
+    if not user_ids:
+        raise HTTPException(status_code=400, detail="至少需要提供一个用户ID")
+    
+    # 分割用户ID列表
+    user_id_list = user_ids.split(',')
+    
+    if not user_id_list:
+        raise HTTPException(status_code=400, detail="无效的用户ID列表格式")
+    
+    logger.info(f"批量获取 {len(user_id_list)} 个用户的备注数据")
+    
+    # 获取所有用户的备注数据
+    all_notes = {}
+    
+    for user_id in user_id_list:
+        # 获取单个用户的备注
+        user_notes = await get_user_notes(user_id)
+        
+        # 处理并添加到结果集
+        for note in user_notes:
+            note_hash = note.get("notificationHash")
+            if note_hash:
+                # 直接使用哈希值作为键，便于前端使用
+                all_notes[note_hash] = note.get("noteContent", "")
+    
+    logger.info(f"成功获取 {len(all_notes)} 条备注数据")
+    return {"success": True, "data": all_notes}
 
 # 如果直接运行此文件，启动 uvicorn 服务器 (主要用于开发)
 if __name__ == "__main__":
