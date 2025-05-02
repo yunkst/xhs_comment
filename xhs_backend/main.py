@@ -1,16 +1,20 @@
 from fastapi import FastAPI, HTTPException, Depends, Header, status, Body
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from fastapi.middleware.cors import CORSMiddleware # 导入 CORS 中间件
 from typing import Optional, Dict, Any, List
 import os
 import logging
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
-
-from models import IncomingPayload # 假设模型在 models.py
-from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, get_user_historical_comments, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION # 假设数据库函数在 database.py
+from jose import JWTError, jwt
+import pyotp
+import qrcode
+import io
+from fastapi.responses import StreamingResponse
+from models import IncomingPayload, UserInRegister, UserInLogin, TokenResponse # 假设模型在 models.py
+from database import connect_to_mongo, close_mongo_connection, save_notifications, save_comments_with_upsert, save_structured_comments, save_notes, get_user_historical_comments, NOTIFICATIONS_COLLECTION, COMMENTS_COLLECTION, NOTES_COLLECTION, get_user_by_username, create_user, verify_user_password # 假设数据库函数在 database.py
 from processing import transform_raw_comments_to_structured # 导入转换函数
-
+from datetime import datetime, timedelta
 # 配置日志
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -23,6 +27,35 @@ API_SECRET_TOKEN = os.getenv("API_SECRET_TOKEN")
 if not API_SECRET_TOKEN:
     logger.warning("警告: API_SECRET_TOKEN 未在 .env 文件中设置！将使用默认值 'test_token'。请务必在生产环境中设置安全令牌！")
     API_SECRET_TOKEN = "test_token" # 提供一个默认值，但强烈建议用户设置
+
+SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change_this_secret")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7天
+ALLOW_REGISTER = os.getenv("ALLOW_REGISTER", "true").lower() == "true"
+
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/login")
+
+def create_access_token(data: dict, expires_delta: timedelta = None):
+    to_encode = data.copy()
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
+    to_encode.update({"exp": expire})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+def get_current_user(token: str = Depends(oauth2_scheme)):
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="无法验证凭证",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise credentials_exception
+    except JWTError:
+        raise credentials_exception
+    return username
 
 # --- FastAPI 应用实例 ---
 app = FastAPI(title="小红书数据接收服务", version="1.0.0")
@@ -76,7 +109,7 @@ async def read_root():
     return {"message": "小红书数据接收服务运行中"}
 
 @app.post("/api/data", tags=["数据接收"], status_code=status.HTTP_201_CREATED)
-async def receive_data(payload: IncomingPayload, token: str = Depends(verify_token)) -> Dict[str, Any]:
+async def receive_data(payload: IncomingPayload, username: str = Depends(get_current_user)) -> Dict[str, Any]:
     """接收插件发送的数据（通知、评论或笔记）"""
     logger.info(f"接收到类型为 '{payload.type}' 的数据，共 {len(payload.data)} 条")
     
@@ -158,12 +191,12 @@ async def receive_data(payload: IncomingPayload, token: str = Depends(verify_tok
 
 # --- 添加获取用户历史评论的API端点 ---
 @app.get("/api/user/{user_id}/comments", tags=["数据查询"], response_model=List[Dict[str, Any]])
-async def get_user_comments(user_id: str, token: str = Depends(verify_token)) -> List[Dict[str, Any]]:
+async def get_user_comments(user_id: str, username: str = Depends(get_current_user)) -> List[Dict[str, Any]]:
     """获取指定用户ID的所有历史评论
     
     Args:
         user_id: 用户ID
-        token: 认证令牌
+        username: 认证用户名
         
     Returns:
         包含用户评论及相关笔记信息的列表，按时间降序排序
@@ -186,6 +219,40 @@ async def get_user_comments(user_id: str, token: str = Depends(verify_token)) ->
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, 
             detail=f"获取历史评论时出错: {str(e)}"
         )
+
+@app.post("/api/register", response_model=TokenResponse, tags=["用户"])
+async def register(user_in: UserInRegister):
+    if not ALLOW_REGISTER:
+        raise HTTPException(status_code=403, detail="注册功能已关闭")
+    user = await create_user(user_in, allow_register=ALLOW_REGISTER)
+    # 注册后直接登录
+    access_token = create_access_token(data={"sub": user["username"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.post("/api/login", response_model=TokenResponse, tags=["用户"])
+async def login(user_in: UserInLogin):
+    user = await verify_user_password(user_in.username, user_in.password)
+    if not user:
+        raise HTTPException(status_code=401, detail="用户名或密码错误")
+    # 校验OTP
+    totp = pyotp.TOTP(user["otp_secret"])
+    if not totp.verify(user_in.otp_code):
+        raise HTTPException(status_code=401, detail="动态验证码错误")
+    access_token = create_access_token(data={"sub": user["username"]})
+    return {"access_token": access_token, "token_type": "bearer"}
+
+@app.get("/api/otp-qrcode", tags=["用户"])
+async def get_otp_qrcode(username: str):
+    user = await get_user_by_username(username)
+    if not user:
+        raise HTTPException(status_code=404, detail="用户不存在")
+    otp_secret = user["otp_secret"]
+    otp_uri = pyotp.totp.TOTP(otp_secret).provisioning_uri(name=username, issuer_name="XHSCommentSystem")
+    img = qrcode.make(otp_uri)
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    buf.seek(0)
+    return StreamingResponse(buf, media_type="image/png")
 
 # 如果直接运行此文件，启动 uvicorn 服务器 (主要用于开发)
 if __name__ == "__main__":

@@ -69,5 +69,29 @@ class IncomingPayload(BaseModel):
     type: Literal["通知", "评论", "笔记"]
     data: List[Dict[str, Any]]
 
+# --- 用户相关模型 ---
+class User(BaseModel):
+    username: str
+    password_hash: str
+    otp_secret: str
+    is_active: bool = True
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+class UserInRegister(BaseModel):
+    username: str
+    password: str
+
+class UserInLogin(BaseModel):
+    username: str
+    password: str
+    otp_code: str
+
+class UserInDB(User):
+    pass
+
+class TokenResponse(BaseModel):
+    access_token: str
+    token_type: str = "bearer"
+
 # 更新向前引用
 CommentItem.update_forward_refs() 

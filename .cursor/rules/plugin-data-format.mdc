@@ -1,0 +1,22 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 插件数据格式与API交互
+
+浏览器插件采集两类数据：
+- 通知（tabType、userInfo、interaction、content、timestamp等字段）
+- 评论（id、noteId、authorName、content、timestamp、replies等字段，支持多层嵌套回复）
+
+插件发送到后端API的数据格式为：
+```json
+{
+  "type": "通知" 或 "评论",
+  "data": [ ...数据对象数组... ]
+}
+```
+
+详细字段说明和示例见 [xhs_chrome_plugin/README.md](mdc:xhs_chrome_plugin/README.md)。
+
+后端会对评论数据进行结构化处理，存储为扁平化的结构化评论（见 [processing.py](mdc:xhs_backend/processing.py) 及 [xhs_backend/README.md](mdc:xhs_backend/README.md)）。

@@ -5,7 +5,8 @@
 ## 功能
 
 - 接收通过 POST 请求发送的 JSON 数据（包含类型和数据列表）。
-- 通过 Bearer Token 进行简单的认证。
+- 通过“账号+密码+动态验证码（OTP）”登录，获取 JWT 令牌，后续接口需携带 JWT。
+- 支持注册新账号（可通过 .env 配置 ALLOW_REGISTER=true/false 控制是否允许注册）。
 - 根据数据类型存储到 MongoDB 中不同的集合：
     - **通知数据**: 直接插入到 `notifications` 集合。
     - **评论数据**:
@@ -122,7 +123,7 @@
 
 - **`POST /api/data`**: 接收数据的核心端点。
     - **请求体 (Body)**: 需要符合 `models.IncomingPayload` 结构，包含 `type` ("通知" 或 "评论") 和 `data` (通知或评论对象的列表)。
-    - **认证 (Authentication)**: 需要在请求头中包含 `Authorization: Bearer <你的API_SECRET_TOKEN>`。
+    - **认证 (Authentication)**: 需要在请求头中包含 `Authorization: Bearer <JWT令牌>`，JWT 通过登录接口获取。
     - **响应 (Response)**:
         - **通知**: 返回 `{ "message": "...", "inserted": <count> }`
         - **评论**: 返回一个更详细的字典，包含原始数据和结构化数据的处理结果，例如：
@@ -207,3 +208,14 @@
   ]
 }
 ``` 
+
+## 用户认证与注册
+
+- 通过 `/api/register` 注册新账号（如允许注册），注册后自动登录，返回 JWT。
+- 通过 `/api/login` 使用账号、密码和 OTP 动态码登录，返回 JWT。
+- 通过 `/api/otp-qrcode?username=xxx` 获取 OTP 二维码（用于 Google Authenticator 等扫码绑定）。
+- 登录后，所有受保护接口需在请求头携带：
+  ```
+  Authorization: Bearer <JWT令牌>
+  ```
+- `.env` 文件中可配置 `ALLOW_REGISTER=false` 禁用注册功能。 

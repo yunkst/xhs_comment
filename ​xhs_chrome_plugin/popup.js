@@ -42,6 +42,13 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   });
   
+  // 监听来自options页面的消息
+  chrome.runtime.onMessage.addListener(function(message) {
+    if (message.action === 'refreshApiConfig') {
+      loadApiConfig(); // 收到消息后刷新API配置
+    }
+  });
+  
   // 处理数据获取请求
   function handleDataFetch(fetchType) {
     let targetUrlPattern, extractionFunction, dataTypeLabel;
@@ -188,8 +195,8 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 加载API配置
   function loadApiConfig() {
-    chrome.storage.sync.get(['apiHost', 'apiToken'], function(result) {
-      apiConfig.host = result.apiHost || '';
+    chrome.storage.local.get(['apiBaseUrl', 'apiToken'], function(result) {
+      apiConfig.host = result.apiBaseUrl || '';
       apiConfig.token = result.apiToken || '';
       
       updateModeInfo();
@@ -260,8 +267,11 @@ document.addEventListener('DOMContentLoaded', function() {
       data: data
     };
     
+    // 构建完整的API URL
+    const apiUrl = apiConfig.host + '/api/data';
+    
     // 发送请求
-    fetch(apiConfig.host, {
+    fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

@@ -1,0 +1,21 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 后端 API 端点与认证规则
+
+后端服务基于 FastAPI，主要 API 端点如下：
+
+- `POST /api/data`：接收插件发送的通知、评论或笔记数据。请求体需符合 [models.py](mdc:xhs_backend/models.py) 中 `IncomingPayload` 结构，字段包括：
+  - `type`: "通知"、"评论" 或 "笔记"
+  - `data`: 对应类型的数据数组
+- `GET /api/user/{user_id}/comments`：查询指定用户的所有历史评论。
+
+所有 API 端点均需通过 Bearer Token 认证，需在请求头中携带：
+```
+Authorization: Bearer <API_SECRET_TOKEN>
+```
+`API_SECRET_TOKEN` 需在 [xhs_backend/.env](mdc:xhs_backend/.env) 文件中配置，并与插件端设置一致。
+
+详细的 API 数据格式和响应示例见 [xhs_backend/README.md](mdc:xhs_backend/README.md)。

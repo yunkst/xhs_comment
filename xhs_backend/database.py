@@ -9,6 +9,9 @@ from pymongo.errors import ConnectionFailure, BulkWriteError
 from datetime import datetime
 import asyncio
 from processing import parse_relative_timestamp
+import bcrypt
+import pyotp
+from models import User, UserInRegister, UserInDB
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +28,7 @@ COMMENTS_COLLECTION = os.getenv("COMMENTS_COLLECTION", "comments")
 RAW_COMMENTS_COLLECTION = "raw_comments" # 存放原始合并后的评论数据
 STRUCTURED_COMMENTS_COLLECTION = "structured_comments" # 存放结构化评论数据
 NOTES_COLLECTION = "notes" # 存放笔记数据
+USERS_COLLECTION = "users"
 
 client: motor.motor_asyncio.AsyncIOMotorClient = None
 db: motor.motor_asyncio.AsyncIOMotorDatabase = None
@@ -492,3 +496,37 @@ async def get_user_historical_comments(user_id: str):
     
     logger.info(f"成功生成用户 {user_id} 的历史评论数据，涉及 {len(result)} 条笔记")
     return result 
+
+async def get_user_by_username(username: str) -> Optional[dict]:
+    db_inst = await get_database()
+    user = await db_inst[USERS_COLLECTION].find_one({"username": username})
+    return user
+
+async def create_user(user_in: UserInRegister, allow_register: bool = True) -> Optional[dict]:
+    if not allow_register:
+        raise Exception("注册功能已关闭")
+    db_inst = await get_database()
+    # 检查用户名是否已存在
+    existing = await db_inst[USERS_COLLECTION].find_one({"username": user_in.username})
+    if existing:
+        raise Exception("用户名已存在")
+    # 生成密码哈希
+    password_hash = bcrypt.hashpw(user_in.password.encode(), bcrypt.gensalt()).decode()
+    # 生成OTP密钥
+    otp_secret = pyotp.random_base32()
+    user = User(
+        username=user_in.username,
+        password_hash=password_hash,
+        otp_secret=otp_secret,
+        is_active=True
+    )
+    await db_inst[USERS_COLLECTION].insert_one(user.dict())
+    return user.dict()
+
+async def verify_user_password(username: str, password: str) -> Optional[dict]:
+    user = await get_user_by_username(username)
+    if not user:
+        return None
+    if not bcrypt.checkpw(password.encode(), user["password_hash"].encode()):
+        return None
+    return user 
