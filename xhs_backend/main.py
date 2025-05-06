@@ -23,10 +23,6 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 
 # 从环境变量获取API密钥
-API_SECRET_TOKEN = os.getenv("API_SECRET_TOKEN")
-if not API_SECRET_TOKEN:
-    logger.warning("警告: API_SECRET_TOKEN 未在 .env 文件中设置！将使用默认值 'test_token'。请务必在生产环境中设置安全令牌！")
-    API_SECRET_TOKEN = "test_token" # 提供一个默认值，但强烈建议用户设置
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change_this_secret")
 ALGORITHM = "HS256"
@@ -77,12 +73,12 @@ app.add_middleware(
 security = HTTPBearer()
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """验证传入的 Bearer Token"""
-    if credentials.scheme != "Bearer" or credentials.credentials != API_SECRET_TOKEN:
-        logger.warning(f"无效的 Token 尝试: {credentials.scheme} {credentials.credentials[:5]}...")
+    """验证传入的 Bearer Token - 现在不再验证，接受任何Bearer token"""
+    if credentials.scheme != "Bearer":
+        logger.warning(f"无效的Token格式: {credentials.scheme}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的认证令牌",
+            detail="认证格式错误，需要使用Bearer格式",
             headers={"WWW-Authenticate": "Bearer"},
         )
     logger.info("Token 验证通过")
