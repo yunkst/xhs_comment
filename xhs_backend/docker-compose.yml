@@ -11,7 +11,7 @@ services:
     #   MONGO_INITDB_ROOT_USERNAME: root
     #   MONGO_INITDB_ROOT_PASSWORD: example
     networks:
-      - nginx-network
+      - app-network
 
   app:
     build: 
@@ -33,13 +33,14 @@ services:
     depends_on:
       - mongo # Ensure mongo starts before the app
     networks:
-      - nginx-network
+      - app-network
     # env_file:
     #   - .env # Alternatively, load all variables from .env file
 
 networks:
-  nginx-network:
-    driver: bridge
+  app-network:
+    external: true
+    name: app-network 
 
 volumes:
   mongo_data: # Define the named volume for MongoDB data 

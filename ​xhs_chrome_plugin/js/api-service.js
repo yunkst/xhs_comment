@@ -1,5 +1,45 @@
 // API服务相关模块
 
+// 通过background.js代理API请求，解决跨域问题
+async function proxyFetch(url, options = {}) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage({
+      action: 'proxyApiRequest',
+      url: url,
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      body: options.body
+    }, response => {
+      if (chrome.runtime.lastError) {
+        console.error('消息发送错误:', chrome.runtime.lastError);
+        reject(new Error(`消息发送失败: ${chrome.runtime.lastError.message}`));
+        return;
+      }
+      
+      if (!response) {
+        reject(new Error('未收到代理响应'));
+        return;
+      }
+      
+      if (!response.success) {
+        reject(new Error(response.error || '代理请求失败'));
+        return;
+      }
+      
+      // 模拟fetch返回的Response对象
+      const fetchResponse = {
+        ok: response.status >= 200 && response.status < 300,
+        status: response.status,
+        statusText: response.statusText,
+        text: () => Promise.resolve(typeof response.data === 'string' ? response.data : JSON.stringify(response.data)),
+        json: () => Promise.resolve(response.data)
+      };
+      
+      resolve(fetchResponse);
+    });
+  });
+}
+
 // 从后端API获取用户历史评论
 async function fetchUserHistoricalComments(userId) {
   try {
@@ -18,7 +58,10 @@ async function fetchUserHistoricalComments(userId) {
     
     const url = `${apiBaseUrl}/api/user/${userId}/comments`;
     
-    const response = await fetch(url, {
+    console.log(`通过代理请求URL: ${url}`);
+    
+    // 使用代理请求替代直接fetch
+    const response = await proxyFetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
@@ -79,7 +122,10 @@ async function fetchUserNotes(userId) {
     
     const url = `${apiBaseUrl}/api/user-notes?user_id=${userId}`;
     
-    const response = await fetch(url, {
+    console.log(`通过代理请求备注URL: ${url}`);
+    
+    // 使用代理请求替代直接fetch
+    const response = await proxyFetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
@@ -136,17 +182,18 @@ async function saveUserNote(userId, notificationHash, noteContent) {
     
     const url = `${apiBaseUrl}/api/user-notes`;
     
-    const response = await fetch(url, {
+    // 使用代理请求替代直接fetch
+    const response = await proxyFetch(url, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
+      body: {
         userId: userId,
         notificationHash: notificationHash,
         noteContent: noteContent
-      })
+      }
     });
     
     if (!response.ok) {
@@ -191,7 +238,8 @@ async function fetchUserNotesInBatch(userIds) {
     const userIdsParam = userIds.join(',');
     const url = `${apiBaseUrl}/api/user-notes/batch?user_ids=${userIdsParam}`;
     
-    const response = await fetch(url, {
+    // 使用代理请求替代直接fetch
+    const response = await proxyFetch(url, {
       method: 'GET',
       headers: {
         'Authorization': `Bearer ${apiToken}`,
