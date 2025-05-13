@@ -16,7 +16,7 @@ services:
   app:
     build: 
       context: . # Build the image from the Dockerfile in the current directory
-      dockerfile: Dockerfile.dev # Use the Dockerfile.dev file
+      # dockerfile: Dockerfile.dev # Use the Dockerfile.dev file
     container_name: xhs_backend_app
     # ports:1
     #   - "8000:8000" # Map host port 8000 to container port 8000
