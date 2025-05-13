@@ -1,0 +1,87 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统后端开发指南
+
+后端部分使用FastAPI + MongoDB构建，提供RESTful API服务。
+
+## 技术栈
+
+- FastAPI (Python Web框架)
+- MongoDB (数据存储)
+- PyJWT (用户认证)
+- Docker (容器化部署)
+
+## 项目结构
+
+```
+xhs_backend/
+  ├── main.py          # 入口文件，包含API路由定义
+  ├── database.py      # 数据库连接和操作
+  ├── models.py        # Pydantic数据模型
+  ├── processing.py    # 评论数据处理逻辑
+  ├── requirements.txt # Python依赖
+  ├── Dockerfile       # 生产环境Docker配置
+  └── docker-compose.yml # 多容器应用配置
+```
+
+## 核心模块说明
+
+### API入口
+
+[xhs_backend/main.py](mdc:xhs_backend/main.py) 定义了所有API端点：
+
+- `/api/data` - 接收评论数据
+- `/api/login` - 用户登录认证
+- `/api/register` - 用户注册
+- `/api/user/{user_id}/comments` - 获取用户评论
+- `/api/comments` - 评论管理
+- `/api/system/settings` - 系统设置
+
+### 数据库操作
+
+[xhs_backend/database.py](mdc:xhs_backend/database.py) 封装了MongoDB的操作：
+
+- 连接管理
+- 数据CRUD操作
+- 索引创建和优化
+
+### 数据模型
+
+[xhs_backend/models.py](mdc:xhs_backend/models.py) 使用Pydantic定义数据结构：
+
+- 请求/响应模型
+- 数据验证规则
+- 模型间转换
+
+### 数据处理
+
+[xhs_backend/processing.py](mdc:xhs_backend/processing.py) 包含数据转换和处理逻辑：
+
+- 原始评论转结构化数据
+- 文本分析和提取
+
+## API认证与安全
+
+系统使用JWT (JSON Web Token) 进行API认证：
+
+- token生成与验证
+- 权限控制
+- 会话管理
+
+## 数据库设计
+
+MongoDB集合设计：
+
+- `NOTIFICATIONS_COLLECTION` - 存储通知数据
+- `COMMENTS_COLLECTION` - 存储评论数据
+- `USERS_COLLECTION` - 存储用户信息
+- `NOTES_COLLECTION` - 存储用户笔记
+
+## 部署指南
+
+- 使用docker-compose进行快速部署
+- 支持开发和生产环境分离
+- 数据持久化和备份策略

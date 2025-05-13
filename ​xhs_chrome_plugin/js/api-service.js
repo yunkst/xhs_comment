@@ -56,7 +56,7 @@ async function fetchUserHistoricalComments(userId) {
       throw new Error('未配置API令牌，请在插件选项中设置');
     }
     
-    const url = `${apiBaseUrl}/api/user/${userId}/comments`;
+    const url = `${apiBaseUrl}/api/comments/user/${userId}`;
     
     console.log(`通过代理请求URL: ${url}`);
     

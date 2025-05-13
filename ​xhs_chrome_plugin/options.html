@@ -143,9 +143,12 @@
       <strong>API使用说明：</strong><br>
       - 请正确设置API地址并使用账号登录<br>
       - 首次使用需先注册账号并扫码绑定二次验证<br>
-      - 获取的通知数据将发送到配置的API接口<br>
-      - 历史评论功能需要正确登录后才能使用<br>
-      - 默认API地址: http://localhost:8000
+      - 评论、通知和笔记数据将发送到不同的API端点：<br>
+      &nbsp;&nbsp;• 评论数据：/api/comments/data<br>
+      &nbsp;&nbsp;• 通知数据：/api/notifications/data<br>
+      &nbsp;&nbsp;• 笔记数据：/api/notes/data<br>
+      - 历史评论功能需要正确登录后才能使用，访问路径：/api/comments/user/{user_id}<br>
+      - 默认API基础地址: http://localhost:8000
     </div>
   </div>
   
