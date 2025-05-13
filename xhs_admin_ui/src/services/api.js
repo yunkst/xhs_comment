@@ -59,7 +59,7 @@ export const commentApi = {
   },
   // 获取特定用户的评论
   getUserComments: (userId) => {
-    return api.get(`/api/user/${userId}/comments`);
+    return api.get(`/api/comments/user/${userId}`);
   },
   // 更新评论状态
   updateCommentStatus: (commentId, status) => {

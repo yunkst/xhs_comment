@@ -59,6 +59,12 @@ def parse_relative_timestamp(timestamp_str: Optional[str]) -> Optional[datetime]
                     parsed_dt = datetime(now.year - 1, month, day)
                 return parsed_dt
         
+        # 格式: 今天 HH:MM (例如: 今天 08:52)
+        match = re.match(r'今天\s+(\d{1,2}):(\d{2})', timestamp_str)
+        if match:
+            hour, minute = map(int, match.groups())
+            return now.replace(hour=hour, minute=minute, second=0, microsecond=0)
+        
         # 格式: 昨天 HH:MM (例如: 昨天 14:09)
         match = re.match(r'昨天\s+(\d{1,2}):(\d{2})', timestamp_str)
         if match:

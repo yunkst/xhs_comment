@@ -168,9 +168,9 @@ async function sendData(type, data) {
 
 1. 安装依赖项：
 
-```bash
-pip install -r requirements.txt
-```
+    ```bash
+    pip install -r requirements.txt
+    ```
 
 2. 创建`.env`文件，配置环境变量：
 
@@ -189,9 +189,9 @@ python main.py
 
 或者使用uvicorn直接运行：
 
-```bash
-uvicorn main:app --reload --host 0.0.0.0 --port 8000
-```
+    ```bash
+    uvicorn main:app --reload --host 0.0.0.0 --port 8000
+    ```
 
 ## 生产环境部署
 
@@ -203,9 +203,9 @@ uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 使用以下命令启动服务：
 
-```bash
+    ```bash
 docker-compose up -d
-```
+    ```
 
 ## 如何扩展
 
