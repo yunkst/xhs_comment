@@ -21,6 +21,46 @@ document.addEventListener('DOMContentLoaded', function() {
   const otpQrcodeDiv = document.getElementById('otpQrcode');
   const otpCodeGroup = document.getElementById('otpCodeGroup');
   
+  // 通过background.js代理API请求，解决跨域问题
+  async function proxyFetch(url, options = {}) {
+    return new Promise((resolve, reject) => {
+      chrome.runtime.sendMessage({
+        action: 'proxyApiRequest',
+        url: url,
+        method: options.method || 'GET',
+        headers: options.headers || {},
+        body: options.body
+      }, response => {
+        if (chrome.runtime.lastError) {
+          console.error('消息发送错误:', chrome.runtime.lastError);
+          reject(new Error(`消息发送失败: ${chrome.runtime.lastError.message}`));
+          return;
+        }
+        
+        if (!response) {
+          reject(new Error('未收到代理响应'));
+          return;
+        }
+        
+        if (!response.success) {
+          reject(new Error(response.error || '代理请求失败'));
+          return;
+        }
+        
+        // 模拟fetch返回的Response对象
+        const fetchResponse = {
+          ok: response.status >= 200 && response.status < 300,
+          status: response.status,
+          statusText: response.statusText,
+          text: () => Promise.resolve(typeof response.data === 'string' ? response.data : JSON.stringify(response.data)),
+          json: () => Promise.resolve(response.data)
+        };
+        
+        resolve(fetchResponse);
+      });
+    });
+  }
+  
   // 从storage中加载已保存的配置
   chrome.storage.local.get(['apiBaseUrl'], function(result) {
     if (result.apiBaseUrl) {
@@ -72,11 +112,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     try {
       showStatus('正在登录...', '');
-      const resp = await fetch(apiBaseUrl + '/api/login', {
+      
+      // 使用代理请求替代直接fetch
+      const resp = await proxyFetch(apiBaseUrl + '/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, otp_code: otp })
+        body: { username, password, otp_code: otp }
       });
+      
       if (!resp.ok) {
         const err = await resp.text();
         throw new Error('登录失败: ' + err);
@@ -143,11 +186,14 @@ document.addEventListener('DOMContentLoaded', function() {
     if (otpQrcodeGroup.style.display === 'none') {
       try {
         showRegisterStatus('正在注册账号...', '');
-        const resp = await fetch(apiBaseUrl + '/api/register', {
+        
+        // 使用代理请求替代直接fetch
+        const resp = await proxyFetch(apiBaseUrl + '/api/register', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username, password })
+          body: { username, password }
         });
+        
         if (!resp.ok) {
           const err = await resp.text();
           throw new Error('注册失败: ' + err);
@@ -155,9 +201,32 @@ document.addEventListener('DOMContentLoaded', function() {
         // 注册成功，获取OTP二维码
         otpQrcodeGroup.style.display = 'block';
         otpCodeGroup.style.display = 'block';
-        // 获取二维码
-        const qrUrl = apiBaseUrl + '/api/otp-qrcode?username=' + encodeURIComponent(username);
-        otpQrcodeDiv.innerHTML = '<img src="' + qrUrl + '" style="width:180px;height:180px;">';
+        
+        // 获取二维码 - 使用代理请求获取图片
+        const qrCodeUrl = apiBaseUrl + '/api/otp-qrcode?username=' + encodeURIComponent(username);
+        
+        // 使用data URL形式显示二维码图片
+        try {
+          // 使用代理请求直接获取二维码二进制数据
+          chrome.runtime.sendMessage({
+            action: 'proxyApiRequest',
+            url: qrCodeUrl,
+            method: 'GET',
+            responseType: 'blob'
+          }, response => {
+            if (response && response.success && response.data) {
+              // 创建Base64数据URL
+              otpQrcodeDiv.innerHTML = `<img src="data:image/png;base64,${response.data}" style="width:180px;height:180px;">`;
+            } else {
+              // 显示错误信息
+              otpQrcodeDiv.innerHTML = `<div class="error-msg">二维码加载失败，请重试</div>`;
+              console.error('获取二维码失败:', response?.error || '未知错误');
+            }
+          });
+        } catch (e) {
+          console.error('获取二维码时出错:', e);
+          otpQrcodeDiv.innerHTML = `<div class="error-msg">二维码加载失败: ${e.message}</div>`;
+        }
         showRegisterStatus('请用App扫码绑定后，输入动态码完成注册', 'success');
       } catch (e) {
         showRegisterStatus(e.message || '注册异常', 'error');
@@ -171,11 +240,14 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     try {
       showRegisterStatus('正在验证动态码并登录...', '');
-      const resp = await fetch(apiBaseUrl + '/api/login', {
+      
+      // 使用代理请求替代直接fetch
+      const resp = await proxyFetch(apiBaseUrl + '/api/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password, otp_code: otp })
+        body: { username, password, otp_code: otp }
       });
+      
       if (!resp.ok) {
         const err = await resp.text();
         throw new Error('动态码验证失败: ' + err);

@@ -65,7 +65,7 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
     allow_credentials=True,
-    allow_methods=["GET", "POST"], # 允许的方法
+    allow_methods=["GET", "POST", "OPTIONS"], # 允许的方法
     allow_headers=["Authorization", "Content-Type"], # 允许的请求头
 )
 
