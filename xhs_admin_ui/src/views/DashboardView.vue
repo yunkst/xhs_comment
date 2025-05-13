@@ -1,7 +1,7 @@
 <template>
   <div class="dashboard-container">
     <el-row :gutter="20">
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card class="box-card">
           <div class="card-header">
             <el-icon class="card-icon comment"><ChatDotRound /></el-icon>
@@ -15,7 +15,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card class="box-card">
           <div class="card-header">
             <el-icon class="card-icon user"><User /></el-icon>
@@ -29,31 +29,17 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card class="box-card">
           <div class="card-header">
-            <el-icon class="card-icon pending"><Timer /></el-icon>
+            <el-icon class="card-icon reply"><Bell /></el-icon>
             <div class="card-info">
-              <div class="card-title">待审核评论</div>
-              <div class="card-value">{{ statistics.pendingComments || 0 }}</div>
+              <div class="card-title">待回复评论</div>
+              <div class="card-value">{{ statistics.pendingReplyComments || 0 }}</div>
             </div>
           </div>
           <div class="card-footer">
-            <span>较昨日 <span :class="statistics.pendingChange >= 0 ? 'up' : 'down'">{{ statistics.pendingChange >= 0 ? '+' : '' }}{{ statistics.pendingChange || 0 }}%</span></span>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card class="box-card">
-          <div class="card-header">
-            <el-icon class="card-icon warning"><Warning /></el-icon>
-            <div class="card-info">
-              <div class="card-title">拦截评论</div>
-              <div class="card-value">{{ statistics.blockedComments || 0 }}</div>
-            </div>
-          </div>
-          <div class="card-footer">
-            <span>较昨日 <span :class="statistics.blockedChange >= 0 ? 'up' : 'down'">{{ statistics.blockedChange >= 0 ? '+' : '' }}{{ statistics.blockedChange || 0 }}%</span></span>
+            <span>较昨日 <span :class="statistics.pendingReplyChange >= 0 ? 'up' : 'down'">{{ statistics.pendingReplyChange >= 0 ? '+' : '' }}{{ statistics.pendingReplyChange || 0 }}%</span></span>
           </div>
         </el-card>
       </el-col>
@@ -100,15 +86,16 @@
             <el-table-column prop="content" label="评论内容" />
             <el-table-column prop="status" label="状态" width="100">
               <template #default="scope">
-                <el-tag :type="scope.row.status === '通过' ? 'success' : scope.row.status === '待审核' ? 'warning' : 'danger'">
+                <el-tag :type="scope.row.status === '通过' ? 'success' : scope.row.status === '待回复' ? 'info' : 'danger'">
                   {{ scope.row.status }}
                 </el-tag>
               </template>
             </el-table-column>
             <el-table-column prop="createTime" label="创建时间" width="180" />
-            <el-table-column label="操作" width="150">
+            <el-table-column label="操作" width="220">
               <template #default="scope">
                 <el-button size="small" @click="handleView(scope.row)">查看</el-button>
+                <el-button size="small" type="primary" v-if="scope.row.status === '待回复'" @click="handleReply(scope.row)">回复</el-button>
                 <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
               </template>
             </el-table-column>
@@ -124,8 +111,7 @@ import { ref, reactive, onMounted } from 'vue'
 import { 
   ChatDotRound, 
   User, 
-  Timer, 
-  Warning
+  Bell
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { commentApi, userManagementApi, systemApi } from '../services/api'
@@ -140,10 +126,8 @@ const statistics = reactive({
   commentsChange: 0,
   totalUsers: 0,
   usersChange: 0,
-  pendingComments: 0,
-  pendingChange: 0,
-  blockedComments: 0,
-  blockedChange: 0
+  pendingReplyComments: 0,
+  pendingReplyChange: 0
 })
 
 // 获取统计数据
@@ -157,10 +141,8 @@ const fetchStatistics = async () => {
       statistics.commentsChange = response.commentsChange || 0
       statistics.totalUsers = response.totalUsers || 0
       statistics.usersChange = response.usersChange || 0
-      statistics.pendingComments = response.pendingComments || 0
-      statistics.pendingChange = response.pendingChange || 0
-      statistics.blockedComments = response.blockedComments || 0
-      statistics.blockedChange = response.blockedChange || 0
+      statistics.pendingReplyComments = response.pendingReplyComments || 0
+      statistics.pendingReplyChange = response.pendingReplyChange || 0
     }
   } catch (error) {
     console.error('获取统计数据失败:', error)
@@ -210,6 +192,21 @@ const handleView = (row) => {
   ElMessage.info(`查看评论：${row.id}`)
 }
 
+// 处理回复评论
+const handleReply = (row) => {
+  ElMessageBox.prompt('请输入回复内容', '回复评论', {
+    confirmButtonText: '确认回复',
+    cancelButtonText: '取消',
+    inputPlaceholder: '输入回复内容...'
+  }).then(({ value }) => {
+    if (value) {
+      ElMessage.success(`回复评论 ${row.id} 成功`)
+      // 这里可以调用API保存回复
+      fetchLatestComments()
+    }
+  }).catch(() => {})
+}
+
 const handleDelete = (row) => {
   ElMessageBox.confirm(`确定要删除ID为 ${row.id} 的评论吗?`, '提示', {
     confirmButtonText: '确定',
@@ -240,7 +237,7 @@ onMounted(() => {
 
 <style scoped>
 .dashboard-container {
-  padding: 10px;
+  width: 100%;
 }
 
 .box-card {
@@ -270,14 +267,9 @@ onMounted(() => {
   color: #67C23A;
 }
 
-.pending {
-  background-color: rgba(230, 162, 60, 0.1);
-  color: #E6A23C;
-}
-
-.warning {
-  background-color: rgba(245, 108, 108, 0.1);
-  color: #F56C6C;
+.reply {
+  background-color: rgba(144, 147, 153, 0.1);
+  color: #909399;
 }
 
 .card-info {

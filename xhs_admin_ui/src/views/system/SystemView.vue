@@ -8,69 +8,6 @@
       </template>
 
       <el-tabs type="border-card">
-        <el-tab-pane label="基本设置">
-          <el-form :model="basicForm" label-width="140px">
-            <el-form-item label="系统名称">
-              <el-input v-model="basicForm.systemName" />
-            </el-form-item>
-            <el-form-item label="系统描述">
-              <el-input v-model="basicForm.systemDesc" type="textarea" :rows="3" />
-            </el-form-item>
-            <el-form-item label="管理员联系邮箱">
-              <el-input v-model="basicForm.adminEmail" />
-            </el-form-item>
-            <el-form-item label="每页显示记录数">
-              <el-select v-model="basicForm.pageSize">
-                <el-option label="10条/页" :value="10" />
-                <el-option label="20条/页" :value="20" />
-                <el-option label="50条/页" :value="50" />
-                <el-option label="100条/页" :value="100" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="saveBasicSettings">保存设置</el-button>
-              <el-button @click="resetBasicSettings">重置</el-button>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
-        <el-tab-pane label="评论设置">
-          <el-form :model="commentForm" label-width="180px">
-            <el-form-item label="评论是否需要审核">
-              <el-switch v-model="commentForm.needAudit" />
-            </el-form-item>
-            <el-form-item label="评论敏感词过滤">
-              <el-switch v-model="commentForm.sensitiveFilter" />
-            </el-form-item>
-            <el-form-item label="自动拦截含敏感词评论">
-              <el-switch v-model="commentForm.autoBlock" />
-            </el-form-item>
-            <el-form-item label="敏感词列表">
-              <el-input
-                type="textarea"
-                v-model="commentForm.sensitiveWords"
-                :rows="5"
-                placeholder="每行一个敏感词"
-              />
-            </el-form-item>
-            <el-form-item label="评论最大长度">
-              <el-input-number v-model="commentForm.maxLength" :min="1" :max="1000" />
-            </el-form-item>
-            <el-form-item label="评论提交频率限制">
-              <el-select v-model="commentForm.submitLimit">
-                <el-option label="无限制" :value="0" />
-                <el-option label="10秒/条" :value="10" />
-                <el-option label="30秒/条" :value="30" />
-                <el-option label="60秒/条" :value="60" />
-              </el-select>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" @click="saveCommentSettings">保存设置</el-button>
-              <el-button @click="resetCommentSettings">重置</el-button>
-            </el-form-item>
-          </el-form>
-        </el-tab-pane>
-
         <el-tab-pane label="安全设置">
           <el-form :model="securityForm" label-width="180px">
             <el-form-item label="登录密码有效期">
@@ -165,24 +102,6 @@ import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Upload, RefreshRight } from '@element-plus/icons-vue'
 
-// 基本设置表单
-const basicForm = reactive({
-  systemName: '小红书评论维护系统',
-  systemDesc: '用于管理小红书平台用户评论的后台管理系统',
-  adminEmail: 'admin@example.com',
-  pageSize: 20
-})
-
-// 评论设置表单
-const commentForm = reactive({
-  needAudit: true,
-  sensitiveFilter: true,
-  autoBlock: true,
-  sensitiveWords: '垃圾\n广告\n智商税\n骗子\n传销\n假货',
-  maxLength: 200,
-  submitLimit: 10
-})
-
 // 安全设置表单
 const securityForm = reactive({
   passwordExpiration: 90,
@@ -214,34 +133,6 @@ const backupHistory = ref([
     createTime: '2023-06-01 18:00:00'
   }
 ])
-
-// 基本设置相关方法
-const saveBasicSettings = () => {
-  ElMessage.success('基本设置保存成功')
-}
-
-const resetBasicSettings = () => {
-  basicForm.systemName = '小红书评论维护系统'
-  basicForm.systemDesc = '用于管理小红书平台用户评论的后台管理系统'
-  basicForm.adminEmail = 'admin@example.com'
-  basicForm.pageSize = 20
-  ElMessage.info('基本设置已重置')
-}
-
-// 评论设置相关方法
-const saveCommentSettings = () => {
-  ElMessage.success('评论设置保存成功')
-}
-
-const resetCommentSettings = () => {
-  commentForm.needAudit = true
-  commentForm.sensitiveFilter = true
-  commentForm.autoBlock = true
-  commentForm.sensitiveWords = '垃圾\n广告\n智商税\n骗子\n传销\n假货'
-  commentForm.maxLength = 200
-  commentForm.submitLimit = 10
-  ElMessage.info('评论设置已重置')
-}
 
 // 安全设置相关方法
 const saveSecuritySettings = () => {
@@ -330,7 +221,7 @@ const deleteBackup = (backup) => {
 
 <style scoped>
 .system-container {
-  padding: 10px;
+  width: 100%;
 }
 
 .system-card {

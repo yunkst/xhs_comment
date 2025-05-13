@@ -189,6 +189,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { userManagementApi } from '../../services/api'
 
 // 搜索表单
 const searchForm = reactive({
@@ -218,129 +219,45 @@ const actionForm = reactive({
   duration: '7'
 })
 
-// 模拟用户数据
-const mockUserList = [
-  {
-    id: 'U10001',
-    username: 'xiaohongshu_user1',
-    nickname: '小红书达人1号',
-    avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-    commentCount: 156,
-    status: '正常',
-    registerTime: '2022-03-15 10:23:45',
-    lastLoginTime: '2023-06-14 15:30:22',
-    phone: '138****5678',
-    email: 'user1@example.com',
-    violationCount: 0,
-    recentComments: [
-      {
-        content: '这个产品真的很不错，已经买了三次了，超级好用！',
-        articleTitle: '2023年必入的护肤单品推荐',
-        createTime: '2023-06-15 10:23:45'
-      },
-      {
-        content: '谢谢博主的分享，学到了很多',
-        articleTitle: '护肤小白必看的基础知识',
-        createTime: '2023-06-10 16:43:21'
-      }
-    ]
-  },
-  {
-    id: 'U10002',
-    username: 'xiaohongshu_user2',
-    nickname: '美妆爱好者',
-    avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-    commentCount: 87,
-    status: '已禁言',
-    registerTime: '2022-05-20 14:33:12',
-    lastLoginTime: '2023-06-13 09:12:45',
-    phone: '139****1234',
-    email: 'user2@example.com',
-    violationCount: 2,
-    recentComments: [
-      {
-        content: '这个牌子我在专柜买过，但是网上的价格便宜太多了，有点担心是假货',
-        articleTitle: '这些贵妇级护肤品到底值不值得买？',
-        createTime: '2023-06-13 09:18:32'
-      }
-    ]
-  },
-  {
-    id: 'U10003',
-    username: 'xiaohongshu_user3',
-    nickname: '吃货小王子',
-    avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-    commentCount: 65,
-    status: '已封禁',
-    registerTime: '2022-08-10 20:12:34',
-    lastLoginTime: '2023-06-01 18:45:21',
-    phone: '136****4567',
-    email: 'user3@example.com',
-    violationCount: 5,
-    recentComments: [
-      {
-        content: '这个垃圾产品根本不值这个价钱，纯粹是智商税！',
-        articleTitle: '网红产品踩雷记录',
-        createTime: '2023-06-01 18:45:21'
-      }
-    ]
-  }
-]
-
-// 生成更多模拟数据
-for (let i = 4; i <= 30; i++) {
-  mockUserList.push({
-    id: `U1000${i}`,
-    username: `xiaohongshu_user${i}`,
-    nickname: `小红书用户${i}`,
-    avatar: 'https://cube.elemecdn.com/0/88/03b0d39583f48206768a7534e55bcpng.png',
-    commentCount: Math.floor(Math.random() * 200),
-    status: ['正常', '已禁言', '已封禁'][Math.floor(Math.random() * 3)],
-    registerTime: '2023-01-01 10:00:00',
-    lastLoginTime: '2023-06-10 10:00:00',
-    phone: '135****7890',
-    email: `user${i}@example.com`,
-    violationCount: Math.floor(Math.random() * 5),
-    recentComments: [
-      {
-        content: `这是测试评论内容${i}，用于演示列表功能`,
-        articleTitle: `测试文章标题${i}`,
-        createTime: '2023-06-10 10:00:00'
-      }
-    ]
-  })
-}
-
 // 获取用户列表数据
-const getUserList = () => {
+const getUserList = async () => {
   loading.value = true
   
-  // 模拟异步请求
-  setTimeout(() => {
-    // 模拟过滤
-    let filtered = [...mockUserList]
+  try {
+    // 构建查询参数
+    const params = {
+      page: currentPage.value,
+      pageSize: pageSize.value,
+    }
     
     if (searchForm.keyword) {
-      filtered = filtered.filter(item => 
-        item.username.includes(searchForm.keyword) ||
-        item.id.includes(searchForm.keyword)
-      )
+      params.keyword = searchForm.keyword
     }
     
     if (searchForm.status) {
-      filtered = filtered.filter(item => item.status === searchForm.status)
+      params.status = searchForm.status
     }
     
-    // 计算总条数
-    total.value = filtered.length
+    if (searchForm.dateRange && searchForm.dateRange.length === 2) {
+      params.startDate = searchForm.dateRange[0]
+      params.endDate = searchForm.dateRange[1]
+    }
     
-    // 模拟分页
-    const startIndex = (currentPage.value - 1) * pageSize.value
-    const endIndex = Math.min(startIndex + pageSize.value, filtered.length)
-    userList.value = filtered.slice(startIndex, endIndex)
+    // 调用API获取数据
+    const response = await userManagementApi.getUserList(params)
     
+    userList.value = response.items || []
+    total.value = response.total || 0
+  } catch (error) {
+    console.error('获取用户列表失败:', error)
+    ElMessage.error('获取用户列表失败')
+    
+    // 发生错误时显示空数据
+    userList.value = []
+    total.value = 0
+  } finally {
     loading.value = false
-  }, 500)
+  }
 }
 
 // 搜索
@@ -363,31 +280,46 @@ const refreshTable = () => {
 }
 
 // 查看用户详情
-const handleView = (row) => {
-  currentUser.value = { ...row }
-  dialogVisible.value = true
+const handleView = async (row) => {
+  try {
+    loading.value = true
+    // 获取用户详情
+    const userDetail = await userManagementApi.getUserDetail(row.id)
+    currentUser.value = userDetail
+    dialogVisible.value = true
+  } catch (error) {
+    console.error('获取用户详情失败:', error)
+    ElMessage.error('获取用户详情失败')
+  } finally {
+    loading.value = false
+  }
 }
 
 // 处理禁言
-const handleMute = (row) => {
+const handleMute = async (row) => {
   if (row.status === '已禁言') {
     // 解除禁言
-    ElMessageBox.confirm(`确定要解除对用户 ${row.nickname}(${row.id}) 的禁言吗?`, '提示', {
+    ElMessageBox.confirm(`确定要解除对用户 ${row.nickname || row.username}(${row.id}) 的禁言吗?`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(() => {
-      // 实际项目中应该调用API
-      ElMessage.success(`已解除对用户 ${row.nickname} 的禁言`)
-      row.status = '正常'
-      if (currentUser.value.id === row.id) {
-        currentUser.value.status = '正常'
+    }).then(async () => {
+      try {
+        await userManagementApi.unmuteUser(row.id)
+        ElMessage.success(`已解除对用户 ${row.nickname || row.username} 的禁言`)
+        row.status = '正常'
+        if (currentUser.value.id === row.id) {
+          currentUser.value.status = '正常'
+        }
+      } catch (error) {
+        console.error('解除禁言失败:', error)
+        ElMessage.error('操作失败')
       }
     }).catch(() => {})
   } else {
     // 禁言
     actionType.value = 'mute'
-    actionTitle.value = `禁言用户: ${row.nickname}`
+    actionTitle.value = `禁言用户: ${row.nickname || row.username}`
     actionForm.reason = '发布违规内容'
     actionForm.detail = ''
     actionForm.duration = '7'
@@ -397,25 +329,30 @@ const handleMute = (row) => {
 }
 
 // 处理封禁
-const handleBan = (row) => {
+const handleBan = async (row) => {
   if (row.status === '已封禁') {
     // 解除封禁
-    ElMessageBox.confirm(`确定要解除对用户 ${row.nickname}(${row.id}) 的封禁吗?`, '提示', {
+    ElMessageBox.confirm(`确定要解除对用户 ${row.nickname || row.username}(${row.id}) 的封禁吗?`, '提示', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
-    }).then(() => {
-      // 实际项目中应该调用API
-      ElMessage.success(`已解除对用户 ${row.nickname} 的封禁`)
-      row.status = '正常'
-      if (currentUser.value.id === row.id) {
-        currentUser.value.status = '正常'
+    }).then(async () => {
+      try {
+        await userManagementApi.unbanUser(row.id)
+        ElMessage.success(`已解除对用户 ${row.nickname || row.username} 的封禁`)
+        row.status = '正常'
+        if (currentUser.value.id === row.id) {
+          currentUser.value.status = '正常'
+        }
+      } catch (error) {
+        console.error('解除封禁失败:', error)
+        ElMessage.error('操作失败')
       }
     }).catch(() => {})
   } else {
     // 封禁
     actionType.value = 'ban'
-    actionTitle.value = `封禁用户: ${row.nickname}`
+    actionTitle.value = `封禁用户: ${row.nickname || row.username}`
     actionForm.reason = '多次违反社区规定'
     actionForm.detail = ''
     actionDialog.value = true
@@ -424,18 +361,30 @@ const handleBan = (row) => {
 }
 
 // 确认操作
-const confirmAction = () => {
+const confirmAction = async () => {
   const reason = actionForm.reason === '其他原因' ? actionForm.detail : actionForm.reason
   const duration = actionType.value === 'mute' ? (actionForm.duration === '-1' ? '永久' : `${actionForm.duration}天`) : '永久'
   
-  if (actionType.value === 'mute') {
-    // 禁言
-    ElMessage.success(`已对用户 ${currentUser.value.nickname} 禁言 ${duration}，原因: ${reason}`)
-    currentUser.value.status = '已禁言'
-  } else {
-    // 封禁
-    ElMessage.success(`已封禁用户 ${currentUser.value.nickname}，原因: ${reason}`)
-    currentUser.value.status = '已封禁'
+  try {
+    if (actionType.value === 'mute') {
+      // 禁言
+      await userManagementApi.muteUser(currentUser.value.id, {
+        reason: reason,
+        duration: actionForm.duration
+      })
+      ElMessage.success(`已对用户 ${currentUser.value.nickname || currentUser.value.username} 禁言 ${duration}，原因: ${reason}`)
+      currentUser.value.status = '已禁言'
+    } else {
+      // 封禁
+      await userManagementApi.banUser(currentUser.value.id, {
+        reason: reason
+      })
+      ElMessage.success(`已封禁用户 ${currentUser.value.nickname || currentUser.value.username}，原因: ${reason}`)
+      currentUser.value.status = '已封禁'
+    }
+  } catch (error) {
+    console.error('操作失败:', error)
+    ElMessage.error('操作失败')
   }
   
   actionDialog.value = false

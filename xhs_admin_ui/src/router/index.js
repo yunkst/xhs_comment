@@ -31,12 +31,6 @@ const router = createRouter({
           meta: { title: '评论列表' }
         },
         {
-          path: 'comment/audit',
-          name: 'commentAudit',
-          component: () => import('../views/comment/CommentAuditView.vue'),
-          meta: { title: '评论审核' }
-        },
-        {
           path: 'user/list',
           name: 'userList',
           component: () => import('../views/user/UserListView.vue'),

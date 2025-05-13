@@ -351,7 +351,6 @@ onMounted(() => {
 
 <style scoped>
 .comment-list-container {
-  padding: 10px;
   width: 100%;
 }
 

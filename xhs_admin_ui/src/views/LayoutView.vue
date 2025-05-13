@@ -25,7 +25,6 @@
               <span>评论管理</span>
             </template>
             <el-menu-item index="/comment/list">评论列表</el-menu-item>
-            <el-menu-item index="/comment/audit">评论审核</el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="user">
             <template #title>
@@ -134,16 +133,19 @@ const handleLogout = () => {
 
 <style scoped>
 .layout-container {
-  min-height: 100vh;
-  width: 100%;
+  height: 100vh;
+  width: 100vw;
   display: flex;
   flex-direction: row;
+  overflow: hidden;
 }
 
 .sidebar {
   background-color: #304156;
   transition: width 0.3s;
   overflow-x: hidden;
+  height: 100%;
+  z-index: 1000;
 }
 
 .logo {
@@ -169,6 +171,7 @@ const handleLogout = () => {
   padding: 0 15px;
   box-shadow: 0 1px 4px rgba(0,21,41,.08);
   width: 100%;
+  height: 60px;
 }
 
 .header-left {
