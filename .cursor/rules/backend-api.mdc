@@ -1,21 +1,71 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
 # 后端 API 端点与认证规则
 
-后端服务基于 FastAPI，主要 API 端点如下：
+后端服务基于 FastAPI，采用模块化的API架构设计。主要 API 端点如下：
 
-- `POST /api/data`：接收插件发送的通知、评论或笔记数据。请求体需符合 [models.py](mdc:xhs_backend/models.py) 中 `IncomingPayload` 结构，字段包括：
-  - `type`: "通知"、"评论" 或 "笔记"
+## 数据接收端点
+
+- 评论数据：`POST /api/comments/data`
+- 通知数据：`POST /api/notifications/data`
+- 笔记数据：`POST /api/notes/data`
+
+请求体需符合 [models.py](mdc:xhs_backend/models.py) 中 `IncomingPayload` 结构，字段包括：
+  - `type`: "通知"、"评论" 或 "笔记"（需与API路径匹配）
   - `data`: 对应类型的数据数组
-- `GET /api/user/{user_id}/comments`：查询指定用户的所有历史评论。
 
-所有 API 端点均需通过 Bearer Token 认证，需在请求头中携带：
+## 评论管理端点
+
+- `GET /api/comments`: 获取评论列表（支持过滤和分页）
+- `GET /api/comments/{comment_id}`: 获取评论详情
+- `PUT /api/comments/{comment_id}/status`: 更新评论状态
+- `DELETE /api/comments/{comment_id}`: 删除评论
+- `PUT /api/comments/batch/status`: 批量更新评论状态
+- `POST /api/comments/batch/delete`: 批量删除评论
+- `GET /api/comments/user/{user_id}`: 获取用户历史评论
+
+## 笔记管理端点
+
+- `GET /api/notes`: 获取笔记列表（支持过滤和分页）
+- `GET /api/notes/{note_id}`: 获取笔记详情
+
+## 通知管理端点
+
+- `GET /api/notifications`: 获取通知列表（支持过滤和分页）
+- `GET /api/notifications/{notification_id}`: 获取通知详情
+
+## 用户认证端点
+
+- `POST /api/register`: 用户注册
+- `POST /api/login`: 用户登录（用户名、密码和OTP）
+- `GET /api/otp-qrcode`: 获取OTP二维码
+- `GET /api/users/me`: 获取当前用户信息
+
+## 系统管理端点
+
+- `GET /api/system/status`: 获取系统状态信息
+- `GET /api/system/database-stats`: 获取数据库统计信息
+- `GET /api/system/version`: 获取系统版本信息
+
+## 认证与安全
+
+所有 API 端点（除了登录、注册和版本信息外）均需通过 JWT Bearer Token 认证，需在请求头中携带：
 ```
-Authorization: Bearer <API_SECRET_TOKEN>
+Authorization: Bearer <JWT_TOKEN>
 ```
-`API_SECRET_TOKEN` 需在 [xhs_backend/.env](mdc:xhs_backend/.env) 文件中配置，并与插件端设置一致。
+
+JWT令牌通过登录接口获取，系统使用 `.env` 文件中的 `JWT_SECRET_KEY` 进行令牌签名。
+
+## 浏览器插件配置
+
+浏览器插件需要根据数据类型配置不同的API端点：
+- 评论数据：`http://<服务器地址>/api/comments/data`
+- 通知数据：`http://<服务器地址>/api/notifications/data`
+- 笔记数据：`http://<服务器地址>/api/notes/data`
+
+如果插件不支持多端点配置，需更新插件代码，请参考 [xhs_backend/README.md](mdc:xhs_backend/README.md) 中的"浏览器插件API调用更新指南"。
 
 详细的 API 数据格式和响应示例见 [xhs_backend/README.md](mdc:xhs_backend/README.md)。

@@ -8,3 +8,4 @@ pyotp
 python-jose 
 qrcode
 pillow
+psutil # 用于系统监控

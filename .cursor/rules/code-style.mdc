@@ -1,0 +1,115 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统代码风格指南
+
+本项目采用统一的代码风格规范，确保代码质量和可维护性。
+
+## 通用规范
+
+- 使用UTF-8编码
+- 使用LF作为行结束符
+- 文件末尾保留一个空行
+- 使用2空格缩进（前端）和4空格缩进（后端）
+- 避免超过80字符的行长度
+- 删除尾随空格
+
+## 前端代码规范 (Vue 3)
+
+### 组件命名
+
+- 组件文件名使用PascalCase
+- 视图组件以"View"结尾，如`CommentListView.vue`
+- 通用组件以描述性名称命名，如`SearchForm.vue`
+
+### Vue组件结构
+
+```vue
+<template>
+  <!-- 模板代码 -->
+</template>
+
+<script setup>
+// 导入语句
+import { ref, reactive, computed, onMounted } from 'vue'
+
+// 状态定义
+const state = reactive({})
+
+// 计算属性
+const computed = computed(() => {})
+
+// 方法定义
+const handleEvent = () => {}
+
+// 生命周期钩子
+onMounted(() => {})
+</script>
+
+<style scoped>
+/* CSS样式 */
+</style>
+```
+
+### JavaScript规范
+
+- 使用ES6+语法
+- 使用`const`和`let`，避免`var`
+- 使用箭头函数表达简洁逻辑
+- 使用async/await处理异步操作
+- 使用解构赋值简化代码
+
+### CSS规范
+
+- 使用`scoped`属性限制样式作用域
+- 使用kebab-case命名CSS类
+- 组织CSS属性按类型分组
+- 使用Element Plus变量保持一致性
+
+## 后端代码规范 (Python)
+
+### 命名规范
+
+- 文件名使用snake_case
+- 类名使用PascalCase
+- 函数和变量使用snake_case
+- 常量使用UPPER_CASE
+
+### Python代码风格
+
+- 遵循PEP 8风格指南
+- 使用类型注解增强代码可读性
+- 函数和类添加文档字符串
+- 适当使用空行分隔逻辑块
+
+```python
+def process_data(data: dict) -> List[dict]:
+    """
+    处理输入数据并返回处理结果列表
+    
+    Args:
+        data: 输入数据字典
+        
+    Returns:
+        处理后的数据列表
+    """
+    result = []
+    # 处理逻辑
+    return result
+```
+
+### API设计规范
+
+- 使用RESTful风格定义API端点
+- HTTP方法语义：GET（查询）、POST（创建）、PUT/PATCH（更新）、DELETE（删除）
+- 统一的错误处理和响应格式
+- 适当的路径嵌套表示资源关系
+
+## 提交规范
+
+- 提交前进行代码格式化
+- 简明扼要的提交信息
+- 单一职责的提交内容
+- 适当的代码审查流程

@@ -1,0 +1,92 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统前端开发指南
+
+前端部分使用Vue 3 + Element Plus + Vite构建，遵循组件化开发理念。
+
+## 技术栈
+
+- Vue 3 (Composition API)
+- Element Plus 组件库
+- Vite 构建工具
+- Vue Router 路由管理
+- Pinia 状态管理
+
+## 项目结构
+
+```
+xhs_admin_ui/
+  ├── src/               # 源代码目录
+  │   ├── assets/        # 静态资源
+  │   ├── components/    # 公共组件
+  │   ├── router/        # 路由配置
+  │   ├── services/      # API服务
+  │   ├── stores/        # Pinia状态管理
+  │   ├── views/         # 页面组件
+  │   ├── App.vue        # 根组件
+  │   └── main.js        # 入口文件
+  ├── public/            # 公共资源
+  ├── index.html         # HTML入口
+  └── vite.config.js     # Vite配置
+```
+
+## 核心组件说明
+
+### 主布局组件
+
+[xhs_admin_ui/src/views/LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue) 实现了系统的整体布局：
+
+- 左侧边栏导航菜单
+- 顶部标题栏
+- 内容区域
+
+### 仪表盘
+
+[xhs_admin_ui/src/views/DashboardView.vue](mdc:xhs_admin_ui/src/views/DashboardView.vue) 展示系统概况：
+
+- 统计卡片 (总评论数、总用户数、待回复评论数)
+- 评论趋势图表
+- 最新评论列表
+
+### 评论管理
+
+[xhs_admin_ui/src/views/comment/CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue) 提供评论的增删改查功能：
+
+- 评论列表展示
+- 评论筛选搜索
+- 评论状态管理
+- 批量操作功能
+
+### 系统设置
+
+[xhs_admin_ui/src/views/system/SystemView.vue](mdc:xhs_admin_ui/src/views/system/SystemView.vue) 包含系统配置选项：
+
+- 安全设置
+- 备份与恢复功能
+
+## API服务
+
+[xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js) 封装了所有与后端的交互：
+
+- 用户认证
+- 评论操作
+- 用户管理
+- 系统设置
+
+## 状态管理
+
+使用Pinia管理全局状态，避免组件间的过度耦合。主要的Store包括：
+
+- 用户状态
+- 系统设置
+- 评论数据缓存
+
+## 前端样式规范
+
+- 使用Element Plus组件库确保UI一致性
+- 自定义样式使用scoped CSS隔离
+- 响应式设计适配各种屏幕尺寸
+- 颜色与字体保持一致性

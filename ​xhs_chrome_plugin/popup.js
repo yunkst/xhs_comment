@@ -267,8 +267,22 @@ document.addEventListener('DOMContentLoaded', function() {
       data: data
     };
     
+    // 根据数据类型选择不同的API端点
+    let apiEndpoint;
+    if (dataTypeLabel === '评论') {
+      apiEndpoint = '/api/comments/data';
+    } else if (dataTypeLabel === '通知') {
+      apiEndpoint = '/api/notifications/data';
+    } else if (dataTypeLabel === '笔记') {
+      apiEndpoint = '/api/notes/data';
+    } else {
+      console.error('不支持的数据类型:', dataTypeLabel);
+      updateStatus(`发送失败: 不支持的数据类型 ${dataTypeLabel}`, 'error');
+      return;
+    }
+    
     // 构建完整的API URL
-    const apiUrl = apiConfig.host + '/api/data';
+    const apiUrl = apiConfig.host + apiEndpoint;
     
     // 发送请求
     fetch(apiUrl, {

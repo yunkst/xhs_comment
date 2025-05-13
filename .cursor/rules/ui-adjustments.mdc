@@ -1,0 +1,101 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统UI调整指南
+
+根据用户需求，对系统界面进行了多项优化调整，以提升用户体验。
+
+## 布局优化
+
+### 全局布局
+
+在[App.vue](mdc:xhs_admin_ui/src/App.vue)和[index.html](mdc:xhs_admin_ui/index.html)中进行的修改：
+
+- 去除页面大黑边，充分利用浏览器宽度
+- 添加`overflow: hidden`避免不必要的滚动条
+- 优化viewport设置，改善移动端适配
+
+```css
+/* App.vue中的全局样式优化 */
+#app {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
+}
+```
+
+### 主布局组件
+
+在[LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue)中进行的修改：
+
+- 将容器宽度从`100%`改为`100vw`以利用全屏宽度
+- 设置固定高度`100vh`确保充满整个视口
+- 添加`z-index`提升侧边栏层级避免被遮挡
+
+```css
+/* LayoutView.vue中的布局容器样式优化 */
+.layout-container {
+  height: 100vh;
+  width: 100vw;
+  display: flex;
+  flex-direction: row;
+  overflow: hidden;
+}
+
+.sidebar {
+  /* 其他样式 */
+  height: 100%;
+  z-index: 1000;
+}
+```
+
+## 功能界面调整
+
+### 仪表盘
+
+在[DashboardView.vue](mdc:xhs_admin_ui/src/views/DashboardView.vue)中进行的修改：
+
+- 将统计卡片从4个调整为3个，每个占1/3宽度
+- 删除"待审核评论"和"拦截评论"模块
+- 添加"待回复评论"模块
+- 优化卡片布局和间距
+
+### 评论列表
+
+在[CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue)中进行的修改：
+
+- 优化容器样式，删除冗余padding
+- 确保表格充分利用可用空间
+- 优化操作按钮和状态标签的展示
+
+### 系统设置
+
+在[SystemView.vue](mdc:xhs_admin_ui/src/views/system/SystemView.vue)中进行的修改：
+
+- 删除"基本设置"选项卡
+- 删除"评论设置"选项卡
+- 仅保留"安全设置"和"备份恢复"选项卡
+- 优化表单布局和对齐方式
+
+## 响应式设计
+
+- 所有容器使用相对单位和flex布局
+- 表格组件添加响应式设计
+- 小屏幕优化处理，确保在各种设备上可用
+
+## 色彩设计
+
+- 保持Element Plus默认色彩系统
+- 按钮使用语义化颜色：主要(蓝)、成功(绿)、警告(黄)、危险(红)
+- 状态标签使用对应的语义化颜色
+- 图表和数据可视化使用协调的配色方案
