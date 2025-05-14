@@ -11,7 +11,8 @@ from database import (
     STRUCTURED_COMMENTS_COLLECTION,
     COMMENTS_COLLECTION,
     connect_to_mongo,
-    get_database
+    get_database,
+    save_user_info
 )
 from processing import transform_raw_comments_to_structured
 from api.deps import get_current_user, get_pagination, PaginationParams
@@ -28,6 +29,7 @@ async def get_comments(
     status: Optional[str] = None,
     noteId: Optional[str] = None,
     authorName: Optional[str] = None,
+    authorId_filter: Optional[str] = Query(None, alias="authorId"),
     startDate: Optional[str] = None,
     endDate: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination),
@@ -37,12 +39,13 @@ async def get_comments(
     获取评论列表，支持多种过滤条件
     
     Args:
-        keyword: 关键词（评论内容）
-        status: 评论状态
-        noteId: 笔记ID
-        authorName: 作者名称
-        startDate: 开始日期
-        endDate: 结束日期
+        keyword: 关键词（将用于搜索评论内容、作者名称、笔记ID、作者ID）
+        status: 评论状态 (暂未使用)
+        noteId: 精确匹配笔记ID (如果提供，keyword中的笔记ID搜索可能被覆盖或结合)
+        authorName: 精确匹配作者名称 (如果提供，keyword中的作者名搜索可能被覆盖或结合)
+        authorId_filter: 精确匹配作者ID (参数名在URL中为 authorId)
+        startDate: 开始日期 (YYYY-MM-DD)
+        endDate: 结束日期 (YYYY-MM-DD)
         pagination: 分页参数
         current_user: 当前用户
         
@@ -50,42 +53,72 @@ async def get_comments(
         评论列表和总数
     """
     # 构建查询条件
-    query = {}
+    query_conditions = []
     
     if keyword:
-        query["content"] = {"$regex": keyword, "$options": "i"}
+        keyword_regex = {"$regex": keyword, "$options": "i"}
+        query_conditions.append({
+            "$or": [
+                {"content": keyword_regex},
+                {"authorName": keyword_regex},
+                {"noteId": keyword_regex},
+                {"authorId": keyword_regex}
+            ]
+        })
     
-    if status:
-        query["status"] = status
-    
+    # 如果提供了精确的noteId或authorName，可以添加到主查询条件中
+    # 这里的逻辑是 AND，如果希望是 OR，则需要调整
     if noteId:
-        query["noteId"] = noteId
+        query_conditions.append({"noteId": noteId})
     
     if authorName:
-        query["authorName"] = {"$regex": authorName, "$options": "i"}
+        query_conditions.append({"authorName": {"$regex": authorName, "$options": "i"}}) # 或者精确匹配: authorName
+        
+    if authorId_filter:
+        query_conditions.append({"authorId": authorId_filter})
     
-    # 处理日期范围
+    # 状态查询 (如果将来启用)
+    # if status:
+    #     query_conditions.append({"status": status})
+    
+    # 处理日期范围 (基于评论实际发布时间 timestamp)
     date_query = {}
     if startDate:
-        date_query["$gte"] = datetime.strptime(startDate, "%Y-%m-%d")
+        try:
+            date_query["$gte"] = datetime.strptime(startDate, "%Y-%m-%d")
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的开始日期格式: {startDate}. 请使用 YYYY-MM-DD.")
     if endDate:
-        date_query["$lte"] = datetime.strptime(endDate, "%Y-%m-%d")
+        try:
+            # 将结束日期设为当天的最后一秒，以包含整个结束日期
+            dt_endDate = datetime.strptime(endDate, "%Y-%m-%d")
+            date_query["$lte"] = dt_endDate.replace(hour=23, minute=59, second=59, microsecond=999999)
+        except ValueError:
+            raise HTTPException(status_code=400, detail=f"无效的结束日期格式: {endDate}. 请使用 YYYY-MM-DD.")
+            
     if date_query:
-        query["fetchTimestamp"] = date_query
+        query_conditions.append({"timestamp": date_query})
+    
+    # 合并所有查询条件
+    final_query = {}
+    if query_conditions:
+        final_query["$and"] = query_conditions
     
     # 获取数据库集合
     db = await get_database()
     comments_collection = db[STRUCTURED_COMMENTS_COLLECTION]
     
     # 获取总数
-    total = await comments_collection.count_documents(query)
+    total = await comments_collection.count_documents(final_query)
     
     # 获取评论列表
-    comments = await comments_collection.find(query) \
-        .sort("fetchTimestamp", -1) \
+    # 通常按评论时间降序排序
+    comments_cursor = comments_collection.find(final_query) \
+        .sort("timestamp", -1) \
         .skip(pagination.skip) \
-        .limit(pagination.limit) \
-        .to_list(length=pagination.limit)
+        .limit(pagination.limit)
+    
+    comments = await comments_cursor.to_list(length=pagination.limit)
     
     # 处理结果（特别是将_id转换为字符串）
     for comment in comments:
@@ -322,14 +355,64 @@ async def receive_comments_data(
     logger.info(f"接收到类型为 '评论' 的数据，共 {len(payload.data)} 条")
     
     try:
-        # 1. 保存原始评论数据
+        # 1. 提取和保存用户信息
+        users_saved = 0
+        try:
+            logger.info("开始提取用户信息...")
+            for comment_data in payload.data:
+                # 提取作者信息
+                author_id = None
+                if comment_data.get("authorUrl"):
+                    from processing import parse_author_id
+                    author_id = parse_author_id(comment_data.get("authorUrl"))
+                
+                if author_id and comment_data.get("authorName"):
+                    # 创建用户信息对象
+                    user_info = {
+                        "id": author_id,
+                        "name": comment_data.get("authorName"),
+                        "avatar": comment_data.get("authorAvatar"),
+                        "url": comment_data.get("authorUrl"),
+                    }
+                    # 保存用户信息
+                    save_result = await save_user_info(user_info)
+                    if save_result.get("success", False):
+                        users_saved += 1
+                
+                # 处理评论回复，也提取用户信息
+                for reply in comment_data.get("replies", []):
+                    reply_author_id = None
+                    if reply.get("authorUrl"):
+                        from processing import parse_author_id
+                        reply_author_id = parse_author_id(reply.get("authorUrl"))
+                    
+                    if reply_author_id and reply.get("authorName"):
+                        # 创建用户信息对象
+                        reply_user_info = {
+                            "id": reply_author_id,
+                            "name": reply.get("authorName"),
+                            "avatar": reply.get("authorAvatar"),
+                            "url": reply.get("authorUrl"),
+                        }
+                        # 保存用户信息
+                        save_result = await save_user_info(reply_user_info)
+                        if save_result.get("success", False):
+                            users_saved += 1
+            
+            logger.info(f"用户信息处理完成，成功保存/更新 {users_saved} 条用户信息")
+        except Exception as e:
+            logger.error(f"处理用户信息时出错: {e}", exc_info=True)
+            # 即使处理用户信息失败，仍继续处理评论数据
+            logger.info("继续处理评论数据...")
+        
+        # 2. 保存原始评论数据
         logger.info("开始保存原始评论数据...")
         raw_save_result = await save_comments_with_upsert(payload.data)
         raw_inserted = raw_save_result.get('inserted', 0)
         raw_updated = raw_save_result.get('updated', 0)
         logger.info(f"原始评论数据保存完成 - 插入: {raw_inserted}, 更新: {raw_updated}")
 
-        # 2. 转换评论数据为结构化格式
+        # 3. 转换评论数据为结构化格式
         logger.info("开始转换评论数据为结构化格式...")
         try:
             structured_data = transform_raw_comments_to_structured(payload.data)
@@ -337,11 +420,11 @@ async def receive_comments_data(
         except Exception as e:
             logger.error(f"转换评论数据时出错: {e}", exc_info=True)
             # 即使转换失败，原始数据已保存，可以返回部分成功信息
-            message = f"成功保存 {raw_inserted + raw_updated} 条原始评论 (插入: {raw_inserted}, 更新: {raw_updated})，但结构化处理失败。"
+            message = f"成功保存 {raw_inserted + raw_updated} 条原始评论 (插入: {raw_inserted}, 更新: {raw_updated})，但结构化处理失败。用户信息: {users_saved} 条。"
             # 返回 500 错误可能更合适，表示处理未完全成功
             raise HTTPException(status_code=500, detail=f"原始评论已保存，但结构化处理失败: {e}")
 
-        # 3. 保存结构化评论数据
+        # 4. 保存结构化评论数据
         if structured_data:
             logger.info("开始保存结构化评论数据...")
             structured_save_result = await save_structured_comments(structured_data)
@@ -352,7 +435,8 @@ async def receive_comments_data(
             logger.info(f"结构化评论数据保存完成 - 新增/Upserted: {struct_upserted}, 匹配/Matched: {struct_matched}, 修改/Modified: {struct_modified}, 失败: {struct_failed}")
             
             message = (f"处理完成。原始评论: 插入={raw_inserted}, 更新={raw_updated}. "
-                       f"结构化评论: 新增/更新={struct_upserted}, 匹配={struct_matched}, 修改={struct_modified}, 失败={struct_failed}.")
+                       f"结构化评论: 新增/更新={struct_upserted}, 匹配={struct_matched}, 修改={struct_modified}, 失败={struct_failed}. "
+                       f"用户信息: {users_saved} 条。")
             return {
                 "message": message,
                 "raw_inserted": raw_inserted,
@@ -360,15 +444,17 @@ async def receive_comments_data(
                 "structured_upserted": struct_upserted,
                 "structured_matched": struct_matched,
                 "structured_modified": struct_modified,
-                "structured_failed": struct_failed
+                "structured_failed": struct_failed,
+                "users_saved": users_saved
             }
         else:
             logger.info("没有生成结构化评论数据需要保存。")
-            message = f"成功保存 {raw_inserted + raw_updated} 条原始评论 (插入: {raw_inserted}, 更新: {raw_updated})。未生成结构化数据。"
+            message = f"成功保存 {raw_inserted + raw_updated} 条原始评论 (插入: {raw_inserted}, 更新: {raw_updated})。未生成结构化数据。用户信息: {users_saved} 条。"
             return {
                 "message": message,
                 "raw_inserted": raw_inserted,
-                "raw_updated": raw_updated
+                "raw_updated": raw_updated,
+                "users_saved": users_saved
             }
     except HTTPException:
         # 重新抛出已经处理过的HTTP异常

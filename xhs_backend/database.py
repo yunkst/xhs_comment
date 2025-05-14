@@ -30,6 +30,7 @@ STRUCTURED_COMMENTS_COLLECTION = "structured_comments" # 存放结构化评论�
 NOTES_COLLECTION = "notes" # 存放笔记数据
 USERS_COLLECTION = "users"
 USER_NOTES_COLLECTION = "user_notes" # 存放用户备注数据
+USER_INFO_COLLECTION = "user_info" # 存放小红书用户信息数据
 
 client: motor.motor_asyncio.AsyncIOMotorClient = None
 db: motor.motor_asyncio.AsyncIOMotorDatabase = None
@@ -592,3 +593,157 @@ async def get_user_notes(user_id: str):
     user_notes = await collection.find({"userId": user_id}).to_list(length=None)
     logger.info(f"获取到用户 {user_id} 的 {len(user_notes)} 条备注")
     return user_notes 
+
+# --- 用户信息相关函数 ---
+async def save_user_info(user_info: Dict[str, Any]) -> Dict[str, Any]:
+    """保存或更新用户信息
+    
+    Args:
+        user_info: 用户信息字典，必须包含id字段
+        
+    Returns:
+        操作结果
+    """
+    user_id = user_info.get("id")
+    if not user_id:
+        logger.warning("尝试保存用户信息时缺少id字段")
+        return {"success": False, "message": "用户信息缺少id字段"}
+    
+    try:
+        # 获取数据库集合
+        db = await get_database()
+        collection = db[USER_INFO_COLLECTION]
+        
+        # 更新时间戳
+        user_info["updatedAt"] = datetime.utcnow()
+        if "createdAt" not in user_info:
+            user_info["createdAt"] = user_info["updatedAt"]
+        
+        # 使用upsert确保创建或更新
+        result = await collection.update_one(
+            {"id": user_id},
+            {"$set": user_info},
+            upsert=True
+        )
+        
+        if result.modified_count > 0:
+            logger.info(f"更新用户信息: id={user_id}")
+            return {"success": True, "message": "用户信息已更新", "action": "updated"}
+        elif result.upserted_id:
+            logger.info(f"创建用户信息: id={user_id}")
+            return {"success": True, "message": "用户信息已创建", "action": "created"}
+        else:
+            logger.info(f"用户信息无变化: id={user_id}")
+            return {"success": True, "message": "用户信息无变化", "action": "no_change"}
+    except Exception as e:
+        logger.exception(f"保存用户信息时出错: {e}")
+        return {"success": False, "message": f"保存用户信息时出错: {str(e)}"}
+
+async def get_user_info(user_id: str) -> Optional[Dict[str, Any]]:
+    """获取指定用户的信息
+    
+    Args:
+        user_id: 用户ID
+        
+    Returns:
+        用户信息或None（如果用户不存在）
+    """
+    if not user_id:
+        logger.warning("获取用户信息时缺少用户ID")
+        return None
+    
+    try:
+        # 获取数据库集合
+        db = await get_database()
+        collection = db[USER_INFO_COLLECTION]
+        
+        # 查询用户信息
+        user_info = await collection.find_one({"id": user_id})
+        
+        # 处理结果（特别是将_id转换为字符串）
+        if user_info and '_id' in user_info:
+            user_info['_id'] = str(user_info['_id'])
+        
+        return user_info
+    except Exception as e:
+        logger.exception(f"获取用户信息时出错: {e}")
+        return None
+
+async def batch_get_user_info(user_ids: List[str]) -> Dict[str, Dict[str, Any]]:
+    """批量获取多个用户的信息
+    
+    Args:
+        user_ids: 用户ID列表
+        
+    Returns:
+        用户信息映射（用户ID -> 用户信息）
+    """
+    if not user_ids:
+        return {}
+    
+    try:
+        # 获取数据库集合
+        db = await get_database()
+        collection = db[USER_INFO_COLLECTION]
+        
+        # 构建批量查询
+        query = {"id": {"$in": user_ids}}
+        user_infos = await collection.find(query).to_list(length=None)
+        
+        # 构建结果映射
+        result = {}
+        for user_info in user_infos:
+            if '_id' in user_info:
+                user_info['_id'] = str(user_info['_id'])
+            user_id = user_info.get("id")
+            if user_id:
+                result[user_id] = user_info
+        
+        return result
+    except Exception as e:
+        logger.exception(f"批量获取用户信息时出错: {e}")
+        return {} 
+
+async def get_all_user_info_paginated(page: int = 1, page_size: int = 10) -> Dict[str, Any]:
+    """分页获取所有用户信息
+
+    Args:
+        page: 当前页码
+        page_size: 每页数量
+
+    Returns:
+        包含用户列表和总数的字典
+    """
+    try:
+        db = await get_database()
+        collection = db[USER_INFO_COLLECTION]
+
+        skip = (page - 1) * page_size
+        total = await collection.count_documents({})
+        
+        cursor = collection.find().skip(skip).limit(page_size).sort("updatedAt", -1) # 按更新时间降序排序
+        users = await cursor.to_list(length=page_size)
+
+        # 处理结果（特别是将_id转换为字符串）
+        for user in users:
+            if '_id' in user:
+                user['_id'] = str(user['_id'])
+            if 'createdAt' in user and isinstance(user['createdAt'], datetime):
+                user['createdAt'] = user['createdAt'].isoformat()
+            if 'updatedAt' in user and isinstance(user['updatedAt'], datetime):
+                user['updatedAt'] = user['updatedAt'].isoformat()
+
+        return {
+            "items": users,
+            "total": total,
+            "page": page,
+            "page_size": page_size
+        }
+    except Exception as e:
+        logger.exception(f"分页获取用户信息时出错: {e}")
+        return {
+            "items": [],
+            "total": 0,
+            "page": page,
+            "page_size": page_size
+        } 

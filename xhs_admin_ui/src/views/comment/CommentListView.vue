@@ -3,16 +3,16 @@
     <el-card class="search-card">
       <el-form :inline="true" :model="searchForm" class="search-form">
         <el-form-item label="关键词">
-          <el-input v-model="searchForm.keyword" placeholder="评论内容/用户名" clearable />
+          <el-input v-model="searchForm.keyword" placeholder="评论内容/作者名/作者ID/笔记ID" clearable />
         </el-form-item>
-        <el-form-item label="状态">
+        <!-- <el-form-item label="状态">
           <el-select v-model="searchForm.status" placeholder="请选择状态" clearable>
             <el-option label="通过" value="通过" />
             <el-option label="待审核" value="待审核" />
             <el-option label="拦截" value="拦截" />
           </el-select>
-        </el-form-item>
-        <el-form-item label="时间范围">
+        </el-form-item> -->
+        <el-form-item label="评论时间范围">
           <el-date-picker
             v-model="searchForm.dateRange"
             type="daterange"
@@ -21,6 +21,7 @@
             end-placeholder="结束日期"
             format="YYYY-MM-DD"
             value-format="YYYY-MM-DD"
+            :picker-options="pickerOptions"
           />
         </el-form-item>
         <el-form-item>
@@ -34,12 +35,12 @@
       <div class="table-header">
         <h3>评论列表</h3>
         <div class="table-operations">
-          <el-button type="primary" @click="handleBatchApprove" :disabled="selectedComments.length === 0">
+          <!-- <el-button type="primary" @click="handleBatchApprove" :disabled="selectedComments.length === 0">
             批量通过
           </el-button>
           <el-button type="danger" @click="handleBatchDelete" :disabled="selectedComments.length === 0">
             批量删除
-          </el-button>
+          </el-button> -->
           <el-button @click="refreshTable">刷新</el-button>
         </div>
       </div>
@@ -51,22 +52,39 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <el-table-column prop="id" label="ID" width="80" />
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="content" label="评论内容" min-width="300" show-overflow-tooltip />
-        <el-table-column prop="articleTitle" label="文章标题" min-width="200" show-overflow-tooltip />
-        <el-table-column prop="status" label="状态" width="100">
+        <!-- <el-table-column prop="commentId" label="评论ID" width="220" /> -->
+        <el-table-column prop="authorId" label="作者ID" width="220" />
+        <el-table-column label="作者头像" width="100">
+          <template #default="scope">
+            <el-avatar :size="40" :src="scope.row.authorAvatar">
+              <img src="https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png"/>
+            </el-avatar>
+          </template>
+        </el-table-column>
+        <el-table-column prop="authorName" label="作者名称" width="150" />
+        <el-table-column prop="content" label="评论内容" min-width="250" show-overflow-tooltip />
+        <el-table-column prop="noteId" label="笔记ID" width="220" />
+        <!-- <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
             <el-tag :type="scope.row.status === '通过' ? 'success' : scope.row.status === '待审核' ? 'warning' : 'danger'">
               {{ scope.row.status }}
             </el-tag>
           </template>
+        </el-table-column> -->
+        <el-table-column prop="timestamp" label="评论时间" width="180">
+            <template #default="scope">
+                {{ formatDateTime(scope.row.timestamp) }}
+            </template>
         </el-table-column>
-        <el-table-column prop="createTime" label="创建时间" width="180" />
-        <el-table-column label="操作" width="220" fixed="right">
+        <el-table-column prop="fetchTimestamp" label="获取时间" width="180">
+            <template #default="scope">
+                {{ formatDateTime(scope.row.fetchTimestamp) }}
+            </template>
+        </el-table-column>
+        <el-table-column label="操作" width="100" fixed="right">
           <template #default="scope">
-            <el-button size="small" @click="handleEdit(scope.row)">查看</el-button>
-            <el-button
+            <el-button size="small" @click="handleViewComment(scope.row)">查看</el-button>
+            <!-- <el-button
               size="small"
               type="success"
               v-if="scope.row.status !== '通过'"
@@ -74,7 +92,7 @@
             >
               通过
             </el-button>
-            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button> -->
           </template>
         </el-table-column>
       </el-table>
@@ -83,10 +101,10 @@
         <el-pagination
           background
           layout="total, sizes, prev, pager, next, jumper"
-          :current-page="currentPage"
+          :current-page="pagination.currentPage"
           :page-sizes="[10, 20, 50, 100]"
-          :page-size="pageSize"
-          :total="total"
+          :page-size="pagination.pageSize"
+          :total="pagination.total"
           @size-change="handleSizeChange"
           @current-change="handleCurrentChange"
         />
@@ -95,36 +113,30 @@
 
     <!-- 评论详情对话框 -->
     <el-dialog v-model="dialogVisible" title="评论详情" width="600px">
-      <el-form label-width="100px" :model="currentComment">
-        <el-form-item label="用户名">
-          <span>{{ currentComment.username }}</span>
-        </el-form-item>
-        <el-form-item label="文章标题">
-          <span>{{ currentComment.articleTitle }}</span>
-        </el-form-item>
-        <el-form-item label="评论内容">
-          <el-input
-            type="textarea"
-            v-model="currentComment.content"
-            :rows="4"
-            readonly
-          />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-select v-model="currentComment.status">
-            <el-option label="通过" value="通过" />
-            <el-option label="待审核" value="待审核" />
-            <el-option label="拦截" value="拦截" />
-          </el-select>
-        </el-form-item>
-        <el-form-item label="创建时间">
-          <span>{{ currentComment.createTime }}</span>
-        </el-form-item>
-      </el-form>
+      <el-descriptions :column="1" border v-if="currentComment && Object.keys(currentComment).length > 0">
+        <el-descriptions-item label="评论ID">{{ currentComment.commentId }}</el-descriptions-item>
+        <el-descriptions-item label="作者ID">{{ currentComment.authorId }}</el-descriptions-item>
+        <el-descriptions-item label="作者名称">{{ currentComment.authorName }}</el-descriptions-item>
+        <el-descriptions-item label="作者头像">
+          <el-avatar :size="60" :src="currentComment.authorAvatar">
+            <img src="https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png"/>
+          </el-avatar>
+        </el-descriptions-item>
+        <el-descriptions-item label="笔记ID">{{ currentComment.noteId }}</el-descriptions-item>
+        <el-descriptions-item label="评论内容">
+          <div style="white-space: pre-wrap;">{{ currentComment.content }}</div>
+        </el-descriptions-item>
+        <el-descriptions-item label="评论时间">{{ formatDateTime(currentComment.timestamp) }}</el-descriptions-item>
+        <el-descriptions-item label="获取时间">{{ formatDateTime(currentComment.fetchTimestamp) }}</el-descriptions-item>
+        <el-descriptions-item label="回复评论ID" v-if="currentComment.repliedId">{{ currentComment.repliedId }}</el-descriptions-item>
+      </el-descriptions>
+      <div v-else>
+        <p>暂无评论详情</p>
+      </div>
       <template #footer>
         <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">取消</el-button>
-          <el-button type="primary" @click="handleSaveComment">保存</el-button>
+          <el-button @click="dialogVisible = false">关闭</el-button>
+          <!-- <el-button type="primary" @click="handleSaveComment">保存状态</el-button> -->
         </div>
       </template>
     </el-dialog>
@@ -139,73 +151,112 @@ import { commentApi } from '../../services/api'
 // 搜索表单
 const searchForm = reactive({
   keyword: '',
-  status: '',
+  // status: '', // 暂时移除status，因为后端数据中不包含此字段
   dateRange: []
 })
+
+const pickerOptions = {
+  shortcuts: [{
+    text: '最近一周',
+    onClick(picker) {
+      const end = new Date();
+      const start = new Date();
+      start.setTime(start.getTime() - 3600 * 1000 * 24 * 7);
+      picker.$emit('pick', [start, end]);
+    }
+  }, {
+    text: '最近一个月',
+    onClick(picker) {
+      const end = new Date();
+      const start = new Date();
+      start.setTime(start.getTime() - 3600 * 1000 * 24 * 30);
+      picker.$emit('pick', [start, end]);
+    }
+  }, {
+    text: '最近三个月',
+    onClick(picker) {
+      const end = new Date();
+      const start = new Date();
+      start.setTime(start.getTime() - 3600 * 1000 * 24 * 90);
+      picker.$emit('pick', [start, end]);
+    }
+  }]
+}
 
 // 表格数据
 const loading = ref(false)
 const commentList = ref([])
-const selectedComments = ref([])
-const currentPage = ref(1)
-const pageSize = ref(10)
-const total = ref(0)
+const selectedComments = ref([]) // 即使移除了批量操作，保留以防未来使用
+const pagination = reactive({
+    currentPage: 1,
+    pageSize: 10,
+    total: 0
+})
 
-// 当前编辑的评论
+// 当前查看的评论
 const dialogVisible = ref(false)
 const currentComment = ref({})
 
 // 获取评论列表数据
 const getCommentList = async () => {
   loading.value = true
-  
   try {
-    // 构建查询参数
     const params = {
-      page: currentPage.value,
-      pageSize: pageSize.value,
+      page: pagination.currentPage,
+      page_size: pagination.pageSize, // 确保参数名与后端一致
+      keyword: searchForm.keyword || undefined,
+      // status: searchForm.status || undefined, // 暂时移除
     }
-    
-    if (searchForm.keyword) {
-      params.keyword = searchForm.keyword
-    }
-    
-    if (searchForm.status) {
-      params.status = searchForm.status
-    }
-    
     if (searchForm.dateRange && searchForm.dateRange.length === 2) {
       params.startDate = searchForm.dateRange[0]
       params.endDate = searchForm.dateRange[1]
     }
     
-    // 调用API获取数据
     const response = await commentApi.getCommentList(params)
-    
-    commentList.value = response.items || []
-    total.value = response.total || 0
+    // 注意：api.js中的响应拦截器已返回 response.data，所以这里response就是后端返回的完整对象
+    if (response && response.items) { 
+      commentList.value = response.items
+      pagination.total = response.total
+    } else {
+      ElMessage.error(response.message || '获取评论列表失败，数据格式不正确');
+      commentList.value = []
+      pagination.total = 0
+    }
   } catch (error) {
     console.error('获取评论列表失败:', error)
-    ElMessage.error('获取评论列表失败')
-    
-    // 发生错误时显示空数据
+    const message = error.response?.data?.detail || error.message || '获取评论列表失败'
+    ElMessage.error(message)
     commentList.value = []
-    total.value = 0
+    pagination.total = 0
   } finally {
     loading.value = false
   }
 }
 
+// 格式化日期时间
+const formatDateTime = (dateTimeStr) => {
+  if (!dateTimeStr) return '-';
+  try {
+    const date = new Date(dateTimeStr);
+    if (isNaN(date.getTime())) {
+        return dateTimeStr; // 如果解析无效，返回原始字符串
+    }
+    return date.toLocaleString('zh-CN', { hour12: false });
+  } catch (e) {
+    return dateTimeStr; // 解析出错则返回原始值
+  }
+}
+
 // 搜索
 const handleSearch = () => {
-  currentPage.value = 1
+  pagination.currentPage = 1
   getCommentList()
 }
 
 // 重置搜索条件
 const resetSearch = () => {
   searchForm.keyword = ''
-  searchForm.status = ''
+  // searchForm.status = ''
   searchForm.dateRange = []
   handleSearch()
 }
@@ -220,130 +271,70 @@ const handleSelectionChange = (selection) => {
   selectedComments.value = selection
 }
 
+// 查看评论详情
+const handleViewComment = (row) => {
+  currentComment.value = { ...row }
+  dialogVisible.value = true
+}
+
+/* // 暂时注释掉状态管理和删除逻辑，因为后端数据结构不包含status，且删除/更新状态API需确认
 // 处理批量通过
 const handleBatchApprove = () => {
-  const commentIds = selectedComments.value.map(item => item.id)
-  
+  const commentIds = selectedComments.value.map(item => item.commentId) // 使用 commentId
   ElMessageBox.confirm(`确定要批量通过这 ${selectedComments.value.length} 条评论吗?`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
+    // ... 省略 ...
   }).then(async () => {
-    loading.value = true
-    try {
-      await commentApi.batchUpdateStatus(commentIds, '通过')
-      ElMessage.success(`已批量通过 ${selectedComments.value.length} 条评论`)
-      getCommentList()
-    } catch (error) {
-      console.error('批量通过评论失败:', error)
-      ElMessage.error('批量操作失败')
-    } finally {
-      loading.value = false
-    }
+    // await commentApi.batchUpdateStatus(commentIds, '通过') // 假设后端有此接口
+    // ... 省略 ...
   }).catch(() => {})
 }
 
 // 处理批量删除
 const handleBatchDelete = () => {
-  const commentIds = selectedComments.value.map(item => item.id)
-  
+  const commentIds = selectedComments.value.map(item => item.commentId) // 使用 commentId
   ElMessageBox.confirm(`确定要批量删除这 ${selectedComments.value.length} 条评论吗?`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
+    // ... 省略 ...
   }).then(async () => {
-    loading.value = true
-    try {
-      await commentApi.batchDelete(commentIds)
-      ElMessage.success(`已批量删除 ${selectedComments.value.length} 条评论`)
-      getCommentList()
-    } catch (error) {
-      console.error('批量删除评论失败:', error)
-      ElMessage.error('批量操作失败')
-    } finally {
-      loading.value = false
-    }
+    // await commentApi.batchDelete(commentIds)
+    // ... 省略 ...
   }).catch(() => {})
 }
 
-// 处理单条通过
-const handleApprove = (row) => {
-  ElMessageBox.confirm(`确定要通过ID为 ${row.id} 的评论吗?`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    loading.value = true
-    try {
-      await commentApi.updateCommentStatus(row.id, '通过')
-      ElMessage.success(`已通过评论: ${row.id}`)
-      row.status = '通过'
-    } catch (error) {
-      console.error('通过评论失败:', error)
-      ElMessage.error('操作失败')
-    } finally {
-      loading.value = false
-    }
-  }).catch(() => {})
+// 单条通过
+const handleApprove = async (row) => {
+    // await commentApi.updateCommentStatus(row.commentId, '通过') // 假设后端有此接口
+    // ... 省略 ...
 }
 
-// 处理单条删除
-const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要删除ID为 ${row.id} 的评论吗?`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    loading.value = true
-    try {
-      await commentApi.deleteComment(row.id)
-      ElMessage.success(`已删除评论: ${row.id}`)
-      getCommentList()
-    } catch (error) {
-      console.error('删除评论失败:', error)
-      ElMessage.error('操作失败')
-    } finally {
-      loading.value = false
-    }
-  }).catch(() => {})
+// 单条删除
+const handleDelete = async (row) => {
+    // await commentApi.deleteComment(row.commentId)
+    // ... 省略 ...
 }
 
-// 处理编辑
-const handleEdit = (row) => {
-  currentComment.value = { ...row }
-  dialogVisible.value = true
-}
-
-// 保存评论修改
+// 保存评论状态 (对话框中)
 const handleSaveComment = async () => {
-  loading.value = true
-  try {
-    await commentApi.updateCommentStatus(currentComment.value.id, currentComment.value.status)
-    ElMessage.success(`保存成功: ${currentComment.value.id}`)
-    dialogVisible.value = false
-    getCommentList()
-  } catch (error) {
-    console.error('保存评论失败:', error)
-    ElMessage.error('保存失败')
-  } finally {
-    loading.value = false
-  }
-}
-
-// 处理页码变化
-const handleCurrentChange = (val) => {
-  currentPage.value = val
+  if (!currentComment.value || !currentComment.value.commentId) return;
+  // await commentApi.updateCommentStatus(currentComment.value.commentId, currentComment.value.status)
+  // ... 省略 ...
+  dialogVisible.value = false
   getCommentList()
 }
+*/
 
-// 处理每页显示条数变化
+// 分页处理
 const handleSizeChange = (val) => {
-  pageSize.value = val
-  currentPage.value = 1
+  pagination.pageSize = val
+  pagination.currentPage = 1
   getCommentList()
 }
 
-// 初始加载
+const handleCurrentChange = (val) => {
+  pagination.currentPage = val
+  getCommentList()
+}
+
+// 组件挂载时获取初始数据
 onMounted(() => {
   getCommentList()
 })
@@ -351,31 +342,32 @@ onMounted(() => {
 
 <style scoped>
 .comment-list-container {
-  width: 100%;
+  padding: 20px;
 }
 
-.search-card,
-.table-card {
+.search-card {
   margin-bottom: 20px;
-  width: 100%;
 }
 
-.table-header {
+.search-form .el-form-item {
+  margin-bottom: 0; /* 减少搜索表单项的底部间距 */
+}
+
+.table-card .table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
-  width: 100%;
+  margin-bottom: 15px;
 }
 
-.table-header h3 {
+.table-card .table-header h3 {
   margin: 0;
   font-size: 18px;
 }
 
 .pagination-container {
-  margin-top: 20px;
   display: flex;
   justify-content: flex-end;
+  margin-top: 20px;
 }
 </style> 

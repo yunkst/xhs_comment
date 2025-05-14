@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Query
 from fastapi.security import OAuth2PasswordBearer
 from typing import Dict, Any, List
 import os
@@ -11,8 +11,8 @@ from fastapi.responses import StreamingResponse
 from jose import jwt
 
 from models import UserInRegister, UserInLogin, TokenResponse
-from database import get_user_by_username, create_user, verify_user_password
-from api.deps import get_current_user
+from database import get_user_by_username, create_user, verify_user_password, get_user_info, batch_get_user_info, get_all_user_info_paginated
+from api.deps import get_current_user, PaginationParams, get_pagination
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -154,3 +154,90 @@ async def get_current_user_info(current_user: str = Depends(get_current_user)):
         del user["otp_secret"]
         
     return user
+
+# 小红书用户信息相关API
+
+@router.get("/info/list", tags=["小红书用户"])
+async def list_xhs_users(
+    pagination: PaginationParams = Depends(get_pagination),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    分页获取小红书用户信息列表
+
+    Args:
+        pagination: 分页参数
+        current_user: 当前认证用户名
+
+    Returns:
+        分页的用户信息列表
+    """
+    logger.info(f"分页查询小红书用户信息: page={pagination.page}, page_size={pagination.page_size}")
+    
+    user_data = await get_all_user_info_paginated(page=pagination.page, page_size=pagination.page_size)
+    
+    return {
+        "success": True,
+        "message": "获取用户列表成功",
+        "data": user_data
+    }
+
+@router.get("/info/{user_id}", tags=["小红书用户"])
+async def get_xhs_user_info(
+    user_id: str,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    获取小红书用户的信息
+    
+    Args:
+        user_id: 小红书用户ID
+        current_user: 当前认证用户名
+        
+    Returns:
+        用户信息或404
+    """
+    logger.info(f"查询小红书用户信息: userId={user_id}")
+    
+    user_info = await get_user_info(user_id)
+    if not user_info:
+        raise HTTPException(status_code=404, detail="未找到该用户信息")
+    
+    return {
+        "success": True,
+        "message": "获取用户信息成功",
+        "data": user_info
+    }
+
+@router.get("/info", tags=["小红书用户"])
+async def get_multiple_xhs_user_info(
+    user_ids: str = Query(..., description="逗号分隔的用户ID列表"),
+    current_user: str = Depends(get_current_user)
+):
+    """
+    批量获取多个小红书用户的信息
+    
+    Args:
+        user_ids: 逗号分隔的小红书用户ID列表
+        current_user: 当前认证用户名
+        
+    Returns:
+        用户信息映射
+    """
+    user_id_list = user_ids.split(',')
+    logger.info(f"批量查询小红书用户信息: userIds={user_id_list}")
+    
+    if not user_id_list:
+        return {
+            "success": True,
+            "message": "未提供有效的用户ID列表",
+            "data": {}
+        }
+    
+    user_infos = await batch_get_user_info(user_id_list)
+    
+    return {
+        "success": True,
+        "message": f"获取到 {len(user_infos)} 个用户信息",
+        "data": user_infos
+    }

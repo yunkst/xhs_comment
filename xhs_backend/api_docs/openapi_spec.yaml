@@ -93,6 +93,113 @@ paths:
               schema: {}
       security:
       - OAuth2PasswordBearer: []
+  /api/users/info/{user_id}:
+    get:
+      tags:
+      - 用户
+      - 小红书用户
+      summary: Get Xhs User Info
+      description: "获取小红书用户的信息\n\nArgs:\n    user_id: 小红书用户ID\n    current_user: 当前认证用户名\n\
+        \    \nReturns:\n    用户信息或404"
+      operationId: get_xhs_user_info_api_users_info__user_id__get
+      parameters:
+      - required: true
+        schema:
+          type: string
+          title: User Id
+        name: user_id
+        in: path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/users/info:
+    get:
+      tags:
+      - 用户
+      - 小红书用户
+      summary: Get Multiple Xhs User Info
+      description: "批量获取多个小红书用户的信息\n\nArgs:\n    user_ids: 逗号分隔的小红书用户ID列表\n    current_user:\
+        \ 当前认证用户名\n    \nReturns:\n    用户信息映射"
+      operationId: get_multiple_xhs_user_info_api_users_info_get
+      parameters:
+      - description: 逗号分隔的用户ID列表
+        required: true
+        schema:
+          type: string
+          title: User Ids
+          description: 逗号分隔的用户ID列表
+        name: user_ids
+        in: query
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/users/info/list:
+    get:
+      tags:
+      - 用户
+      - 小红书用户
+      summary: List Xhs Users
+      description: "分页获取小红书用户信息列表\n\nArgs:\n    pagination: 分页参数\n    current_user:\
+        \ 当前认证用户名\n\nReturns:\n    分页的用户信息列表"
+      operationId: list_xhs_users_api_users_info_list_get
+      parameters:
+      - description: 页码
+        required: false
+        schema:
+          type: integer
+          minimum: 1.0
+          title: Page
+          description: 页码
+          default: 1
+        name: page
+        in: query
+      - description: 每页项目数
+        required: false
+        schema:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Page Size
+          description: 每页项目数
+          default: 20
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
   /api/comments:
     get:
       tags:
@@ -921,6 +1028,113 @@ paths:
           content:
             application/json:
               schema: {}
+      security:
+      - OAuth2PasswordBearer: []
+  /api/info/{user_id}:
+    get:
+      tags:
+      - 认证
+      - 小红书用户
+      summary: Get Xhs User Info
+      description: "获取小红书用户的信息\n\nArgs:\n    user_id: 小红书用户ID\n    current_user: 当前认证用户名\n\
+        \    \nReturns:\n    用户信息或404"
+      operationId: get_xhs_user_info_api_info__user_id__get
+      parameters:
+      - required: true
+        schema:
+          type: string
+          title: User Id
+        name: user_id
+        in: path
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/info:
+    get:
+      tags:
+      - 认证
+      - 小红书用户
+      summary: Get Multiple Xhs User Info
+      description: "批量获取多个小红书用户的信息\n\nArgs:\n    user_ids: 逗号分隔的小红书用户ID列表\n    current_user:\
+        \ 当前认证用户名\n    \nReturns:\n    用户信息映射"
+      operationId: get_multiple_xhs_user_info_api_info_get
+      parameters:
+      - description: 逗号分隔的用户ID列表
+        required: true
+        schema:
+          type: string
+          title: User Ids
+          description: 逗号分隔的用户ID列表
+        name: user_ids
+        in: query
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+      security:
+      - OAuth2PasswordBearer: []
+  /api/info/list:
+    get:
+      tags:
+      - 认证
+      - 小红书用户
+      summary: List Xhs Users
+      description: "分页获取小红书用户信息列表\n\nArgs:\n    pagination: 分页参数\n    current_user:\
+        \ 当前认证用户名\n\nReturns:\n    分页的用户信息列表"
+      operationId: list_xhs_users_api_info_list_get
+      parameters:
+      - description: 页码
+        required: false
+        schema:
+          type: integer
+          minimum: 1.0
+          title: Page
+          description: 页码
+          default: 1
+        name: page
+        in: query
+      - description: 每页项目数
+        required: false
+        schema:
+          type: integer
+          maximum: 100.0
+          minimum: 1.0
+          title: Page Size
+          description: 每页项目数
+          default: 20
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
       security:
       - OAuth2PasswordBearer: []
   /:

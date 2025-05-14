@@ -81,46 +81,69 @@
             <el-button type="primary" size="small" @click="fetchLatestComments">刷新</el-button>
           </div>
           <el-table :data="latestComments" style="width: 100%" v-loading="tableLoading">
-            <el-table-column prop="id" label="ID" width="80" />
-            <el-table-column prop="username" label="用户名" width="120" />
-            <el-table-column prop="content" label="评论内容" />
-            <el-table-column prop="status" label="状态" width="100">
+            <el-table-column prop="commentId" label="评论ID" width="200" />
+            <el-table-column label="作者" width="180">
               <template #default="scope">
-                <el-tag :type="scope.row.status === '通过' ? 'success' : scope.row.status === '待回复' ? 'info' : 'danger'">
-                  {{ scope.row.status }}
-                </el-tag>
+                <div style="display: flex; align-items: center;">
+                  <el-avatar :size="30" :src="scope.row.authorAvatar" style="margin-right: 8px;">
+                    <img src="https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png"/>
+                  </el-avatar>
+                  <span>{{ scope.row.authorName }}</span>
+                </div>
               </template>
             </el-table-column>
-            <el-table-column prop="createTime" label="创建时间" width="180" />
-            <el-table-column label="操作" width="220">
+            <el-table-column prop="content" label="评论内容" min-width="250" show-overflow-tooltip/>
+            <el-table-column prop="noteId" label="笔记ID" width="200" />
+            <el-table-column prop="timestamp" label="评论时间" width="180">
               <template #default="scope">
-                <el-button size="small" @click="handleView(scope.row)">查看</el-button>
-                <el-button size="small" type="primary" v-if="scope.row.status === '待回复'" @click="handleReply(scope.row)">回复</el-button>
-                <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
+                {{ formatDateTime(scope.row.timestamp) }}
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="100" fixed="right">
+              <template #default="scope">
+                <el-button size="small" @click="handleViewCommentDetails(scope.row)">查看</el-button>
               </template>
             </el-table-column>
           </el-table>
         </el-card>
       </el-col>
     </el-row>
+
+    <!-- 评论详情对话框 (可以复用 CommentListView 的或新建一个简化的) -->
+    <el-dialog v-model="commentDialogVisible" title="评论详情" width="600px">
+      <el-descriptions :column="1" border v-if="currentDetailComment && Object.keys(currentDetailComment).length > 0">
+        <el-descriptions-item label="评论ID">{{ currentDetailComment.commentId }}</el-descriptions-item>
+        <el-descriptions-item label="作者ID">{{ currentDetailComment.authorId }}</el-descriptions-item>
+        <el-descriptions-item label="作者名称">{{ currentDetailComment.authorName }}</el-descriptions-item>
+        <el-descriptions-item label="笔记ID">{{ currentDetailComment.noteId }}</el-descriptions-item>
+        <el-descriptions-item label="评论内容">
+          <div style="white-space: pre-wrap;">{{ currentDetailComment.content }}</div>
+        </el-descriptions-item>
+        <el-descriptions-item label="评论时间">{{ formatDateTime(currentDetailComment.timestamp) }}</el-descriptions-item>
+      </el-descriptions>
+      <template #footer>
+        <el-button @click="commentDialogVisible = false">关闭</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { 
   ChatDotRound, 
   User, 
   Bell
 } from '@element-plus/icons-vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
-import { commentApi, userManagementApi, systemApi } from '../services/api'
+import { commentApi, systemApi } from '../services/api'
 
 const chartTimeRange = ref('week')
 const tableLoading = ref(false)
 const latestComments = ref([])
+const commentDialogVisible = ref(false)
+const currentDetailComment = ref({})
 
-// 统计数据
 const statistics = reactive({
   totalComments: 0,
   commentsChange: 0,
@@ -130,11 +153,8 @@ const statistics = reactive({
   pendingReplyChange: 0
 })
 
-// 获取统计数据
 const fetchStatistics = async () => {
   try {
-    // 这里假设后端提供了获取统计数据的API
-    // 如果没有，可以通过多个请求组合获取
     const response = await systemApi.getSystemSettings()
     if (response) {
       statistics.totalComments = response.totalComments || 0
@@ -146,29 +166,20 @@ const fetchStatistics = async () => {
     }
   } catch (error) {
     console.error('获取统计数据失败:', error)
+    ElMessage.error(error.response?.data?.detail || error.message || '获取统计数据失败');
   }
 }
 
-// 获取图表数据
 const fetchChartData = async () => {
-  try {
-    // 根据选择的时间范围获取图表数据
-    // 可根据后端API调整
-    console.log(`获取${chartTimeRange.value}图表数据`)
-  } catch (error) {
-    console.error('获取图表数据失败:', error)
-  }
+  console.log(`获取${chartTimeRange.value}图表数据`)
 }
 
-// 获取最新评论
 const fetchLatestComments = async () => {
   tableLoading.value = true
   try {
     const response = await commentApi.getCommentList({
       page: 1,
-      pageSize: 5,
-      sortBy: 'createTime',
-      sortOrder: 'desc'
+      page_size: 5,
     })
     
     if (response && response.items) {
@@ -176,58 +187,31 @@ const fetchLatestComments = async () => {
     } else {
       latestComments.value = []
     }
-    
-    ElMessage.success('刷新成功')
   } catch (error) {
     console.error('获取最新评论失败:', error)
-    ElMessage.error('获取数据失败')
+    ElMessage.error(error.response?.data?.detail || error.message || '获取最新评论失败')
     latestComments.value = []
   } finally {
     tableLoading.value = false
   }
 }
 
-const handleView = (row) => {
-  // 实现查看评论详情
-  ElMessage.info(`查看评论：${row.id}`)
+const formatDateTime = (dateTimeStr) => {
+  if (!dateTimeStr) return '-';
+  try {
+    const date = new Date(dateTimeStr);
+    if (isNaN(date.getTime())) return dateTimeStr;
+    return date.toLocaleString('zh-CN', { hour12: false });
+  } catch (e) {
+    return dateTimeStr;
+  }
 }
 
-// 处理回复评论
-const handleReply = (row) => {
-  ElMessageBox.prompt('请输入回复内容', '回复评论', {
-    confirmButtonText: '确认回复',
-    cancelButtonText: '取消',
-    inputPlaceholder: '输入回复内容...'
-  }).then(({ value }) => {
-    if (value) {
-      ElMessage.success(`回复评论 ${row.id} 成功`)
-      // 这里可以调用API保存回复
-      fetchLatestComments()
-    }
-  }).catch(() => {})
+const handleViewCommentDetails = (row) => {
+  currentDetailComment.value = { ...row };
+  commentDialogVisible.value = true;
 }
 
-const handleDelete = (row) => {
-  ElMessageBox.confirm(`确定要删除ID为 ${row.id} 的评论吗?`, '提示', {
-    confirmButtonText: '确定',
-    cancelButtonText: '取消',
-    type: 'warning'
-  }).then(async () => {
-    tableLoading.value = true
-    try {
-      await commentApi.deleteComment(row.id)
-      ElMessage.success(`已删除评论: ${row.id}`)
-      fetchLatestComments()
-    } catch (error) {
-      console.error('删除评论失败:', error)
-      ElMessage.error('操作失败')
-    } finally {
-      tableLoading.value = false
-    }
-  }).catch(() => {})
-}
-
-// 初始加载数据
 onMounted(() => {
   fetchStatistics()
   fetchChartData()
@@ -248,75 +232,81 @@ onMounted(() => {
 .card-header {
   display: flex;
   align-items: center;
+  height: 60px;
 }
 
 .card-icon {
-  font-size: 48px;
-  margin-right: 20px;
+  font-size: 36px;
+  margin-right: 15px;
   padding: 10px;
   border-radius: 8px;
+  color: #fff;
 }
 
 .comment {
-  background-color: rgba(64, 158, 255, 0.1);
-  color: #409EFF;
+  background-color: #67C23A;
 }
 
 .user {
-  background-color: rgba(103, 194, 58, 0.1);
-  color: #67C23A;
+  background-color: #409EFF;
 }
 
 .reply {
-  background-color: rgba(144, 147, 153, 0.1);
-  color: #909399;
+  background-color: #E6A23C;
 }
 
 .card-info {
-  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
 }
 
 .card-title {
-  font-size: 16px;
+  font-size: 14px;
   color: #909399;
+  margin-bottom: 5px;
 }
 
 .card-value {
   font-size: 24px;
   font-weight: bold;
-  margin-top: 5px;
+  color: #303133;
 }
 
 .card-footer {
-  margin-top: 20px;
-  font-size: 14px;
-  color: #909399;
+  margin-top: 10px;
+  font-size: 12px;
+  color: #C0C4CC;
+  border-top: 1px solid #EBEEF5;
+  padding-top: 10px;
+  text-align: center;
 }
 
-.up {
-  color: #67C23A;
-}
-
-.down {
+.card-footer .up {
   color: #F56C6C;
 }
 
+.card-footer .down {
+  color: #67C23A;
+}
+
 .chart-row, .table-row {
-  margin-bottom: 20px;
+  margin-top: 20px;
 }
 
-.chart-card {
-  min-height: 300px;
+.chart-card, .table-card {
 }
 
-.chart-header {
+.chart-card .chart-header, .table-card .table-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  padding-bottom: 15px;
+  margin-bottom: 15px;
+  border-bottom: 1px solid #EBEEF5;
 }
 
-.chart-header h3 {
+.chart-card .chart-header h3, .table-card .table-header h3 {
   margin: 0;
   font-size: 16px;
 }
@@ -325,17 +315,7 @@ onMounted(() => {
   display: flex;
   justify-content: center;
   align-items: center;
-  height: 250px;
-}
-
-.table-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.table-header h3 {
-  margin: 0;
-  font-size: 16px;
+  height: 300px;
+  color: #909399;
 }
 </style> 

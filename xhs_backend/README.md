@@ -28,6 +28,10 @@ api/
     ├── system.py     # 系统管理端点
     └── users.py      # 用户认证和管理端点
 ```
+## 文档更新
+```bash
+python3 export_openapi.py --format both --html both --output-dir api_docs --standalone
+```
 
 ## API端点
 

@@ -161,6 +161,17 @@ export const userNoteApi = {
   }
 };
 
+// 获取用户列表（小红书用户）
+export const getUserList = async (page = 1, pageSize = 10) => {
+  const response = await api.get('/api/users/info/list', {
+    params: {
+      page: page,
+      page_size: pageSize
+    }
+  });
+  return response; // 直接返回拦截器处理后的完整响应
+};
+
 export default {
   userApi,
   commentApi,

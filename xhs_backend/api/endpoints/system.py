@@ -6,7 +6,7 @@ import psutil
 import platform
 from datetime import datetime, timedelta
 
-from database import get_database, COMMENTS_COLLECTION, NOTES_COLLECTION, NOTIFICATIONS_COLLECTION
+from database import get_database, COMMENTS_COLLECTION, NOTES_COLLECTION, NOTIFICATIONS_COLLECTION, STRUCTURED_COMMENTS_COLLECTION, USER_INFO_COLLECTION, USERS_COLLECTION
 from api.deps import get_current_user
 
 # 配置日志
@@ -105,10 +105,10 @@ async def database_stats(
         
         # 获取各集合数据统计
         comments_count = await db[COMMENTS_COLLECTION].count_documents({})
-        structured_comments_count = await db["structured_comments"].count_documents({})
+        structured_comments_count = await db[STRUCTURED_COMMENTS_COLLECTION].count_documents({})
         notes_count = await db[NOTES_COLLECTION].count_documents({})
         notifications_count = await db[NOTIFICATIONS_COLLECTION].count_documents({})
-        users_count = await db["users"].count_documents({})
+        users_count = await db[USERS_COLLECTION].count_documents({})
         
         # 获取最近统计
         now = datetime.utcnow()
@@ -148,6 +148,45 @@ async def database_stats(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取数据库统计时出错: {str(e)}"
+        )
+
+@router.get("/settings", response_model=Dict[str, Any])
+async def get_system_settings_for_dashboard(
+    current_user: str = Depends(get_current_user)
+):
+    """
+    获取用于仪表盘的系统统计信息。
+    """
+    try:
+        db = await get_database()
+
+        total_structured_comments = await db[STRUCTURED_COMMENTS_COLLECTION].count_documents({})
+        # 假设 totalUsers 指的是小红书用户信息数量
+        total_xhs_users = await db[USER_INFO_COLLECTION].count_documents({})
+        # total_system_users = await db[USERS_COLLECTION].count_documents({}) # 系统注册用户
+
+        # TODO: 实现待回复评论的统计逻辑
+        pending_reply_comments = 0 # 暂时为0
+
+        # TODO: 实现较昨日变化率的计算逻辑
+        comments_change_percentage = 0 # 暂时为0
+        users_change_percentage = 0    # 暂时为0
+        pending_reply_change_percentage = 0 # 暂时为0
+
+        return {
+            "totalComments": total_structured_comments,
+            "commentsChange": comments_change_percentage, # 较昨日变化百分比
+            "totalUsers": total_xhs_users, # 使用小红书用户数
+            "usersChange": users_change_percentage,
+            "pendingReplyComments": pending_reply_comments,
+            "pendingReplyChange": pending_reply_change_percentage,
+            "lastUpdated": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        logger.exception("获取仪表盘系统设置时发生错误")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"获取仪表盘设置时出错: {str(e)}"
         )
 
 @router.get("/version", response_model=Dict[str, Any])

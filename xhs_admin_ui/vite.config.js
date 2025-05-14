@@ -6,6 +6,7 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 
 // https://vite.dev/config/
 export default defineConfig({
+  base: '/web/',
   plugins: [
     vue(),
     vueDevTools(),
@@ -26,5 +27,9 @@ export default defineConfig({
     hmr: {
       overlay: true      // 错误覆盖显示
     }
+  },
+  build: {
+    outDir: '../xhs_backend/static_frontend',
+    emptyOutDir: true,
   }
 })
