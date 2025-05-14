@@ -1,0 +1,1605 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "小红书评论维护系统",
+    "description": "小红书评论数据的管理和维护系统",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/api/users/register": {
+      "post": {
+        "tags": [
+          "用户",
+          "认证"
+        ],
+        "summary": "Register",
+        "description": "注册新用户\n\nArgs:\n    user_in: 用户注册信息\n    \nReturns:\n    访问令牌",
+        "operationId": "register_api_users_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserInRegister"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/login": {
+      "post": {
+        "tags": [
+          "用户",
+          "认证"
+        ],
+        "summary": "Login",
+        "description": "用户登录\n\nArgs:\n    user_in: 登录信息，包含用户名、密码和OTP代码\n    \nReturns:\n    访问令牌",
+        "operationId": "login_api_users_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserInLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/users/otp-qrcode": {
+      "get": {
+        "tags": [
+          "用户",
+          "用户"
+        ],
+        "summary": "Get Otp Qrcode",
+        "description": "获取当前登录用户的OTP二维码\n\nArgs:\n    current_user: 当前用户名\n    \nReturns:\n    OTP二维码图像",
+        "operationId": "get_otp_qrcode_api_users_otp_qrcode_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/users/me": {
+      "get": {
+        "tags": [
+          "用户",
+          "用户"
+        ],
+        "summary": "Get Current User Info",
+        "description": "获取当前登录用户信息\n\nArgs:\n    current_user: 当前用户名\n    \nReturns:\n    用户信息",
+        "operationId": "get_current_user_info_api_users_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments": {
+      "get": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Get Comments",
+        "description": "获取评论列表，支持多种过滤条件\n\nArgs:\n    keyword: 关键词（评论内容）\n    status: 评论状态\n    noteId: 笔记ID\n    authorName: 作者名称\n    startDate: 开始日期\n    endDate: 结束日期\n    pagination: 分页参数\n    current_user: 当前用户\n    \nReturns:\n    评论列表和总数",
+        "operationId": "get_comments_api_comments_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Keyword"
+            },
+            "name": "keyword",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Status"
+            },
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Noteid"
+            },
+            "name": "noteId",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorname"
+            },
+            "name": "authorName",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Startdate"
+            },
+            "name": "startDate",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Enddate"
+            },
+            "name": "endDate",
+            "in": "query"
+          },
+          {
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1.0,
+              "title": "Page",
+              "description": "页码",
+              "default": 1
+            },
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "description": "每页项目数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "title": "Page Size",
+              "description": "每页项目数",
+              "default": 20
+            },
+            "name": "page_size",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Comments Api Comments Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments/{comment_id}": {
+      "get": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Get Comment By Id",
+        "description": "根据ID获取评论详情\n\nArgs:\n    comment_id: 评论ID\n    current_user: 当前用户\n    \nReturns:\n    评论详情",
+        "operationId": "get_comment_by_id_api_comments__comment_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            },
+            "name": "comment_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Comment By Id Api Comments  Comment Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Delete Comment",
+        "description": "删除评论\n\nArgs:\n    comment_id: 评论ID\n    current_user: 当前用户\n    \nReturns:\n    删除结果",
+        "operationId": "delete_comment_api_comments__comment_id__delete",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            },
+            "name": "comment_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Delete Comment Api Comments  Comment Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments/{comment_id}/status": {
+      "put": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Update Comment Status",
+        "description": "更新评论状态\n\nArgs:\n    comment_id: 评论ID\n    status_data: 包含新状态的数据\n    current_user: 当前用户\n    \nReturns:\n    更新结果",
+        "operationId": "update_comment_status_api_comments__comment_id__status_put",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Comment Id"
+            },
+            "name": "comment_id",
+            "in": "path"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Status Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Update Comment Status Api Comments  Comment Id  Status Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments/batch/status": {
+      "put": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Batch Update Status",
+        "description": "批量更新评论状态\n\nArgs:\n    data: 包含评论ID列表和新状态的数据\n    current_user: 当前用户\n    \nReturns:\n    更新结果",
+        "operationId": "batch_update_status_api_comments_batch_status_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Batch Update Status Api Comments Batch Status Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments/batch/delete": {
+      "post": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Batch Delete",
+        "description": "批量删除评论\n\nArgs:\n    data: 包含评论ID列表的数据\n    current_user: 当前用户\n    \nReturns:\n    删除结果",
+        "operationId": "batch_delete_api_comments_batch_delete_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "title": "Data"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Batch Delete Api Comments Batch Delete Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments/user/{user_id}": {
+      "get": {
+        "tags": [
+          "评论"
+        ],
+        "summary": "Get User Comments",
+        "description": "获取指定用户ID的所有历史评论\n\nArgs:\n    user_id: 用户ID\n    current_user: 认证用户名\n    \nReturns:\n    包含用户评论及相关笔记信息的列表，按时间降序排序",
+        "operationId": "get_user_comments_api_comments_user__user_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            },
+            "name": "user_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get User Comments Api Comments User  User Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/comments/data": {
+      "post": {
+        "tags": [
+          "评论",
+          "数据接收"
+        ],
+        "summary": "Receive Comments Data",
+        "description": "接收评论数据\n\nArgs:\n    payload: 包含评论数据的有效载荷\n    current_user: 当前用户\n    \nReturns:\n    保存结果",
+        "operationId": "receive_comments_data_api_comments_data_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncomingPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Receive Comments Data Api Comments Data Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notes": {
+      "get": {
+        "tags": [
+          "笔记"
+        ],
+        "summary": "Get Notes",
+        "description": "获取笔记列表，支持多种过滤条件\n\nArgs:\n    noteId: 笔记ID\n    authorName: 作者名称\n    keyword: 关键词（笔记内容）\n    startDate: 开始日期\n    endDate: 结束日期\n    pagination: 分页参数\n    current_user: 当前用户\n    \nReturns:\n    笔记列表和总数",
+        "operationId": "get_notes_api_notes_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Noteid"
+            },
+            "name": "noteId",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Authorname"
+            },
+            "name": "authorName",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Keyword"
+            },
+            "name": "keyword",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Startdate"
+            },
+            "name": "startDate",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Enddate"
+            },
+            "name": "endDate",
+            "in": "query"
+          },
+          {
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1.0,
+              "title": "Page",
+              "description": "页码",
+              "default": 1
+            },
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "description": "每页项目数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "title": "Page Size",
+              "description": "每页项目数",
+              "default": 20
+            },
+            "name": "page_size",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Notes Api Notes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notes/{note_id}": {
+      "get": {
+        "tags": [
+          "笔记"
+        ],
+        "summary": "Get Note By Id",
+        "description": "根据ID获取笔记详情\n\nArgs:\n    note_id: 笔记ID\n    current_user: 当前用户\n    \nReturns:\n    笔记详情",
+        "operationId": "get_note_by_id_api_notes__note_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Note Id"
+            },
+            "name": "note_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Note By Id Api Notes  Note Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notes/data": {
+      "post": {
+        "tags": [
+          "笔记",
+          "数据接收"
+        ],
+        "summary": "Receive Notes Data",
+        "description": "接收笔记数据\n\nArgs:\n    payload: 包含笔记数据的有效载荷\n    current_user: 当前用户\n    \nReturns:\n    保存结果",
+        "operationId": "receive_notes_data_api_notes_data_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncomingPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Receive Notes Data Api Notes Data Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notifications": {
+      "get": {
+        "tags": [
+          "通知"
+        ],
+        "summary": "Get Notifications",
+        "description": "获取通知列表，支持多种过滤条件\n\nArgs:\n    userId: 用户ID\n    type: 通知类型（如评论、点赞）\n    status: 通知状态\n    keyword: 关键词（通知内容）\n    startDate: 开始日期\n    endDate: 结束日期\n    pagination: 分页参数\n    current_user: 当前用户\n    \nReturns:\n    通知列表和总数",
+        "operationId": "get_notifications_api_notifications_get",
+        "parameters": [
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Userid"
+            },
+            "name": "userId",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Type"
+            },
+            "name": "type",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Status"
+            },
+            "name": "status",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Keyword"
+            },
+            "name": "keyword",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Startdate"
+            },
+            "name": "startDate",
+            "in": "query"
+          },
+          {
+            "required": false,
+            "schema": {
+              "type": "string",
+              "title": "Enddate"
+            },
+            "name": "endDate",
+            "in": "query"
+          },
+          {
+            "description": "页码",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1.0,
+              "title": "Page",
+              "description": "页码",
+              "default": 1
+            },
+            "name": "page",
+            "in": "query"
+          },
+          {
+            "description": "每页项目数",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100.0,
+              "minimum": 1.0,
+              "title": "Page Size",
+              "description": "每页项目数",
+              "default": 20
+            },
+            "name": "page_size",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Notifications Api Notifications Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/{notification_id}": {
+      "get": {
+        "tags": [
+          "通知"
+        ],
+        "summary": "Get Notification By Id",
+        "description": "根据ID获取通知详情\n\nArgs:\n    notification_id: 通知ID\n    current_user: 当前用户\n    \nReturns:\n    通知详情",
+        "operationId": "get_notification_by_id_api_notifications__notification_id__get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Notification Id"
+            },
+            "name": "notification_id",
+            "in": "path"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get Notification By Id Api Notifications  Notification Id  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/notifications/data": {
+      "post": {
+        "tags": [
+          "通知",
+          "数据接收"
+        ],
+        "summary": "Receive Notifications Data",
+        "description": "接收通知数据\n\nArgs:\n    payload: 包含通知数据的有效载荷\n    current_user: 当前用户\n    \nReturns:\n    保存结果",
+        "operationId": "receive_notifications_data_api_notifications_data_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IncomingPayload"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Receive Notifications Data Api Notifications Data Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/system/status": {
+      "get": {
+        "tags": [
+          "系统"
+        ],
+        "summary": "System Status",
+        "description": "获取系统状态信息\n\nArgs:\n    current_user: 当前用户\n    \nReturns:\n    系统状态信息",
+        "operationId": "system_status_api_system_status_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response System Status Api System Status Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/system/database-stats": {
+      "get": {
+        "tags": [
+          "系统"
+        ],
+        "summary": "Database Stats",
+        "description": "获取数据库统计信息\n\nArgs:\n    current_user: 当前用户\n    \nReturns:\n    数据库统计信息",
+        "operationId": "database_stats_api_system_database_stats_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Database Stats Api System Database Stats Get"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/system/version": {
+      "get": {
+        "tags": [
+          "系统"
+        ],
+        "summary": "Version Info",
+        "description": "获取系统版本信息（无需认证）\n\nReturns:\n    系统版本信息",
+        "operationId": "version_info_api_system_version_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Version Info Api System Version Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/user-notes": {
+      "get": {
+        "tags": [
+          "用户备注"
+        ],
+        "summary": "Get User Notes By Id",
+        "description": "获取指定用户的所有备注\n\nArgs:\n    user_id: 用户ID\n    current_user: 当前用户\n    \nReturns:\n    用户备注列表",
+        "operationId": "get_user_notes_by_id_api_user_notes_get",
+        "parameters": [
+          {
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Id"
+            },
+            "name": "user_id",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get User Notes By Id Api User Notes Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "用户备注"
+        ],
+        "summary": "Create User Note",
+        "description": "创建或更新用户备注\n\nArgs:\n    note_data: 包含用户ID、通知哈希和备注内容的数据\n    current_user: 当前用户\n    \nReturns:\n    操作结果",
+        "operationId": "create_user_note_api_user_notes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserNoteCreate"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Create User Note Api User Notes Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/user-notes/batch": {
+      "get": {
+        "tags": [
+          "用户备注"
+        ],
+        "summary": "Get User Notes Batch",
+        "description": "批量获取多个用户的备注\n\nArgs:\n    user_ids: 逗号分隔的用户ID列表\n    current_user: 当前用户\n    \nReturns:\n    多个用户的备注数据",
+        "operationId": "get_user_notes_batch_api_user_notes_batch_get",
+        "parameters": [
+          {
+            "description": "逗号分隔的用户ID列表",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "User Ids",
+              "description": "逗号分隔的用户ID列表"
+            },
+            "name": "user_ids",
+            "in": "query"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "title": "Response Get User Notes Batch Api User Notes Batch Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/register": {
+      "post": {
+        "tags": [
+          "认证",
+          "认证"
+        ],
+        "summary": "Register",
+        "description": "注册新用户\n\nArgs:\n    user_in: 用户注册信息\n    \nReturns:\n    访问令牌",
+        "operationId": "register_api_register_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserInRegister"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/login": {
+      "post": {
+        "tags": [
+          "认证",
+          "认证"
+        ],
+        "summary": "Login",
+        "description": "用户登录\n\nArgs:\n    user_in: 登录信息，包含用户名、密码和OTP代码\n    \nReturns:\n    访问令牌",
+        "operationId": "login_api_login_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UserInLogin"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TokenResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/otp-qrcode": {
+      "get": {
+        "tags": [
+          "认证",
+          "用户"
+        ],
+        "summary": "Get Otp Qrcode",
+        "description": "获取当前登录用户的OTP二维码\n\nArgs:\n    current_user: 当前用户名\n    \nReturns:\n    OTP二维码图像",
+        "operationId": "get_otp_qrcode_api_otp_qrcode_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/me": {
+      "get": {
+        "tags": [
+          "认证",
+          "用户"
+        ],
+        "summary": "Get Current User Info",
+        "description": "获取当前登录用户信息\n\nArgs:\n    current_user: 当前用户名\n    \nReturns:\n    用户信息",
+        "operationId": "get_current_user_info_api_me_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/": {
+      "get": {
+        "tags": [
+          "通用"
+        ],
+        "summary": "Read Root",
+        "description": "根路径，用于健康检查或基本信息",
+        "operationId": "read_root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "IncomingPayload": {
+        "properties": {
+          "type": {
+            "type": "string",
+            "enum": [
+              "通知",
+              "评论",
+              "笔记"
+            ],
+            "title": "Type"
+          },
+          "data": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array",
+            "title": "Data"
+          }
+        },
+        "type": "object",
+        "required": [
+          "type",
+          "data"
+        ],
+        "title": "IncomingPayload"
+      },
+      "TokenResponse": {
+        "properties": {
+          "access_token": {
+            "type": "string",
+            "title": "Access Token"
+          },
+          "token_type": {
+            "type": "string",
+            "title": "Token Type",
+            "default": "bearer"
+          }
+        },
+        "type": "object",
+        "required": [
+          "access_token"
+        ],
+        "title": "TokenResponse"
+      },
+      "UserInLogin": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          },
+          "otp_code": {
+            "type": "string",
+            "title": "Otp Code"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password",
+          "otp_code"
+        ],
+        "title": "UserInLogin"
+      },
+      "UserInRegister": {
+        "properties": {
+          "username": {
+            "type": "string",
+            "title": "Username"
+          },
+          "password": {
+            "type": "string",
+            "title": "Password"
+          }
+        },
+        "type": "object",
+        "required": [
+          "username",
+          "password"
+        ],
+        "title": "UserInRegister"
+      },
+      "UserNoteCreate": {
+        "properties": {
+          "userId": {
+            "type": "string",
+            "title": "Userid"
+          },
+          "notificationHash": {
+            "type": "string",
+            "title": "Notificationhash"
+          },
+          "noteContent": {
+            "type": "string",
+            "title": "Notecontent"
+          }
+        },
+        "type": "object",
+        "required": [
+          "userId",
+          "notificationHash",
+          "noteContent"
+        ],
+        "title": "UserNoteCreate"
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      }
+    },
+    "securitySchemes": {
+      "OAuth2PasswordBearer": {
+        "type": "oauth2",
+        "flows": {
+          "password": {
+            "scopes": {},
+            "tokenUrl": "/api/login"
+          }
+        }
+      }
+    }
+  }
+}

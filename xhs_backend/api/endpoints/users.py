@@ -89,18 +89,18 @@ async def login(user_in: UserInLogin):
 
 # OTP二维码生成接口
 @router.get("/otp-qrcode", tags=["用户"])
-async def get_otp_qrcode(username: str):
+async def get_otp_qrcode(current_user: str = Depends(get_current_user)):
     """
-    获取OTP二维码
+    获取当前登录用户的OTP二维码
     
     Args:
-        username: 用户名
+        current_user: 当前用户名
         
     Returns:
         OTP二维码图像
     """
     # 获取用户信息
-    user = await get_user_by_username(username)
+    user = await get_user_by_username(current_user)
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
     
@@ -109,7 +109,7 @@ async def get_otp_qrcode(username: str):
     if not otp_secret:
         raise HTTPException(status_code=400, detail="用户OTP密钥未配置")
     
-    otp_url = pyotp.totp.TOTP(otp_secret).provisioning_uri(name=username, issuer_name="XHS评论系统")
+    otp_url = pyotp.totp.TOTP(otp_secret).provisioning_uri(name=current_user, issuer_name="XHS评论系统")
     
     # 生成二维码
     qr = qrcode.QRCode(
