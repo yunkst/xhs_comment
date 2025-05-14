@@ -94,10 +94,11 @@ if os.path.exists(STATIC_FILES_DIR) and os.path.exists(os.path.join(STATIC_FILES
     app.mount("/web", StaticFiles(directory=STATIC_FILES_DIR, html=True), name="web-spa")
     logger.info(f"前端SPA将从 '{STATIC_FILES_DIR}'目录下的 /web 端点提供服务。")
     # 3. 根路径重定向到 /web/
-    @app.get("/", include_in_schema=False)
-    async def root_redirect_to_web():
-        return RedirectResponse(url="/web/")
-    logger.info("根路径 '/' 将重定向到 '/web/'。")
+    # @app.get("/", include_in_schema=False)
+    # async def root_redirect_to_web():
+    #     return RedirectResponse(url="/web/")
+    # logger.info("根路径 '/' 将重定向到 '/web/'。")
+    # logger.info("根路径 '/' 将不再重定向到 '/web/'. 直接访问 '/' 可能导致404。")
 else:
     logger.warning(f"静态文件目录 '{STATIC_FILES_DIR}' 或其中的 'index.html' 未找到。")
     logger.warning("前端页面将无法通过 /web 提供服务。请确保前端已正确构建并放置到指定目录。")
