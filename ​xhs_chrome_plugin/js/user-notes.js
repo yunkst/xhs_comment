@@ -217,10 +217,9 @@ function generateNotificationHash(notification) {
   const userId = notification.userInfo?.id || '';
   const content = notification.content || '';
   const interactionType = notification.interaction?.type || '';
-  const time = notification.interaction?.time || '';
   
-  // 组合关键信息生成唯一标识
-  return `${userId}_${content.substring(0, 20)}_${interactionType}_${time}`.replace(/\s+/g, '_');
+  // 组合关键信息生成唯一标识 (不使用time，因为time可能会变化)
+  return `${userId}_${content.substring(0, 20)}_${interactionType}`.replace(/\s+/g, '_');
 }
 
 // 导出函数
