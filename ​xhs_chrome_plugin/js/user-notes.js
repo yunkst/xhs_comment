@@ -19,8 +19,8 @@ function addNoteInputToContainer(container, userId, notification) {
   noteInputContainer.className = 'xhs-note-container';
   noteInputContainer.style.cssText = `
     position: absolute;
-    right: 15px;
-    top: 50%;
+    right: -15px;
+    top: 20px;
     transform: translateY(-50%);
     display: flex;
     align-items: center;
@@ -41,22 +41,42 @@ function addNoteInputToContainer(container, userId, notification) {
     border-radius: 4px;
     font-size: 12px;
     outline: none;
-    transition: border-color 0.2s;
+    transition: all 0.3s ease;
     resize: none;
     overflow: auto;
-    color: #777;
+    color: #333;
     line-height: 1.4;
     font-family: Arial, sans-serif;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   `;
+  
+  // 创建状态指示器
+  const statusIndicator = document.createElement('div');
+  statusIndicator.className = 'xhs-note-status';
+  statusIndicator.style.cssText = `
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background-color: transparent;
+    display: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+  `;
+  noteInputContainer.appendChild(statusIndicator);
   
   // 添加输入框获取焦点时的样式
   noteInput.addEventListener('focus', () => {
     noteInput.style.borderColor = '#ff2442';
+    noteInput.style.boxShadow = '0 0 5px rgba(255,36,66,0.3)';
   });
   
   // 添加输入框失去焦点时的样式
   noteInput.addEventListener('blur', () => {
     noteInput.style.borderColor = '#ddd';
+    noteInput.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
   });
   
   // 创建防抖函数，延迟保存备注
@@ -70,20 +90,76 @@ function addNoteInputToContainer(container, userId, notification) {
       
       // 如果备注内容有变化，则保存
       if (newNoteContent !== (window.xhsApiService.userNotes[notificationHash] || '')) {
-        noteInput.style.borderColor = '#ffaa00'; // 保存中状态
+        // 显示保存中状态
+        statusIndicator.style.display = 'block';
+        statusIndicator.style.backgroundColor = '#ffaa00';
+        noteInput.style.borderColor = '#ffaa00';
+        noteInput.style.boxShadow = '0 0 8px rgba(255,170,0,0.5)';
+        
+        // 添加保存中动画
+        statusIndicator.style.animation = 'xhs-note-saving-pulse 1s infinite';
         
         const saveSuccess = await window.xhsApiService.saveUserNote(userId, notificationHash, newNoteContent);
         
+        // 停止保存中动画
+        statusIndicator.style.animation = '';
+        
         if (saveSuccess) {
-          noteInput.style.borderColor = '#4caf50'; // 保存成功状态
+          // 保存成功动画
+          statusIndicator.style.backgroundColor = '#4caf50';
+          noteInput.style.borderColor = '#4caf50';
+          noteInput.style.boxShadow = '0 0 8px rgba(76,175,80,0.5)';
+          
+          // 创建成功提示元素
+          const successIcon = document.createElement('div');
+          successIcon.className = 'xhs-save-success-icon';
+          successIcon.innerHTML = '✓';
+          successIcon.style.cssText = `
+            position: absolute;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+          `;
+          statusIndicator.innerHTML = '';
+          statusIndicator.appendChild(successIcon);
+          
+          // 3秒后隐藏状态
           setTimeout(() => {
+            statusIndicator.style.display = 'none';
             noteInput.style.borderColor = '#ddd';
-          }, 1000);
+            noteInput.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+          }, 2000);
         } else {
-          noteInput.style.borderColor = '#f44336'; // 保存失败状态
+          // 保存失败动画
+          statusIndicator.style.backgroundColor = '#f44336';
+          noteInput.style.borderColor = '#f44336';
+          noteInput.style.boxShadow = '0 0 8px rgba(244,67,54,0.5)';
+          
+          // 创建失败提示元素
+          const failIcon = document.createElement('div');
+          failIcon.className = 'xhs-save-fail-icon';
+          failIcon.innerHTML = '!';
+          failIcon.style.cssText = `
+            position: absolute;
+            color: white;
+            font-size: 10px;
+            font-weight: bold;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+          `;
+          statusIndicator.innerHTML = '';
+          statusIndicator.appendChild(failIcon);
+          
+          // 3秒后隐藏状态
           setTimeout(() => {
+            statusIndicator.style.display = 'none';
             noteInput.style.borderColor = '#ddd';
-          }, 1000);
+            noteInput.style.boxShadow = '0 1px 3px rgba(0,0,0,0.1)';
+          }, 2000);
         }
       }
     }, 500); // 延迟500ms保存，防止频繁请求
@@ -141,10 +217,9 @@ function generateNotificationHash(notification) {
   const userId = notification.userInfo?.id || '';
   const content = notification.content || '';
   const interactionType = notification.interaction?.type || '';
-  const time = notification.interaction?.time || '';
   
-  // 组合关键信息生成唯一标识
-  return `${userId}_${content.substring(0, 20)}_${interactionType}_${time}`.replace(/\s+/g, '_');
+  // 组合关键信息生成唯一标识 (不使用time，因为time可能会变化)
+  return `${userId}_${content.substring(0, 20)}_${interactionType}`.replace(/\s+/g, '_');
 }
 
 // 导出函数

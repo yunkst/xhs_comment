@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const saveBtn = document.getElementById('saveBtn');
   const statusEl = document.getElementById('status');
   const loginBtn = document.getElementById('loginBtn');
+  const logoutBtn = document.getElementById('logoutBtn');
   const loginUsernameInput = document.getElementById('loginUsername');
   const loginPasswordInput = document.getElementById('loginPassword');
   const loginOtpInput = document.getElementById('loginOtp');
@@ -62,9 +63,18 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // 从storage中加载已保存的配置
-  chrome.storage.local.get(['apiBaseUrl'], function(result) {
+  chrome.storage.local.get(['apiBaseUrl', 'apiToken'], function(result) {
     if (result.apiBaseUrl) {
       apiHostInput.value = result.apiBaseUrl;
+    }
+    
+    // 如果有token，显示已登录状态
+    if (result.apiToken) {
+      loginBtn.textContent = '已登录';
+      loginBtn.style.backgroundColor = '#00994d';
+      logoutBtn.style.display = 'inline-block';
+    } else {
+      logoutBtn.style.display = 'none';
     }
     
     console.log('从存储加载配置:', result);
@@ -137,6 +147,10 @@ document.addEventListener('DOMContentLoaded', function() {
           showStatus('保存登录信息失败: ' + chrome.runtime.lastError.message, 'error');
         } else {
           showStatus('登录成功，令牌已保存', 'success');
+          // 更新UI状态
+          loginBtn.textContent = '已登录';
+          loginBtn.style.backgroundColor = '#00994d';
+          logoutBtn.style.display = 'inline-block';
           // 通知popup页面刷新API配置
           chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
         }
@@ -144,6 +158,29 @@ document.addEventListener('DOMContentLoaded', function() {
     } catch (e) {
       showStatus(e.message || '登录异常', 'error');
     }
+  });
+  
+  // 退出登录按钮点击事件
+  logoutBtn.addEventListener('click', function() {
+    // 从存储中移除apiToken
+    chrome.storage.local.remove('apiToken', function() {
+      if (chrome.runtime.lastError) {
+        showStatus('退出失败: ' + chrome.runtime.lastError.message, 'error');
+      } else {
+        // 更新UI状态
+        loginBtn.textContent = '登录';
+        loginBtn.style.backgroundColor = '#ff2442';
+        logoutBtn.style.display = 'none';
+        // 清空登录表单
+        loginUsernameInput.value = '';
+        loginPasswordInput.value = '';
+        loginOtpInput.value = '';
+        // 显示成功消息
+        showStatus('已成功退出登录', 'success');
+        // 通知popup页面刷新API配置
+        chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
+      }
+    });
   });
   
   // 显示注册弹窗
@@ -198,20 +235,35 @@ document.addEventListener('DOMContentLoaded', function() {
           const err = await resp.text();
           throw new Error('注册失败: ' + err);
         }
+        
+        // 解析注册响应并保存token
+        const data = await resp.json();
+        if (!data.access_token) {
+          throw new Error('注册成功但未获取到JWT令牌');
+        }
+        
+        // 保存JWT令牌用于后续请求
+        const token = data.access_token;
+        chrome.storage.local.set({
+          apiBaseUrl: apiBaseUrl,
+          apiToken: token
+        });
+        
         // 注册成功，获取OTP二维码
         otpQrcodeGroup.style.display = 'block';
         otpCodeGroup.style.display = 'block';
         
-        // 获取二维码 - 使用代理请求获取图片
-        const qrCodeUrl = apiBaseUrl + '/api/otp-qrcode?username=' + encodeURIComponent(username);
+        // 获取二维码 - 使用代理请求获取图片，并带上认证头
+        const qrCodeUrl = apiBaseUrl + '/api/otp-qrcode';
         
         // 使用data URL形式显示二维码图片
         try {
-          // 使用代理请求直接获取二维码二进制数据
+          // 使用代理请求直接获取二维码二进制数据，并带上认证头
           chrome.runtime.sendMessage({
             action: 'proxyApiRequest',
             url: qrCodeUrl,
             method: 'GET',
+            headers: { 'Authorization': `Bearer ${token}` },
             responseType: 'blob'
           }, response => {
             if (response && response.success && response.data) {
@@ -264,6 +316,10 @@ document.addEventListener('DOMContentLoaded', function() {
           showRegisterStatus('保存登录信息失败: ' + chrome.runtime.lastError.message, 'error');
         } else {
           showRegisterStatus('注册并登录成功，令牌已保存', 'success');
+          // 更新UI状态
+          loginBtn.textContent = '已登录';
+          loginBtn.style.backgroundColor = '#00994d';
+          logoutBtn.style.display = 'inline-block';
           setTimeout(() => { registerModal.style.display = 'none'; }, 1200);
           // 通知popup页面刷新API配置
           chrome.runtime.sendMessage({ action: 'refreshApiConfig' });

@@ -246,91 +246,35 @@ function addButtonsToNotifications() {
         addButtonsToContainers(allContainers);
       }, 300);
     });
-  }
-  
-  // 添加样式
-  if (!document.querySelector('style.xhs-plugin-style')) {
-    console.log('添加插件样式');
-    const style = document.createElement('style');
-    style.className = 'xhs-plugin-style';
-    style.textContent = `
-      .xhs-plugin-action-btn:hover {
-        opacity: 0.9;
-        transform: translateY(-50%) scale(1.05);
-        transition: all 0.2s ease;
-      }
-      
-      .xhs-plugin-dialog {
-        position: fixed;
-        top: 50%;
-        left: 15%;
-        transform: translate(-50%, -50%);
-        width: 500px;
-        height: 80vh;
-        background-color: #000000;
-        border-radius: 8px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-        z-index: 10000;
-        display: flex;
-        flex-direction: column;
-        color: white;
-        pointer-events: auto; /* 确保弹框可以接收鼠标事件 */
-      }
-      
-      .xhs-plugin-dialog-header {
-        padding: 10px;
-        border-bottom: 1px solid #333;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        background-color: #111;
-      }
-      
-      .xhs-plugin-dialog-title {
-        font-weight: bold;
-        color: white;
-      }
-      
-      .xhs-plugin-dialog-close {
-        cursor: pointer;
-        font-size: 20px;
-        color: white;
-      }
-      
-      .xhs-plugin-dialog-content {
-        flex: 1;
-        padding: 20px;
-        overflow: auto;
-        background-color: #000000;
-        color: white;
-      }
-      
-      /* 备注输入框样式 */
-      .xhs-note-input {
-        border: 1px solid #ddd;
-        border-radius: 4px;
-        padding: 5px 8px;
-        font-size: 12px;
-        height: 60px;
-        width: 150px;
-        outline: none;
-        transition: border-color 0.2s;
-        resize: none;
-        color: #777;
-        line-height: 1.4;
-        font-family: Arial, sans-serif;
+    
+    // 添加动画样式
+    const styleElem = document.createElement('style');
+    styleElem.textContent = `
+      @keyframes xhs-note-saving-pulse {
+        0% { transform: scale(1); opacity: 0.7; }
+        50% { transform: scale(1.2); opacity: 1; }
+        100% { transform: scale(1); opacity: 0.7; }
       }
       
       .xhs-note-input:focus {
-        border-color: #ff2442;
-        box-shadow: 0 0 3px rgba(255, 36, 66, 0.3);
+        border-color: #ff2442 !important;
+        box-shadow: 0 0 5px rgba(255, 36, 66, 0.3) !important;
       }
       
-      .xhs-note-input::placeholder {
-        color: #aaa;
+      .xhs-note-container {
+        position: relative;
+      }
+      
+      .xhs-note-status {
+        z-index: 1000;
+      }
+      
+      /* 保存动画效果过渡 */
+      .xhs-note-input, .xhs-note-status {
+        transition: all 0.3s ease !important;
       }
     `;
-    document.head.appendChild(style);
+    document.head.appendChild(styleElem);
   }
   
   console.log('成功添加红色按钮到通知列表');
@@ -354,3 +298,32 @@ window.xhsNotificationHandler = {
   getActiveTabType,
   navigateToNotificationPage
 }; 
+
+// 添加备注状态动画样式
+(function addSaveAnimationStyles() {
+  // 检查样式是否已存在
+  if (document.querySelector('#xhs-note-animation-styles')) {
+    return;
+  }
+  
+  const animationStyles = document.createElement('style');
+  animationStyles.id = 'xhs-note-animation-styles';
+  animationStyles.textContent = `
+    @keyframes xhs-note-saving-pulse {
+      0% { transform: scale(1); opacity: 0.7; }
+      50% { transform: scale(1.2); opacity: 1; }
+      100% { transform: scale(1); opacity: 0.7; }
+    }
+    
+    .xhs-note-container {
+      position: relative !important;
+    }
+    
+    .xhs-note-status {
+      z-index: 1000 !important;
+    }
+  `;
+  
+  document.head.appendChild(animationStyles);
+  console.log('添加备注状态动画样式');
+})(); 
