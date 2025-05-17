@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
@@ -15,7 +15,7 @@ from database import (
     save_user_info
 )
 from processing import transform_raw_comments_to_structured
-from api.deps import get_current_user, get_pagination, PaginationParams
+from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -33,7 +33,8 @@ async def get_comments(
     startDate: Optional[str] = None,
     endDate: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination),
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取评论列表，支持多种过滤条件

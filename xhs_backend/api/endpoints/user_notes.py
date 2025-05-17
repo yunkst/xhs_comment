@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
@@ -10,7 +10,7 @@ from database import (
     USER_NOTES_COLLECTION,
     get_database
 )
-from api.deps import get_current_user
+from api.deps import get_current_user, get_current_user_combined
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -27,7 +27,8 @@ class UserNoteCreate(BaseModel):
 @router.post("", response_model=Dict[str, Any])
 async def create_user_note(
     note_data: UserNoteCreate,
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     创建或更新用户备注
@@ -69,7 +70,8 @@ async def create_user_note(
 @router.get("", response_model=Dict[str, Any])
 async def get_user_notes_by_id(
     user_id: str,
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取指定用户的所有备注
@@ -106,7 +108,8 @@ async def get_user_notes_by_id(
 @router.get("/batch", response_model=Dict[str, Any])
 async def get_user_notes_batch(
     user_ids: str = Query(..., description="逗号分隔的用户ID列表"),
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     批量获取多个用户的备注

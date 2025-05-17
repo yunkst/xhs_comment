@@ -4,6 +4,27 @@ import LoginView from '../views/LoginView.vue'
 import LayoutView from '../views/LayoutView.vue'
 import DashboardView from '../views/DashboardView.vue'
 
+// 从URL查询参数中提取并存储token
+const processTokenFromUrl = () => {
+  const urlParams = new URLSearchParams(window.location.search)
+  const accessToken = urlParams.get('access_token')
+  const refreshToken = urlParams.get('refresh_token')
+  const idToken = urlParams.get('id_token')
+  
+  if (accessToken) {
+    // 保存token到localStorage
+    console.log('保存token')
+    localStorage.setItem('token', accessToken)
+    if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
+    if (idToken) localStorage.setItem('id_token', idToken)
+    
+    // 清除URL参数，避免token暴露在地址栏
+    window.history.replaceState({}, document.title, window.location.pathname)
+    return true
+  }
+  return false
+}
+
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
@@ -62,11 +83,20 @@ router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 小红书评论维护系统` : '小红书评论维护系统'
 
+  // 处理URL中的token参数（SSO登录后的重定向）
+  const hasProcessedToken = processTokenFromUrl()
+  if (hasProcessedToken) {
+    // 如果处理了token，重定向到主页
+    next({ path: '/', replace: true })
+    return
+  }
+
   // 验证是否需要登录权限
   if (to.meta.noAuth) {
     next()
   } else {
     const token = localStorage.getItem('token')
+    console.log('有token')
     if (!token) {
       ElMessage.warning('请先登录')
       next('/login')

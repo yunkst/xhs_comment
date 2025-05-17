@@ -134,8 +134,7 @@ async def get_user_from_keycloak_or_jwt(request: Request) -> str:
                 options = {"verify_signature": True, "verify_aud": False, "verify_exp": True}
                 token_info = keycloak_openid.decode_token(
                     token,
-                    key=public_key,
-                    options=options
+                    key=public_key
                 )
                 
                 # 提取用户名

@@ -16,6 +16,9 @@ router = APIRouter()
 
 # SSO登录配置
 FRONTEND_REDIRECT_URL = os.getenv("FRONTEND_REDIRECT_URL", "http://localhost:8080/web")
+# 固定的回调URL，确保使用HTTPS
+BASE_URL = os.getenv("BASE_URL", "https://note")
+CALLBACK_URL = f"{BASE_URL}/api/auth/sso-callback"
 
 # SSO登录响应模型
 class SSOLoginResponse(BaseModel):
@@ -44,10 +47,11 @@ async def get_sso_login_url(request: Request):
         )
     
     try:
-        # 生成认证URL
-        callback_url = str(request.url_for("sso_callback"))
+        # 使用固定的回调URL而不是动态生成
+        # callback_url = str(request.url_for("sso_callback"))
+        logger.info(f"使用固定回调URL: {CALLBACK_URL}")
         auth_url = keycloak_openid.auth_url(
-            redirect_uri=callback_url,
+            redirect_uri=CALLBACK_URL,
             scope="openid"
         )
         
@@ -83,14 +87,15 @@ async def sso_callback(
         )
     
     try:
-        # 获取回调URL
-        callback_url = str(request.url_for("sso_callback"))
+        # 使用固定的回调URL
+        # callback_url = str(request.url_for("sso_callback"))
+        logger.info(f"SSO回调处理使用固定URL: {CALLBACK_URL}")
         
         # 交换授权码获取令牌
         token_response = keycloak_openid.token(
             grant_type="authorization_code",
             code=code,
-            redirect_uri=callback_url
+            redirect_uri=CALLBACK_URL
         )
         
         # 获取令牌

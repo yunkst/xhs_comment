@@ -17,6 +17,7 @@ export default defineConfig({
     },
   },
   server: {
+    allowedHosts: ['note-admin.molepix.online', '*'],
     host: '0.0.0.0',
     port: 5173,
     strictPort: false,

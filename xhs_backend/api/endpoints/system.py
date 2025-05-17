@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Request
 from typing import Dict, Any, List
 import logging
 import os
@@ -7,7 +7,7 @@ import platform
 from datetime import datetime, timedelta
 
 from database import get_database, COMMENTS_COLLECTION, NOTES_COLLECTION, NOTIFICATIONS_COLLECTION, STRUCTURED_COMMENTS_COLLECTION, USER_INFO_COLLECTION, USERS_COLLECTION
-from api.deps import get_current_user
+from api.deps import get_current_user, get_current_user_combined
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ router = APIRouter()
 
 @router.get("/status", response_model=Dict[str, Any])
 async def system_status(
-    current_user: str = Depends(get_current_user)
+    request: Request, current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取系统状态信息
@@ -88,7 +88,7 @@ async def system_status(
 
 @router.get("/database-stats", response_model=Dict[str, Any])
 async def database_stats(
-    current_user: str = Depends(get_current_user)
+    request: Request, current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取数据库统计信息
@@ -152,7 +152,7 @@ async def database_stats(
 
 @router.get("/settings", response_model=Dict[str, Any])
 async def get_system_settings_for_dashboard(
-    current_user: str = Depends(get_current_user)
+    request: Request, current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取用于仪表盘的系统统计信息。

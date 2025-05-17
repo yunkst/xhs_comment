@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from typing import Dict, Any, List
 import os
@@ -12,7 +12,7 @@ from jose import jwt
 
 from models import UserInRegister, UserInLogin, TokenResponse
 from database import get_user_by_username, create_user, verify_user_password, get_user_info, batch_get_user_info, get_all_user_info_paginated
-from api.deps import get_current_user, PaginationParams, get_pagination
+from api.deps import get_current_user, get_current_user_combined, PaginationParams, get_pagination
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -89,7 +89,7 @@ async def login(user_in: UserInLogin):
 
 # OTP二维码生成接口
 @router.get("/otp-qrcode", tags=["用户"])
-async def get_otp_qrcode(current_user: str = Depends(get_current_user)):
+async def get_otp_qrcode(request: Request, current_user: str = Depends(get_current_user_combined)):
     """
     获取当前登录用户的OTP二维码
     
@@ -133,7 +133,7 @@ async def get_otp_qrcode(current_user: str = Depends(get_current_user)):
 
 # 获取当前用户信息
 @router.get("/me", tags=["用户"])
-async def get_current_user_info(current_user: str = Depends(get_current_user)):
+async def get_current_user_info(request: Request, current_user: str = Depends(get_current_user_combined)):
     """
     获取当前登录用户信息
     
@@ -159,8 +159,9 @@ async def get_current_user_info(current_user: str = Depends(get_current_user)):
 
 @router.get("/info/list", tags=["小红书用户"])
 async def list_xhs_users(
+    request: Request,
     pagination: PaginationParams = Depends(get_pagination),
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     分页获取小红书用户信息列表
@@ -185,7 +186,8 @@ async def list_xhs_users(
 @router.get("/info/{user_id}", tags=["小红书用户"])
 async def get_xhs_user_info(
     user_id: str,
-    current_user: str = Depends(get_current_user)
+    request: Request,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取小红书用户的信息
@@ -211,8 +213,9 @@ async def get_xhs_user_info(
 
 @router.get("/info", tags=["小红书用户"])
 async def get_multiple_xhs_user_info(
+    request: Request,
     user_ids: str = Query(..., description="逗号分隔的用户ID列表"),
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     批量获取多个小红书用户的信息

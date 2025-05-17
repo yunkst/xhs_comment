@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
@@ -8,7 +8,7 @@ from database import (
     NOTIFICATIONS_COLLECTION,
     get_database
 )
-from api.deps import get_current_user, get_pagination, PaginationParams
+from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
 from models import IncomingPayload
 
 # 配置日志
@@ -26,7 +26,8 @@ async def get_notifications(
     startDate: Optional[str] = None,
     endDate: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination),
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取通知列表，支持多种过滤条件
@@ -97,7 +98,8 @@ async def get_notifications(
 @router.get("/{notification_id}", response_model=Dict[str, Any])
 async def get_notification_by_id(
     notification_id: str,
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     根据ID获取通知详情
@@ -128,7 +130,8 @@ async def get_notification_by_id(
 @router.post("/data", tags=["数据接收"], status_code=status.HTTP_201_CREATED)
 async def receive_notifications_data(
     payload: IncomingPayload,
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ) -> Dict[str, Any]:
     """
     接收通知数据

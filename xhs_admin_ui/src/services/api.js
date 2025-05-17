@@ -9,6 +9,54 @@ const api = axios.create({
   }
 });
 
+// 是否正在刷新token的标记
+let isRefreshing = false;
+// 重试队列，每一项将是一个待执行的函数形式
+let refreshSubscribers = [];
+
+// 将所有请求加入队列
+const subscribeTokenRefresh = (cb) => {
+  refreshSubscribers.push(cb);
+};
+
+// 刷新请求（通知队列中的请求继续执行）
+const onRefreshed = (token) => {
+  refreshSubscribers.forEach(cb => cb(token));
+  refreshSubscribers = [];
+};
+
+// 刷新Token
+const refreshToken = async () => {
+  try {
+    const refreshToken = localStorage.getItem('refresh_token');
+    if (!refreshToken) {
+      return null;
+    }
+    
+    const response = await axios.post(
+      `${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/sso-refresh`,
+      { refresh_token: refreshToken },
+      { headers: { 'Content-Type': 'application/json' }}
+    );
+    
+    const data = response.data;
+    localStorage.setItem('token', data.access_token);
+    
+    if (data.refresh_token) {
+      localStorage.setItem('refresh_token', data.refresh_token);
+    }
+    
+    return data.access_token;
+  } catch (error) {
+    console.error('刷新令牌失败,删除所有token', error);
+    // 刷新失败，清除所有令牌
+    localStorage.removeItem('token');
+    localStorage.removeItem('refresh_token');
+    localStorage.removeItem('id_token');
+    return null;
+  }
+};
+
 // 请求拦截器
 api.interceptors.request.use(
   config => {
@@ -28,12 +76,45 @@ api.interceptors.response.use(
   response => {
     return response.data;
   },
-  error => {
-    if (error.response && error.response.status === 401) {
-      // 未授权，清除token并重定向到登录页
+  async error => {
+    const originalRequest = error.config;
+    
+    // 如果状态码是401(未授权)
+    if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      // 如果refresh_token存在且尚未开始刷新
+      if (localStorage.getItem('refresh_token') && !isRefreshing) {
+        originalRequest._retry = true;
+        isRefreshing = true;
+        
+        const newToken = await refreshToken();
+        isRefreshing = false;
+        
+        if (newToken) {
+          // 通知所有请求继续执行
+          onRefreshed(newToken);
+          // 重试当前请求
+          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+          return axios(originalRequest);
+        }
+      }
+      
+      // 如果已经在刷新，则将请求加入队列
+      if (isRefreshing) {
+        return new Promise((resolve) => {
+          subscribeTokenRefresh(token => {
+            originalRequest.headers['Authorization'] = `Bearer ${token}`;
+            resolve(axios(originalRequest));
+          });
+        });
+      }
+      
+      // 清除token并重定向到登录页
       localStorage.removeItem('token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('id_token');
       window.location.href = '/login';
     }
+    
     return Promise.reject(error);
   }
 );
@@ -48,6 +129,22 @@ export const userApi = {
   },
   getOtpQrcode: (username) => {
     return api.get(`/api/otp-qrcode?username=${username}`);
+  }
+};
+
+// SSO相关接口
+export const ssoApi = {
+  // 获取SSO登录URL
+  getSsoLoginUrl: () => {
+    return api.get('/api/auth/sso-login-url');
+  },
+  // 刷新SSO Token
+  refreshSsoToken: (refreshToken) => {
+    return api.post('/api/auth/sso-refresh', { refresh_token: refreshToken });
+  },
+  // 获取SSO用户信息
+  getSsoUserInfo: () => {
+    return api.get('/api/auth/sso-userinfo');
   }
 };
 
@@ -177,5 +274,6 @@ export default {
   commentApi,
   userManagementApi,
   systemApi,
-  userNoteApi
+  userNoteApi,
+  ssoApi
 }; 

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, status, Body, Query
+from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
@@ -8,7 +8,7 @@ from database import (
     NOTES_COLLECTION,
     get_database
 )
-from api.deps import get_current_user, get_pagination, PaginationParams
+from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
 from models import IncomingPayload
 
 # 配置日志
@@ -25,7 +25,8 @@ async def get_notes(
     startDate: Optional[str] = None,
     endDate: Optional[str] = None,
     pagination: PaginationParams = Depends(get_pagination),
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取笔记列表，支持多种过滤条件
@@ -37,6 +38,7 @@ async def get_notes(
         startDate: 开始日期
         endDate: 结束日期
         pagination: 分页参数
+        request: 请求对象
         current_user: 当前用户
         
     Returns:
@@ -92,13 +94,15 @@ async def get_notes(
 @router.get("/{note_id}", response_model=Dict[str, Any])
 async def get_note_by_id(
     note_id: str,
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     根据ID获取笔记详情
     
     Args:
         note_id: 笔记ID
+        request: 请求对象
         current_user: 当前用户
         
     Returns:
@@ -123,13 +127,15 @@ async def get_note_by_id(
 @router.post("/data", tags=["数据接收"], status_code=status.HTTP_201_CREATED)
 async def receive_notes_data(
     payload: IncomingPayload,
-    current_user: str = Depends(get_current_user)
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ) -> Dict[str, Any]:
     """
     接收笔记数据
     
     Args:
         payload: 包含笔记数据的有效载荷
+        request: 请求对象
         current_user: 当前用户
         
     Returns:
