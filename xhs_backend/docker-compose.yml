@@ -22,20 +22,20 @@ services:
     #   - "8000:8000" # Map host port 8000 to container port 8000
     volumes:
       - .:/app # Mount current directory to /app in container for live code changes (dev)
-    environment:
-      # Important: Point to the mongo service name, not localhost
-      MONGODB_URL: mongodb://mongo:27017 
-      DATABASE_NAME: xiaohongshu_data
-      NOTIFICATIONS_COLLECTION: notifications
-      COMMENTS_COLLECTION: comments
-      # Pass the API secret token from your host environment or a .env file
+    # environment:
+    #   # Important: Point to the mongo service name, not localhost
+    #   MONGODB_URL: mongodb://mongo:27017 
+    #   DATABASE_NAME: xiaohongshu_data
+    #   NOTIFICATIONS_COLLECTION: notifications
+    #   COMMENTS_COLLECTION: comments
+    #   # Pass the API secret token from your host environment or a .env file
 
     depends_on:
       - mongo # Ensure mongo starts before the app
     networks:
       - app-network
-    # env_file:
-    #   - .env # Alternatively, load all variables from .env file
+    env_file:
+      - .env # Load all variables from .env file
 
 networks:
   app-network:

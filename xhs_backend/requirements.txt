@@ -9,3 +9,5 @@ python-jose
 qrcode
 pillow
 psutil # 用于系统监控
+python-keycloak # Keycloak客户端
+httpx # 用于异步HTTP请求

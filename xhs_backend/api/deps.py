@@ -1,5 +1,5 @@
 from typing import Generator, Optional, Dict, Any, List
-from fastapi import Depends, HTTPException, status, Query
+from fastapi import Depends, HTTPException, status, Query, Request
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError, jwt
 import os
@@ -69,3 +69,17 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
         raise credentials_exception
         
     return username
+
+# 新增：组合认证依赖，支持Keycloak和原始JWT
+async def get_current_user_combined(request: Request) -> str:
+    """
+    组合认证函数，支持Keycloak和原始JWT
+    
+    Args:
+        request: FastAPI请求对象
+        
+    Returns:
+        用户名
+    """
+    from .auth import get_user_from_keycloak_or_jwt
+    return await get_user_from_keycloak_or_jwt(request)
