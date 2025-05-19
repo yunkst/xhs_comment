@@ -6,6 +6,9 @@ import os
 from typing import Optional, Dict, Any
 import logging
 from pydantic import BaseModel
+from fastapi.concurrency import run_in_threadpool
+from ..deps import SECRET_KEY, ALGORITHM
+
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -17,6 +20,10 @@ KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "xhs-realm")
 KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "xhs-backend")
 KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
 KEYCLOAK_SSL_VERIFY = os.getenv("KEYCLOAK_SSL_VERIFY", "false").lower() == "true"
+
+# 新增: 定义 TokenData 模型
+class TokenData(BaseModel):
+    username: Optional[str] = None
 
 # 用户信息模型
 class KeycloakUser(BaseModel):
@@ -47,137 +54,154 @@ if KEYCLOAK_ENABLED:
 # OAuth2 Bearer Token验证
 security = HTTPBearer()
 
-async def get_keycloak_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[KeycloakUser]:
+async def get_keycloak_user(request: Request) -> Optional[str]:
     """
-    验证并解析Keycloak JWT令牌
-    
-    Args:
-        credentials: HTTP授权凭据
-        
-    Returns:
-        解析的用户信息或None（如果验证失败）
+    从请求头中提取并验证Keycloak Bearer token。
+    成功则返回用户标识符 (如 preferred_username 或 sub)，否则返回 None。
     """
     if not KEYCLOAK_ENABLED or keycloak_openid is None:
-        return None
-        
-    try:
-        token = credentials.credentials
-        # 获取Keycloak公钥
-        keys_url = f"{KEYCLOAK_SERVER_URL}/realms/{KEYCLOAK_REALM}"
-        jwks_uri = f"{keys_url}/protocol/openid-connect/certs"
-        public_key = keycloak_openid.public_key()
-        
-        # 解码并验证令牌
-        options = {"verify_signature": True, "verify_aud": False, "verify_exp": True}
-        token_info = keycloak_openid.decode_token(
-            token,
-            key=public_key,
-            options=options
-        )
-        
-        # 提取用户信息
-        username = token_info.get("preferred_username")
-        if not username:
-            username = token_info.get("sub")
-            
-        # 创建用户对象
-        user = KeycloakUser(
-            username=username,
-            email=token_info.get("email"),
-            roles=token_info.get("realm_access", {}).get("roles", []) if "realm_access" in token_info else [],
-            given_name=token_info.get("given_name"),
-            family_name=token_info.get("family_name"),
-            preferred_username=token_info.get("preferred_username"),
-            name=token_info.get("name"),
-            sub=token_info.get("sub")
-        )
-        
-        return user
-    except Exception as e:
-        logger.debug(f"Keycloak令牌验证失败: {str(e)}")
+        logger.debug("get_keycloak_user: Keycloak client not initialized, skipping Keycloak auth.")
         return None
 
-async def get_user_from_keycloak_or_jwt(request: Request) -> str:
-    """
-    组合认证，先尝试Keycloak认证，失败后回退到JWT认证
-    
-    Args:
-        request: FastAPI请求对象
-        
-    Returns:
-        用户名
-        
-    Raises:
-        HTTPException: 如果所有认证方式都失败
-    """
-    # 从请求头获取授权信息
-    auth_header = request.headers.get("Authorization")
-    if not auth_header:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="未提供认证凭据",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
-    
-    # 如果启用了Keycloak认证，先尝试Keycloak
-    if KEYCLOAK_ENABLED and keycloak_openid is not None:
-        try:
-            # 尝试解析令牌前缀
-            auth_parts = auth_header.split()
-            if len(auth_parts) == 2 and auth_parts[0].lower() == "bearer":
-                token = auth_parts[1]
-                
-                # 获取Keycloak公钥
-                public_key = keycloak_openid.public_key()
-                
-                # 解码并验证令牌
-                options = {"verify_signature": True, "verify_aud": False, "verify_exp": True}
-                token_info = keycloak_openid.decode_token(
-                    token,
-                    key=public_key
-                )
-                
-                # 提取用户名
-                username = token_info.get("preferred_username")
-                if username:
-                    return username
-                return token_info.get("sub", "")
-        except Exception as e:
-            # Keycloak验证失败，继续尝试JWT
-            logger.debug(f"Keycloak认证失败，尝试JWT认证: {str(e)}")
-    
-    # 回退到JWT认证
-    from api.deps import SECRET_KEY, ALGORITHM  # 导入现有JWT认证所需的配置
-    
     try:
-        # 解析令牌前缀
+        auth_header = request.headers.get("Authorization")
+        if not auth_header:
+            logger.debug("get_keycloak_user: No Authorization header found.")
+            return None
+
         auth_parts = auth_header.split()
-        if len(auth_parts) != 2 or auth_parts[0].lower() != "bearer":
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的认证头格式",
-                headers={"WWW-Authenticate": "Bearer"},
+        if not (len(auth_parts) == 2 and auth_parts[0].lower() == "bearer"):
+            logger.debug(
+                f"get_keycloak_user: Authorization header present but not a Bearer token or malformed: {auth_parts[0] if auth_parts else 'Empty'}"
             )
-            
-        token = auth_parts[1]
-        payload = jwt.decode(
-            token, 
-            SECRET_KEY, 
-            algorithms=[ALGORITHM]
-        )
-        username = payload.get("sub")
+            return None
         
-        if username is None:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="无效的认证凭据",
-                headers={"WWW-Authenticate": "Bearer"},
+        token = auth_parts[1]
+        # 避免在日志中记录完整的token，只记录前缀用于追踪
+        logger.debug(f"get_keycloak_user: Attempting Keycloak token validation for token starting with: {token[:20]}...")
+
+        try:
+            # 让 python-keycloak 使用 JWKS 和 token 中的 'kid' 自动解析和使用公钥
+            # 不再传递 'key' 或 'options' 参数，算法将由库根据JWKS或默认配置处理
+            token_info = await run_in_threadpool(
+                keycloak_openid.decode_token,
+                token=token
             )
+            logger.debug(f"get_keycloak_user: Keycloak token decoded. Raw token_info: {token_info}")
+
+            # 手动校验 audience
+            expected_audience = KEYCLOAK_CLIENT_ID
+            actual_audience = token_info.get("aud")
+
+            audience_is_valid = False
+            if isinstance(actual_audience, str) and actual_audience == expected_audience:
+                audience_is_valid = True
+            elif isinstance(actual_audience, list) and expected_audience in actual_audience:
+                audience_is_valid = True
             
-        return username
-    except JWTError:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="无效的认证凭据",
-            headers={"WWW-Authenticate": "Bearer"},
-        ) 
+            if not audience_is_valid:
+                logger.error(
+                    f"get_keycloak_user: Keycloak token audience validation failed. "
+                    f"Expected '{expected_audience}', but got '{actual_audience}'. Token subject: {token_info.get('sub')}"
+                )
+                return None
+            logger.debug(f"get_keycloak_user: Keycloak token audience validated successfully for '{expected_audience}'.")
+
+        except Exception as e:
+            # 更详细地记录解码或获取公钥时的错误
+            # logger.error(f"get_keycloak_user: Keycloak token fetching public key or decoding failed: {e}", exc_info=True)
+            return None
+
+        # 从解码后的token信息中提取用户名
+        # Keycloak access token 中的标准用户名字段是 preferred_username
+        username = token_info.get("preferred_username")
+        if username:
+            logger.info(f"get_keycloak_user: User '{username}' authenticated via Keycloak (using 'preferred_username').")
+            return username
+        
+        # sub (subject identifier) 通常是用户的UUID，也可以用作后备的唯一用户标识
+        subject = token_info.get("sub")
+        if subject:
+            logger.info(f"get_keycloak_user: User '{subject}' authenticated via Keycloak (using 'sub').")
+            return subject
+        
+        logger.warning(
+            "get_keycloak_user: Keycloak token decoded, but 'preferred_username' and 'sub' fields are missing in the token_info."
+        )
+        return None # 没有找到可用的用户标识
+
+    except Exception as e:
+        # 捕获 get_keycloak_user 函数本身的其他潜在错误
+        logger.error(f"get_keycloak_user: Unexpected error: {e}", exc_info=True)
+        return None
+
+# 这是一个简化的JWT token解码函数，仅用于此模块的 get_user_from_keycloak_or_jwt。
+# 在实际应用中，此类函数通常位于 core.security 或类似共享模块中。
+def _decode_jwt_token_for_auth_fallback(token: str) -> Optional[TokenData]:
+    """Decodes JWT token, returns TokenData if valid, else None."""
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: Optional[str] = payload.get("sub") # 'sub' 通常用于存储用户标识
+        if username is None:
+            logger.warning("_decode_jwt_token_for_auth_fallback: JWT token payload missing 'sub' (username).")
+            return None
+        return TokenData(username=username)
+    except JWTError as e:
+        logger.warning(f"_decode_jwt_token_for_auth_fallback: JWT decoding error: {str(e)}")
+        return None
+
+async def get_user_from_keycloak_or_jwt(request: Request) -> Optional[str]:
+    """
+    尝试使用Keycloak token进行认证，如果失败或token不适用，则回退到JWT认证。
+    返回用户标识符字符串（如用户名或subject ID），如果认证失败则返回None。
+    此函数由 deps.py 中的 get_current_user_combined 调用。
+    """
+    # 1. 尝试 Keycloak 认证
+    keycloak_user_id = await get_keycloak_user(request)
+    if keycloak_user_id:
+        # 日志已在 get_keycloak_user 内部记录
+        return keycloak_user_id
+
+    # 2. 如果 Keycloak 认证失败或未提供适用token，尝试 JWT 认证
+    logger.debug("get_user_from_keycloak_or_jwt: Keycloak auth failed or token not suitable, attempting JWT auth as fallback.")
+    
+    jwt_token_value: Optional[str] = None
+    # 尝试从 Authorization: Bearer header 获取 JWT token
+    auth_header = request.headers.get("Authorization")
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            # 假设此token未被Keycloak处理，或者Keycloak处理失败，现在作为JWT尝试
+            jwt_token_value = parts[1]
+            logger.debug("get_user_from_keycloak_or_jwt: JWT: Found Bearer token in Authorization header.")
+        else:
+            # Header存在但格式不对，可能不是为JWT准备的
+            logger.debug(
+                "get_user_from_keycloak_or_jwt: JWT: Authorization header present but not Bearer or malformed, skipping header for JWT."
+            )
+    
+    # 如果Header中没有，尝试从 cookie 获取 JWT token (如果你的应用也使用cookie传递JWT)
+    if not jwt_token_value:
+        jwt_token_value = request.cookies.get("access_token") # "access_token" 是常见的cookie名
+        if jwt_token_value:
+            logger.debug("get_user_from_keycloak_or_jwt: JWT: Found token in 'access_token' cookie.")
+
+    if not jwt_token_value:
+        logger.debug("get_user_from_keycloak_or_jwt: JWT: No token found in Authorization header or cookie.")
+        return None # 没有token，无法进行JWT认证
+
+    # 解码JWT token
+    token_data = _decode_jwt_token_for_auth_fallback(jwt_token_value)
+    if token_data and token_data.username:
+        # 注意：这里仅验证了JWT token的签名和基本内容。
+        # 一个完整的JWT认证流程还会包括从数据库中查找用户，并检查用户状态（如是否激活）。
+        # 该职责通常由 users.py 中的 get_current_active_user 处理。
+        # 此处返回用户名，上层依赖 (get_current_user_combined) 应确保用户存在于数据库。
+        logger.info(
+            f"get_user_from_keycloak_or_jwt: User '{token_data.username}' authenticated via JWT fallback. "
+            "(Caller should verify user against DB if needed)."
+        )
+        return token_data.username
+    
+    logger.debug("get_user_from_keycloak_or_jwt: JWT authentication failed or token was invalid.")
+    return None # 所有认证尝试均失败 

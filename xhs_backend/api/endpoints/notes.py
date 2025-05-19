@@ -8,7 +8,7 @@ from database import (
     NOTES_COLLECTION,
     get_database
 )
-from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
+from api.deps import get_current_user_combined, get_pagination, PaginationParams
 from models import IncomingPayload
 
 # 配置日志
