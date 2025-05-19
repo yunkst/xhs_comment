@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from typing import Dict, Any, List
 import os
 import logging
@@ -8,11 +8,20 @@ import pyotp
 import qrcode
 import io
 from fastapi.responses import StreamingResponse
-from jose import jwt
+import jwt
+import bcrypt
+import secrets
 
-from models import UserInRegister, UserInLogin, TokenResponse
-from database import get_user_by_username, create_user, verify_user_password, get_user_info, batch_get_user_info, get_all_user_info_paginated
-from api.deps import get_current_user, get_current_user_combined, PaginationParams, get_pagination
+from ..models.user import UserInRegister, UserInLogin, TokenResponse
+from ..services import (
+    get_user_by_username,
+    create_user, 
+    verify_user_password, 
+    get_user_info, 
+    batch_get_user_info, 
+    get_all_user_info_paginated
+)
+from ..deps import get_current_user, get_current_user_combined, PaginationParams, get_pagination
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -54,8 +63,9 @@ async def register(user_in: UserInRegister):
     if existing_user:
         raise HTTPException(status_code=400, detail="用户名已存在")
     
-    # 创建新用户
-    user = await create_user(user_in, allow_register=ALLOW_REGISTER)
+    # 创建新用户 - 转为字典传递给database函数
+    user_data = {"username": user_in.username, "password": user_in.password}
+    user = await create_user(user_data, allow_register=ALLOW_REGISTER)
     
     # 注册后直接登录
     access_token = create_access_token(data={"sub": user["username"]})

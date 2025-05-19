@@ -4,13 +4,12 @@ import logging
 from datetime import datetime
 
 from database import (
-    save_notes,
     NOTES_COLLECTION,
     get_database
 )
 from api.deps import get_current_user_combined, get_pagination, PaginationParams
-from models import IncomingPayload
-
+from api.models.common import IncomingPayload
+from api.services.note import save_notes
 # 配置日志
 logger = logging.getLogger(__name__)
 

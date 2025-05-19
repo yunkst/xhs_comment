@@ -3,20 +3,18 @@ from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
 
-from models import IncomingPayload, StructuredComment
+from api.models.common import IncomingPayload
+from api.models.content import StructuredComment
 from database import (
-    save_comments_with_upsert, 
-    save_structured_comments, 
-    get_user_historical_comments,
     STRUCTURED_COMMENTS_COLLECTION,
     COMMENTS_COLLECTION,
     connect_to_mongo,
-    get_database,
-    save_user_info
+    get_database
 )
 from processing import transform_raw_comments_to_structured
 from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
-
+from api.services.comment import save_comments_with_upsert, save_structured_comments, get_user_historical_comments
+from api.services.user import save_user_info
 # 配置日志
 logger = logging.getLogger(__name__)
 

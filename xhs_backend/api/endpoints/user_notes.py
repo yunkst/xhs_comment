@@ -5,13 +5,11 @@ from datetime import datetime
 from pydantic import BaseModel
 
 from database import (
-    save_user_note,
-    get_user_notes,
     USER_NOTES_COLLECTION,
     get_database
 )
 from api.deps import get_current_user, get_current_user_combined
-
+from api.services.notification import save_user_note, get_user_notes
 # 配置日志
 logger = logging.getLogger(__name__)
 

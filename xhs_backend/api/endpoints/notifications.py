@@ -1,16 +1,17 @@
 from fastapi import APIRouter, HTTPException, Depends, status, Body, Query, Request
+from fastapi.responses import JSONResponse
 from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
+import json
 
 from database import (
-    save_notifications,
     NOTIFICATIONS_COLLECTION,
     get_database
 )
 from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
-from models import IncomingPayload
-
+from api.models.common import IncomingPayload
+from api.services.notification import save_notifications
 # 配置日志
 logger = logging.getLogger(__name__)
 
