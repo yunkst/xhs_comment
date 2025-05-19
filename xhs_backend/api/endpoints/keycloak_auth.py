@@ -32,7 +32,7 @@ router = APIRouter()
 # SSO登录配置
 FRONTEND_REDIRECT_URL = os.getenv("FRONTEND_REDIRECT_URL", "http://localhost:8080/web")
 # 固定的回调URL，确保使用HTTPS
-BASE_URL = os.getenv("BASE_URL", "https://note.molepix.online")
+BASE_URL = os.getenv("BASE_URL", "https://note")
 CALLBACK_URL = f"{BASE_URL}/api/auth/sso-callback"
 
 # 创建会话并生成SSO登录URL
