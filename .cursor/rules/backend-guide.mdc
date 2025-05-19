@@ -1,87 +1,103 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
 # 小红书评论维护系统后端开发指南
 
-后端部分使用FastAPI + MongoDB构建，提供RESTful API服务。
+后端部分使用FastAPI + MongoDB (Motor驱动) 构建，提供异步RESTful API服务，并采用三层架构设计。
 
 ## 技术栈
 
 - FastAPI (Python Web框架)
-- MongoDB (数据存储)
-- PyJWT (用户认证)
-- Docker (容器化部署)
+- Motor (MongoDB异步驱动)
+- Pydantic (数据校验与模型定义)
+- Keycloak (身份和访问管理 - 主要方式)
+- PyJWT (用于JWT处理，配合Keycloak或作为辅助认证)
+- Docker & Docker Compose (容器化部署)
 
-## 项目结构
+## 项目结构 (核心)
 
 ```
 xhs_backend/
-  ├── main.py          # 入口文件，包含API路由定义
-  ├── database.py      # 数据库连接和操作
-  ├── models.py        # Pydantic数据模型
-  ├── processing.py    # 评论数据处理逻辑
-  ├── requirements.txt # Python依赖
-  ├── Dockerfile       # 生产环境Docker配置
-  └── docker-compose.yml # 多容器应用配置
+  ├── main.py                 # FastAPI应用入口, 中间件, APIRouter挂载
+  ├── database.py             # MongoDB异步连接管理, 数据库实例提供
+  ├── models.py               # 可能包含一些共享的或基础的Pydantic模型
+  ├── requirements.txt        # Python依赖
+  ├── Dockerfile              # 生产环境Docker配置
+  ├── Dockerfile.dev          # 开发环境Docker配置
+  ├── docker-compose.yml      # 生产环境多容器应用配置
+  ├── docker-compose.dev.yml  # 开发环境多容器应用配置
+  ├── KEYCLOAK_SETUP.md       # Keycloak配置指南
+  ├── api/
+  │   ├── __init__.py
+  │   ├── endpoints/            # API层: HTTP请求处理, 调用服务层 (e.g., users.py, comments.py)
+  │   ├── services/             # 服务层: 核心业务逻辑, 数据处理 (e.g., user_service.py)
+  │   ├── models/               # 数据模型层: Pydantic模型定义 (e.g., user_models.py)
+  │   ├── auth/                 # 认证逻辑, Keycloak集成, JWT工具
+  │   └── deps.py               # FastAPI依赖项注入 (e.g., 获取当前用户, 数据库会话)
+  └── processing.py           # (可能包含遗留的或辅助的数据处理脚本, 主要业务逻辑在services层)
 ```
 
 ## 核心模块说明
 
-### API入口
+### 1. 应用入口 (`main.py`)
+- 初始化FastAPI应用实例。
+- 配置中间件 (如CORS)。
+- 挂载来自 `api/endpoints/` 的各个APIRouter。
+- 管理应用生命周期事件 (如数据库连接的启动和关闭)。
 
-[xhs_backend/main.py](mdc:xhs_backend/main.py) 定义了所有API端点：
+### 2. API层 (`api/endpoints/`)
+- 包含各个功能的路由模块 (如 `users.py`, `comments.py`)。
+- 定义具体的API路径操作 (GET, POST, PUT, DELETE等)。
+- 使用 `api/models/` 中的Pydantic模型进行请求体验证和响应模型序列化。
+- 调用 `api/services/` 中的服务函数来执行业务逻辑。
+- 处理HTTP相关的异常和响应。
 
-- `/api/data` - 接收评论数据
-- `/api/login` - 用户登录认证
-- `/api/register` - 用户注册
-- `/api/user/{user_id}/comments` - 获取用户评论
-- `/api/comments` - 评论管理
-- `/api/system/settings` - 系统设置
+### 3. 服务层 (`api/services/`)
+- 封装核心业务逻辑，保持API层的简洁性。
+- 与数据访问层 (通过 `database.py` 提供的 `db` 实例) 交互，执行数据库操作。
+- 可能调用其他服务或外部API。
+- 实现数据转换、校验和业务规则。
 
-### 数据库操作
+### 4. 数据模型层 (`api/models/` & `models.py`)
+- 使用Pydantic定义请求体、响应体以及数据库实体的数据结构。
+- 提供数据验证、序列化和文档生成的基础。
+- `api/models/` 通常按功能模块组织模型文件。
 
-[xhs_backend/database.py](mdc:xhs_backend/database.py) 封装了MongoDB的操作：
+### 5. 数据访问层 (`database.py`)
+- 初始化并管理与MongoDB的异步连接 (使用Motor)。
+- 提供获取数据库实例 (`db`) 的函数，供服务层使用。
+- 定义数据库集合名称常量 (如 `USERS_COLLECTION`, `COMMENTS_COLLECTION`)。
 
-- 连接管理
-- 数据CRUD操作
-- 索引创建和优化
+### 6. 认证与授权 (`api/auth/` & `api/deps.py`)
+- 集成Keycloak进行用户认证和授权。
+- 处理JWT令牌的验证和解码。
+- `deps.py` 可能包含用于保护端点的依赖项，如获取已认证用户。
 
-### 数据模型
-
-[xhs_backend/models.py](mdc:xhs_backend/models.py) 使用Pydantic定义数据结构：
-
-- 请求/响应模型
-- 数据验证规则
-- 模型间转换
-
-### 数据处理
-
-[xhs_backend/processing.py](mdc:xhs_backend/processing.py) 包含数据转换和处理逻辑：
-
-- 原始评论转结构化数据
-- 文本分析和提取
+### 7. 数据处理 (`processing.py`)
+- 此文件可能包含一些独立的数据批处理脚本或遗留的数据转换逻辑。
+- 新的主要业务数据处理应在相应的服务模块中实现。
 
 ## API认证与安全
 
-系统使用JWT (JSON Web Token) 进行API认证：
-
-- token生成与验证
-- 权限控制
-- 会话管理
+- 主要通过Keycloak进行认证，客户端获取JWT后通过Bearer Token方式访问API。
+- 详细规范见 [.cursor/rules/auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)。
 
 ## 数据库设计
 
-MongoDB集合设计：
-
-- `NOTIFICATIONS_COLLECTION` - 存储通知数据
-- `COMMENTS_COLLECTION` - 存储评论数据
-- `USERS_COLLECTION` - 存储用户信息
-- `NOTES_COLLECTION` - 存储用户笔记
+MongoDB集合在 `database.py` 中定义常量名，例如：
+- `USERS_COLLECTION`
+- `COMMENTS_COLLECTION`
+- `NOTES_COLLECTION`
+- `NOTIFICATIONS_COLLECTION`
+- `RAW_COMMENTS_COLLECTION`
+- `STRUCTURED_COMMENTS_COLLECTION`
+- `USER_INFO_COLLECTION`
+具体的数据结构由服务层逻辑和 `api/models/` 中的Pydantic模型决定。
 
 ## 部署指南
 
-- 使用docker-compose进行快速部署
-- 支持开发和生产环境分离
-- 数据持久化和备份策略
+- 使用 `docker-compose.yml` (生产) 或 `docker-compose.dev.yml` (开发) 进行快速部署。
+- 环境变量用于配置数据库连接、密钥等敏感信息。
+- 详细的Docker配置见 [.cursor/rules/docker-configuration.mdc](mdc:.cursor/rules/docker-configuration.mdc)。

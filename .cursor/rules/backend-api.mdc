@@ -3,69 +3,70 @@ description:
 globs: 
 alwaysApply: false
 ---
-# 后端 API 端点与认证规则
+# 后端 API 端点与规范
 
-后端服务基于 FastAPI，采用模块化的API架构设计。主要 API 端点如下：
+后端服务基于 FastAPI 构建，API端点组织在 [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints) 目录下的各个模块中 (例如 `users.py`, `comments.py`, `notes.py` 等)。
 
-## 数据接收端点
+## API 文档
 
-- 评论数据：`POST /api/comments/data`
-- 通知数据：`POST /api/notifications/data`
-- 笔记数据：`POST /api/notes/data`
+- **权威API参考**: FastAPI自动生成OpenAPI交互式文档 (通常位于 `/docs`) 和 ReDoc 文档 (通常位于 `/redoc`)。这些是查找最新API端点、请求/响应模型和参数的权威来源。
+- **高级指南**: [xhs_backend/README.md](mdc:xhs_backend/README.md) 可能包含关于API使用的高级指南和概述。
 
-请求体需符合 [models.py](mdc:xhs_backend/models.py) 中 `IncomingPayload` 结构，字段包括：
-  - `type`: "通知"、"评论" 或 "笔记"（需与API路径匹配）
-  - `data`: 对应类型的数据数组
+## 数据接收端点 (示例)
 
-## 评论管理端点
+以下是一些可能的数据接收端点，具体请参考OpenAPI文档：
 
-- `GET /api/comments`: 获取评论列表（支持过滤和分页）
+- 评论数据: `POST /api/comments/data` (或类似路径，如 `/api/v1/plugin/comments`)
+- 通知数据: `POST /api/notifications/data`
+- 笔记数据: `POST /api/notes/data`
+
+请求体结构 (例如 `IncomingPayload` 或特定类型的载荷) 在 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下的相应Pydantic模型中定义。
+例如，一个通用的数据载荷模型可能包含：
+  - `type`: 字符串，如 "通知", "评论", "笔记" (可能根据具体端点而定)
+  - `data`: 对应类型的数据对象或数组
+
+## 资源管理端点 (示例)
+
+以下列出一些常见的资源管理端点模式，具体端点和参数请查阅OpenAPI文档：
+
+### 评论管理
+- `GET /api/comments`: 获取评论列表 (支持过滤和分页)
 - `GET /api/comments/{comment_id}`: 获取评论详情
-- `PUT /api/comments/{comment_id}/status`: 更新评论状态
+- `PUT /api/comments/{comment_id}`: 更新评论 (例如状态)
 - `DELETE /api/comments/{comment_id}`: 删除评论
-- `PUT /api/comments/batch/status`: 批量更新评论状态
-- `POST /api/comments/batch/delete`: 批量删除评论
-- `GET /api/comments/user/{user_id}`: 获取用户历史评论
+- (批量操作可能存在，如 `POST /api/comments/batch/status`)
 
-## 笔记管理端点
-
-- `GET /api/notes`: 获取笔记列表（支持过滤和分页）
+### 笔记管理
+- `GET /api/notes`: 获取笔记列表
 - `GET /api/notes/{note_id}`: 获取笔记详情
 
-## 通知管理端点
-
-- `GET /api/notifications`: 获取通知列表（支持过滤和分页）
+### 通知管理
+- `GET /api/notifications`: 获取通知列表
 - `GET /api/notifications/{notification_id}`: 获取通知详情
 
-## 用户认证端点
+## 用户与认证端点 (示例)
 
-- `POST /api/register`: 用户注册
-- `POST /api/login`: 用户登录（用户名、密码和OTP）
-- `GET /api/otp-qrcode`: 获取OTP二维码
-- `GET /api/users/me`: 获取当前用户信息
+认证相关端点由Keycloak处理或通过后端API暴露 (参考OpenAPI文档和 `auth-security.mdc`)。
+可能包括：
+- `POST /api/auth/token` (如果后端直接处理OAuth2密码流或客户端凭据流)
+- `GET /api/users/me`: 获取当前用户信息 (需认证)
+- (注册等功能通常由Keycloak管理，或通过特定API暴露，如 `POST /api/users/register` 如果允许直接注册)
 
-## 系统管理端点
+## 系统管理端点 (示例)
 
 - `GET /api/system/status`: 获取系统状态信息
-- `GET /api/system/database-stats`: 获取数据库统计信息
 - `GET /api/system/version`: 获取系统版本信息
 
-## 认证与安全
+## 认证与授权
 
-所有 API 端点（除了登录、注册和版本信息外）均需通过 JWT Bearer Token 认证，需在请求头中携带：
-```
-Authorization: Bearer <JWT_TOKEN>
-```
+- 大部分API端点需要通过 **Bearer Token** (JWT)进行认证，该令牌通常从Keycloak获取。
+- 请求头需携带: `Authorization: Bearer <JWT_TOKEN>`
+- 具体的认证要求和权限控制请参考OpenAPI文档中各端点的说明以及 [auth-security.mdc](mdc:.cursor/rules/auth-security.mdc) 文件。
 
-JWT令牌通过登录接口获取，系统使用 `.env` 文件中的 `JWT_SECRET_KEY` 进行令牌签名。
+## 浏览器插件API配置
 
-## 浏览器插件配置
+浏览器插件调用后端API时，需要配置正确的服务端点地址和认证方式。
+-   数据提交端点示例：`http://<服务器地址>/api/v1/plugin/comments` (具体路径参考OpenAPI)
+-   认证可能需要API密钥或通过插件流程获取的用户令牌。
 
-浏览器插件需要根据数据类型配置不同的API端点：
-- 评论数据：`http://<服务器地址>/api/comments/data`
-- 通知数据：`http://<服务器地址>/api/notifications/data`
-- 笔记数据：`http://<服务器地址>/api/notes/data`
-
-如果插件不支持多端点配置，需更新插件代码，请参考 [xhs_backend/README.md](mdc:xhs_backend/README.md) 中的"浏览器插件API调用更新指南"。
-
-详细的 API 数据格式和响应示例见 [xhs_backend/README.md](mdc:xhs_backend/README.md)。
+详细的API数据格式和响应模型定义在 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 中，并通过OpenAPI文档提供。

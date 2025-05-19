@@ -1,92 +1,81 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
-# 小红书评论维护系统前端开发指南
+# 小红书评论维护系统前端开发指南 (xhs_admin_ui)
 
-前端部分使用Vue 3 + Element Plus + Vite构建，遵循组件化开发理念。
+前端管理界面使用 Vue 3 (`<script setup>` 语法与组合式API) + Element Plus + Vite 构建，遵循组件化和模块化开发理念。
 
 ## 技术栈
 
-- Vue 3 (Composition API)
-- Element Plus 组件库
-- Vite 构建工具
-- Vue Router 路由管理
-- Pinia 状态管理
+-   **Vue 3**: 核心框架，使用组合式API (`<script setup>`)。
+-   **Element Plus**: 主要的UI组件库。
+-   **Vite**: 前端构建与开发服务器工具。
+-   **Vue Router**: 用于单页应用的路由管理 ([xhs_admin_ui/src/router/index.js](mdc:xhs_admin_ui/src/router/index.js))。
+-   **Pinia**: 轻量级、类型安全的状态管理库 ([xhs_admin_ui/src/stores/](mdc:xhs_admin_ui/src/stores))。
+-   **Axios** (或 Fetch API): 用于与后端API进行HTTP通信，通常封装在服务模块中。
 
-## 项目结构
+## 项目结构 (`xhs_admin_ui`)
 
 ```
 xhs_admin_ui/
-  ├── src/               # 源代码目录
-  │   ├── assets/        # 静态资源
-  │   ├── components/    # 公共组件
-  │   ├── router/        # 路由配置
-  │   ├── services/      # API服务
-  │   ├── stores/        # Pinia状态管理
-  │   ├── views/         # 页面组件
-  │   ├── App.vue        # 根组件
-  │   └── main.js        # 入口文件
-  ├── public/            # 公共资源
-  ├── index.html         # HTML入口
-  └── vite.config.js     # Vite配置
+  ├── src/                     # 源代码目录
+  │   ├── assets/              # 静态资源 (图片, 全局CSS/SCSS等)
+  │   ├── components/          # 可复用的公共UI组件 (如 BaseButton.vue, SearchInput.vue)
+  │   ├── router/              # Vue Router配置 (routes, navigation guards)
+  │   ├── services/            # API服务模块 (如 api.js, userService.js)
+  │   ├── stores/              # Pinia状态管理模块 (如 authStore.js, commentStore.js)
+  │   ├── views/               # 页面级视图组件 (如 DashboardView.vue, CommentListView.vue)
+  │   ├── App.vue              # 应用根组件, 通常包含 <router-view> 和全局布局
+  │   └── main.js              # 应用入口: 初始化Vue实例, 插件, 路由, Pinia等
+  ├── public/                  # Vite公共资源目录 (会被直接复制到构建输出的根目录)
+  ├── index.html               # 单页应用的HTML入口文件
+  ├── package.json             # 项目依赖和脚本
+  ├── vite.config.js           # Vite构建配置文件
+  └── .eslintrc.js (或类似)    # ESLint配置文件 (推荐)
+  └── .prettierrc.js (或类似)  # Prettier配置文件 (推荐)
 ```
 
-## 核心组件说明
+## 核心概念与模块
 
-### 主布局组件
+### 1. 视图组件 (`src/views/`)
+-   代表应用中的不同页面或主要功能区域。
+-   通常会组合多个来自 `src/components/` 的子组件。
+-   示例：[xhs_admin_ui/src/views/LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue) 可能定义了包含侧边栏、头部和内容区域的整体应用布局。
+-   示例：[xhs_admin_ui/src/views/comment/CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue) 负责展示评论列表、提供筛选和操作功能。
 
-[xhs_admin_ui/src/views/LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue) 实现了系统的整体布局：
+### 2. 公共组件 (`src/components/`)
+-   可跨多个视图或在同一视图中多次使用的UI片段。
+-   应设计为通用和可配置的。
 
-- 左侧边栏导航菜单
-- 顶部标题栏
-- 内容区域
+### 3. API服务 (`src/services/`)
+-   封装所有与后端API的HTTP交互逻辑，通常使用Axios实例。
+-   例如，[xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js) (或按功能拆分的多个服务文件如 `commentService.js`) 会定义如 `fetchComments()`, `updateCommentStatus()` 等函数。
+-   处理API请求的构造、认证令牌的附加 (通常从Pinia的auth store获取)、响应数据的处理和错误处理。
 
-### 仪表盘
+### 4. 状态管理 (`src/stores/` - Pinia)
+-   用于管理全局或跨组件共享的应用状态。
+-   每个store通常对应一个特定的领域或功能 (如 `authStore.js` 管理用户认证状态和信息，`settingsStore.js` 管理应用设置)。
+-   Pinia store 包含 `state` (响应式数据), `getters` (派生状态), 和 `actions` (修改状态的函数，可以是异步的)。
 
-[xhs_admin_ui/src/views/DashboardView.vue](mdc:xhs_admin_ui/src/views/DashboardView.vue) 展示系统概况：
+### 5. 路由 (`src/router/`)
+-   定义URL路径与视图组件之间的映射。
+-   可以包含路由守卫 (navigation guards) 来实现页面访问控制 (例如，检查用户是否已登录)。
 
-- 统计卡片 (总评论数、总用户数、待回复评论数)
-- 评论趋势图表
-- 最新评论列表
+## 开发规范与最佳实践
 
-### 评论管理
-
-[xhs_admin_ui/src/views/comment/CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue) 提供评论的增删改查功能：
-
-- 评论列表展示
-- 评论筛选搜索
-- 评论状态管理
-- 批量操作功能
-
-### 系统设置
-
-[xhs_admin_ui/src/views/system/SystemView.vue](mdc:xhs_admin_ui/src/views/system/SystemView.vue) 包含系统配置选项：
-
-- 安全设置
-- 备份与恢复功能
-
-## API服务
-
-[xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js) 封装了所有与后端的交互：
-
-- 用户认证
-- 评论操作
-- 用户管理
-- 系统设置
-
-## 状态管理
-
-使用Pinia管理全局状态，避免组件间的过度耦合。主要的Store包括：
-
-- 用户状态
-- 系统设置
-- 评论数据缓存
+-   **组件化**: 将UI拆分为小型、可复用、单一职责的组件。
+-   **组合式API**: 充分利用Vue 3的组合式API (`<script setup>`) 进行逻辑组织和复用。
+-   **Props Down, Events Up**: 父组件通过props向子组件传递数据，子组件通过emits向父组件发送事件通知。
+-   **类型检查**: 如果使用TypeScript (推荐)，充分利用其类型系统。如果使用JavaScript，考虑使用JSDoc或Prop类型校验。
+-   **代码风格**: 遵循项目中配置的ESLint和Prettier规则，具体参考 [.cursor/rules/code-style.mdc](mdc:.cursor/rules/code-style.mdc)。
+-   **响应式设计**: 确保应用在不同屏幕尺寸上均有良好表现，Element Plus本身支持响应式，但自定义样式也需考虑。
+-   **性能优化**: 注意虚拟列表、懒加载、代码分割等技术以优化大型应用性能。
 
 ## 前端样式规范
 
-- 使用Element Plus组件库确保UI一致性
-- 自定义样式使用scoped CSS隔离
-- 响应式设计适配各种屏幕尺寸
-- 颜色与字体保持一致性
+-   优先使用Element Plus组件及其预设样式和主题变量，以确保UI一致性。
+-   自定义组件样式应使用 `<style scoped>` 进行作用域隔离。
+-   全局样式 (如重置CSS、通用工具类) 可以放在 `src/assets/css/` (或 `scss/`) 目录下，并在 `main.js` 中引入。
+-   遵循BEM或类似的CSS命名约定，以提高可维护性 (如果适用)。

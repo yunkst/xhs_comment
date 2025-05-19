@@ -1,38 +1,44 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
 # 认证与安全规范
 
-## API 认证机制
+## 核心认证机制
 
-本项目使用两种认证方式：
+本项目后端主要依赖 **Keycloak** 进行身份和访问管理。前端应用和API客户端应通过OAuth 2.0/OpenID Connect流程与Keycloak集成以获取访问令牌。
 
-1. **插件到后端通信**：使用 Bearer Token 认证
-   - 在 [main.py](mdc:xhs_backend/main.py) 中的 `verify_token()` 函数实现
-   - 令牌需配置在插件设置界面：[options.js](mdc:xhs_chrome_plugin/options.js)
-   - 所有数据API调用需要在Header中包含：`Authorization: Bearer <API_SECRET_TOKEN>`
+- **Keycloak 配置**: 详细的Keycloak设置指南参见 [KEYCLOAK_SETUP.md](mdc:xhs_backend/KEYCLOAK_SETUP.md)。
+- **后端认证集成**: FastAPI后端通过 [xhs_backend/api/auth/](mdc:xhs_backend/api/auth) 中的模块与Keycloak交互，验证JWT令牌。相关依赖和工具函数可能在 [xhs_backend/api/deps.py](mdc:xhs_backend/api/deps.py) 中定义。
 
-2. **用户登录**：使用 JWT + OTP 双重认证
-   - JWT认证在 [main.py](mdc:xhs_backend/main.py) 中的 `create_access_token()` 实现
-   - OTP认证提供动态验证码，增加安全性
-   - 用户相关Model在 [models.py](mdc:xhs_backend/models.py) 中定义
+## API 访问认证
+
+1.  **用户访问后端API**: 用户通过前端登录Keycloak后，前端应用携带从Keycloak获取的JWT Bearer Token访问后端API。
+2.  **插件到后端通信**: Chrome插件可能使用特定的API密钥或服务账户令牌（通过Keycloak或专门配置）进行认证。
+    -   如果使用API密钥，需在Header中包含：`Authorization: Bearer <YOUR_API_SECRET_TOKEN>`。
+    -   插件的认证配置（如令牌存储）可能在 [xhs_chrome_plugin/js/options.js](mdc:xhs_chrome_plugin/js/options.js) 或类似脚本中管理。
+
+## 旧有/辅助认证机制 (如适用)
+
+-   **直接JWT+OTP**：如果系统仍保留不通过Keycloak的直接JWT和OTP认证方式：
+    -   JWT创建和验证逻辑可能部分存在于 [xhs_backend/api/auth/](mdc:xhs_backend/api/auth) 或旧的 `main.py` 相关部分。
+    -   用户相关的Pydantic模型主要在 [xhs_backend/api/models/user.py](mdc:xhs_backend/api/models/user.py) (或类似命名) 以及可能在 [xhs_backend/models.py](mdc:xhs_backend/models.py) 中。
 
 ## 安全最佳实践
 
-1. **环境变量保护**：
-   - 不要将 `.env` 文件提交到版本控制
-   - 生产环境使用强随机字符串作为 `API_SECRET_TOKEN` 和 `JWT_SECRET_KEY`
-
-2. **CORS 安全**：
-   - 生产环境应限制 CORS 来源，替换 [main.py](mdc:xhs_backend/main.py) 中的 `origins = ["*"]`
-   - 插件开发时需设置正确的扩展 ID
-
-3. **数据库安全**：
-   - 生产环境中为 MongoDB 启用认证
-   - 限制数据库端口只允许内部网络访问
+1.  **环境变量保护**：
+    -   敏感配置（如数据库连接字符串、Keycloak客户端密钥、API密钥）必须通过环境变量管理。
+    -   不要将包含敏感信息的 `.env` 文件提交到版本控制。
+2.  **CORS 安全**：
+    -   在生产环境中，严格限制CORS来源，配置于 [xhs_backend/main.py](mdc:xhs_backend/main.py) 的FastAPI应用实例。
+    -   Chrome插件开发时，确保 `manifest.json` 中配置了正确的权限和来源。
+3.  **数据库安全**：
+    -   生产环境中为MongoDB启用认证和授权。
+    -   限制数据库端口只允许受信任的内部网络访问。
+4.  **依赖安全**: 定期更新项目依赖，关注安全漏洞通告。
 
 ## 用户注册控制
 
-项目支持通过环境变量 `ALLOW_REGISTER` 控制是否允许新用户注册，可按需设置。
+-   如果系统支持直接注册（非Keycloak管理），环境变量 `ALLOW_REGISTER` (通常在 [xhs_backend/main.py](mdc:xhs_backend/main.py) 或相关配置模块中使用) 可能用于控制是否允许新用户注册。
+-   通过Keycloak管理用户时，注册流程由Keycloak控制。

@@ -1,28 +1,29 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
-# 小红书评论维护系统UI调整指南
+# 小红书评论维护系统UI调整与设计指南
 
-根据用户需求，对系统界面进行了多项优化调整，以提升用户体验。
+本文档记录了对系统用户界面 ([xhs_admin_ui](mdc:xhs_admin_ui)) 已实施的一些重要调整和通用的设计原则，旨在提升用户体验和视觉一致性。
 
-## 布局优化
+**注意**: 以下列出的具体CSS和组件调整反映了过去的修改点。随着UI的持续迭代，最新的实现细节应以实际代码为准。本文档可作为理解某些设计决策背景的参考。
 
-### 全局布局
+## 1. 布局优化原则与历史调整
 
-在[App.vue](mdc:xhs_admin_ui/src/App.vue)和[index.html](mdc:xhs_admin_ui/index.html)中进行的修改：
+目标是提供一个清晰、宽敞且在不同屏幕尺寸上表现良好的用户界面。
 
-- 去除页面大黑边，充分利用浏览器宽度
-- 添加`overflow: hidden`避免不必要的滚动条
-- 优化viewport设置，改善移动端适配
-
+### 全局布局 (`App.vue`, `index.html`)
+-   **历史调整**: 
+    -   曾去除页面外边距，以充分利用浏览器宽度。
+    -   通过CSS `overflow`属性控制不必要的滚动条。
+    -   优化 `viewport` 设置以改善移动设备上的显示效果。
 ```css
-/* App.vue中的全局样式优化 */
+/* 示例：App.vue中的全局样式考虑点 */
 #app {
-  height: 100%;
-  width: 100%;
-  overflow: hidden;
+  height: 100%; /* 或 100vh */
+  width: 100%;  /* 或 100vw */
+  /* overflow: hidden; /* 谨慎使用，确保内容可访问 */
 }
 
 html, body {
@@ -30,72 +31,77 @@ html, body {
   padding: 0;
   height: 100%;
   width: 100%;
-  overflow-x: hidden;
+  /* overflow-x: hidden; /* 避免水平滚动，除非设计需要 */
 }
 ```
+-   **当前指南**: 
+    -   应确保根元素 (`html`, `body`, `#app`) 正确设置为占据整个视口，避免意外的空白或滚动。
+    -   [xhs_admin_ui/src/App.vue](mdc:xhs_admin_ui/src/App.vue) 是应用的主要容器。
+    -   [xhs_admin_ui/index.html](mdc:xhs_admin_ui/index.html) 包含基础的HTML结构和视口设置。
 
-### 主布局组件
-
-在[LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue)中进行的修改：
-
-- 将容器宽度从`100%`改为`100vw`以利用全屏宽度
-- 设置固定高度`100vh`确保充满整个视口
-- 添加`z-index`提升侧边栏层级避免被遮挡
-
+### 主应用布局 (`LayoutView.vue`)
+-   **历史调整**: 
+    -   容器宽度曾使用 `100vw`，高度使用 `100vh` 以填充视口。
+    -   通过 `z-index` 调整侧边栏等元素的层叠顺序，防止遮挡。
+-   **当前指南**: 
+    -   [xhs_admin_ui/src/views/LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue) (或类似命名的布局组件) 通常定义了应用的骨架，如侧边栏导航、顶部栏和主内容区域。
+    -   应使用Flexbox或Grid等现代CSS布局技术实现灵活和响应式的布局。
+    -   确保布局在不同内容量和屏幕尺寸下保持稳定和美观。
 ```css
-/* LayoutView.vue中的布局容器样式优化 */
+/* 示例：LayoutView.vue 中的布局容器样式考虑点 */
 .layout-container {
-  height: 100vh;
-  width: 100vw;
   display: flex;
-  flex-direction: row;
-  overflow: hidden;
+  flex-direction: row; /* 或 column，取决于布局 */
+  min-height: 100vh; /* 确保至少填满视口高度 */
+  width: 100%;
+  /* overflow: hidden; /* 同样，谨慎使用 */
 }
 
-.sidebar {
-  /* 其他样式 */
-  height: 100%;
-  z-index: 1000;
+.sidebar-container {
+  /* ... sidebar styles ... */
+  z-index: 100; /* 合理管理层叠顺序 */
+}
+
+.main-content-area {
+  flex-grow: 1; /* 使内容区域占据剩余空间 */
+  overflow-y: auto; /* 允许内容区域内部滚动 */
+  padding: 16px; /* 合适的内边距 */
 }
 ```
 
-## 功能界面调整
+## 2. 功能界面调整示例 (历史)
 
-### 仪表盘
+以下是一些过去对特定视图进行的调整，作为功能优化的案例。最新功能和布局请参考对应Vue组件代码。
 
-在[DashboardView.vue](mdc:xhs_admin_ui/src/views/DashboardView.vue)中进行的修改：
+### 仪表盘 (`DashboardView.vue`)
+-   曾调整统计卡片数量和布局 ([xhs_admin_ui/src/views/DashboardView.vue](mdc:xhs_admin_ui/src/views/DashboardView.vue))。
+-   模块内容（如图表、列表）会根据业务需求变化。
 
-- 将统计卡片从4个调整为3个，每个占1/3宽度
-- 删除"待审核评论"和"拦截评论"模块
-- 添加"待回复评论"模块
-- 优化卡片布局和间距
+### 评论列表 (`CommentListView.vue`)
+-   曾优化容器样式，确保表格充分利用空间 ([xhs_admin_ui/src/views/comment/CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue))。
+-   操作按钮和状态标签的展示方式会持续优化。
 
-### 评论列表
+### 系统设置 (`SystemView.vue`)
+-   曾调整选项卡内容和表单布局 ([xhs_admin_ui/src/views/system/SystemView.vue](mdc:xhs_admin_ui/src/views/system/SystemView.vue))。
 
-在[CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue)中进行的修改：
+## 3. 响应式设计原则
 
-- 优化容器样式，删除冗余padding
-- 确保表格充分利用可用空间
-- 优化操作按钮和状态标签的展示
+-   **流式布局**: 使用相对单位 (%, vw, vh, rem, em) 和 Flexbox/Grid 来创建可适应不同屏幕宽度的布局。
+-   **断点应用**: Element Plus 本身支持响应式，也可通过CSS媒体查询 (media queries) 在特定断点下调整布局、字体大小或显隐元素。
+-   **移动优先/桌面优先**: 根据项目需求选择一种响应式策略，并系统地进行测试。
+-   **可触摸优化**: 确保按钮、链接等交互元素在触摸设备上有足够大的点击区域。
 
-### 系统设置
+## 4. 色彩与视觉设计指南
 
-在[SystemView.vue](mdc:xhs_admin_ui/src/views/system/SystemView.vue)中进行的修改：
+-   **UI库一致性**: 优先使用并扩展 [Element Plus](mdc:https:/element-plus.org) 的设计系统 (颜色、排版、间距、组件样式)。
+-   **主题化**: 如果需要自定义主题，应通过Element Plus提供的机制 (如CSS变量覆盖) 进行，以保证组件兼容性。
+-   **语义化颜色**: 
+    -   主操作按钮: 使用主题色 (通常是蓝色系)。
+    -   成功/确认: 绿色系。
+    -   警告/提示: 黄色或橙色系。
+    -   危险/错误: 红色系。
+-   **可访问性 (A11y)**: 注意文本与背景的对比度，确保色盲用户也能区分重要信息。
+-   **图表与数据可视化**: 选择清晰、对比度良好且信息传递准确的配色方案。
+-   **一致性**: 在整个应用中保持颜色、字体、图标和间距等视觉元素的一致性。
 
-- 删除"基本设置"选项卡
-- 删除"评论设置"选项卡
-- 仅保留"安全设置"和"备份恢复"选项卡
-- 优化表单布局和对齐方式
-
-## 响应式设计
-
-- 所有容器使用相对单位和flex布局
-- 表格组件添加响应式设计
-- 小屏幕优化处理，确保在各种设备上可用
-
-## 色彩设计
-
-- 保持Element Plus默认色彩系统
-- 按钮使用语义化颜色：主要(蓝)、成功(绿)、警告(黄)、危险(红)
-- 状态标签使用对应的语义化颜色
-- 图表和数据可视化使用协调的配色方案
+参考 [.cursor/rules/frontend-guide.mdc](mdc:.cursor/rules/frontend-guide.mdc) 和 [.cursor/rules/code-style.mdc](mdc:.cursor/rules/code-style.mdc) 获取更多前端开发和编码风格指南。

@@ -1,16 +1,18 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
 # 插件数据格式与API交互规范
 
-## 数据类型和结构
+本文档定义了浏览器插件 ([xhs_chrome_plugin](mdc:xhs_chrome_plugin)) 与后端API交互时使用的数据格式、API端点模式以及相关处理流程。
 
-浏览器插件处理并发送以下几种数据类型：
+## 数据模型定义
 
-### 1. 通知数据
-通知数据模型 [NotificationItem](mdc:xhs_backend/models.py) 包含：
+所有数据模型均使用Pydantic在后端定义，位于 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下的相应模块中 (例如 `comment_model.py`, `notification_model.py`, `note_model.py`)。
+
+### 1. 通知数据 (示例结构)
+-   对应模型如 `NotificationItem` (在 `xhs_backend/api/models/notification_model.py` 中查找)。
 ```json
 {
   "id": "通知唯一ID",
@@ -33,139 +35,128 @@ alwaysApply: false
 }
 ```
 
-### 2. 评论数据
-评论数据模型 [CommentItem](mdc:xhs_backend/models.py) 包含：
+### 2. 评论数据 (示例结构)
+-   对应模型如 `CommentItem` / `CommentCreate` (在 `xhs_backend/api/models/comment_model.py` 中查找)。
 ```json
 {
-  "id": "评论唯一ID",
+  "id": "评论唯一ID (由插件生成或为空，后端可能重新生成)",
   "noteId": "所属笔记ID",
   "authorName": "评论作者名称",
   "authorUrl": "作者主页URL",
   "authorAvatar": "作者头像URL",
   "content": "评论内容",
   "repliedToUser": "回复对象用户名",
-  "timestamp": "评论时间",
+  "timestamp": "评论时间 (ISO格式字符串)",
   "likeCount": "点赞数量",
   "ipLocation": "IP归属地",
-  "replies": ["嵌套回复数组..."],
-  "fetchTimestamp": "获取时间"
+  "replies": [], // 嵌套回复通常由后端处理，插件可能只发送顶层评论
+  "fetchTimestamp": "获取时间 (ISO格式字符串)"
 }
 ```
 
-### 3. 笔记数据
-笔记数据包含笔记的详细信息，如标题、内容、作者等。
+### 3. 笔记数据 (示例结构)
+-   对应模型如 `NoteItem` (在 `xhs_backend/api/models/note_model.py` 中查找)。
+-   包含笔记的详细信息，如标题、内容、作者、发布时间等。
 
-### 4. 结构化评论
-后端会将原始评论处理成扁平化的 [StructuredComment](mdc:xhs_backend/models.py)，添加字段：
-- `commentId`: 评论ID
-- `repliedId`: 回复的评论ID
-- `repliedOrder`: 在回复链中的顺序
-- `status`: 评论状态
+### 4. 结构化评论 (后端处理)
+-   后端服务 (如 `CommentService`) 会将原始评论（包括嵌套回复）处理成扁平化的结构化评论记录 (例如 `StructuredComment` 模型)。
+-   可能添加字段如 `parentId` (父评论ID), `depth` (嵌套深度), `status` (评论状态)。
 
-## API请求格式
+## API请求格式与端点
 
-### 数据发送 (新API结构)
-系统采用模块化API设计，根据数据类型使用不同的端点：
+-   **权威API参考**: 请始终参考后端FastAPI自动生成的OpenAPI文档 (通常位于 `/docs` 或 `/redoc`) 获取最新的API端点、请求/响应模型和参数。
+-   **认证**: API调用通常需要Bearer Token认证。参考 [.cursor/rules/auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)。
 
-#### 1. 评论数据
-- **端点**: `POST /api/comments/data`
-- **认证**: Bearer Token (`Authorization: Bearer <JWT_TOKEN>`)
-- **请求体**:
-  ```json
-  {
-    "type": "评论",
-    "data": [评论对象数组]
-  }
-  ```
+### 数据提交端点 (通用模式示例)
 
-#### 2. 通知数据
-- **端点**: `POST /api/notifications/data`
-- **认证**: Bearer Token (`Authorization: Bearer <JWT_TOKEN>`)
-- **请求体**:
-  ```json
-  {
-    "type": "通知",
-    "data": [通知对象数组]
-  }
-  ```
+插件向后端提交抓取的数据，后端可能提供按类型划分的端点，或一个统一的数据摄入端点。
 
-#### 3. 笔记数据
-- **端点**: `POST /api/notes/data`
-- **认证**: Bearer Token (`Authorization: Bearer <JWT_TOKEN>`)
-- **请求体**:
-  ```json
-  {
-    "type": "笔记",
-    "data": [笔记对象数组]
-  }
-  ```
+**示例：按类型划分的端点 (具体路径参考OpenAPI文档)**
 
-### 用户评论查询
-- **端点**: `GET /api/comments/user/{user_id}`
-- **认证**: Bearer Token
-- **返回**: 指定用户的所有评论历史列表
+-   **评论数据**: `POST /api/v1/plugin/comments`
+-   **通知数据**: `POST /api/v1/plugin/notifications`
+-   **笔记数据**: `POST /api/v1/plugin/notes`
 
-## 数据处理流程
+**请求体 (示例)**:
+```json
+// POST /api/v1/plugin/comments
+[
+  { /* CommentItem 1 */ },
+  { /* CommentItem 2 */ }
+]
+```
+或者，如果采用包装类型：
+```json
+// POST /api/v1/plugin/data (假设有这样一个通用端点)
+{
+  "type": "comment", // "notification", "note"
+  "payload": [
+    { /* Item 1 */ },
+    { /* Item 2 */ }
+  ]
+}
+```
 
-1. 插件在 [content.js](mdc:xhs_chrome_plugin/content.js) 中抓取网页数据
-2. 通过 [popup.js](mdc:xhs_chrome_plugin/popup.js) 中的函数发送至后端的特定端点
-   - 评论数据 → `/api/comments/data`
-   - 通知数据 → `/api/notifications/data` 
-   - 笔记数据 → `/api/notes/data`
-3. 后端在模块化的endpoints中接收数据:
-   - [api/endpoints/comments.py](mdc:xhs_backend/api/endpoints/comments.py)
-   - [api/endpoints/notifications.py](mdc:xhs_backend/api/endpoints/notifications.py)
-   - [api/endpoints/notes.py](mdc:xhs_backend/api/endpoints/notes.py)
-4. 评论数据经 [processing.py](mdc:xhs_backend/processing.py) 转换为结构化格式
-5. 最终通过 [database.py](mdc:xhs_backend/database.py) 保存到MongoDB
+## 数据处理流程 (概览)
 
-## 插件更新指南
+1.  **插件抓取**: 插件内容脚本 ([xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js) 等) 从小红书网页提取数据。
+2.  **插件发送**: 插件通过其UI脚本 ([xhs_chrome_plugin/js/popup.js](mdc:xhs_chrome_plugin/js/popup.js) 或后台脚本 `background.js`) 将数据异步发送到后端API的相应端点。
+3.  **后端API接收**: 后端 `api/endpoints/` 中的相应路由模块接收请求，并使用 `api/models/` 中的Pydantic模型校验数据。
+4.  **后端服务处理**: API端点调用 `api/services/` 中的服务函数。例如，`CommentService` 会处理评论数据：
+    -   数据清洗与转换。
+    -   将嵌套评论扁平化为结构化评论。
+    -   执行业务规则 (如状态更新、通知生成等)。
+5.  **数据存储**: 服务层通过 `database.py` 提供的异步数据库实例 (`db`) 将处理后的数据保存到MongoDB的相应集合中。
 
-由于后端API结构调整，浏览器插件需要更新以适配新的端点。有两种方式：
+## 插件API配置与更新指南
 
-### 1. 修改API配置
-在插件设置页面中，根据数据类型配置不同的API端点：
-- 评论数据：`http://<服务器地址>/api/comments/data`
-- 通知数据：`http://<服务器地址>/api/notifications/data`
-- 笔记数据：`http://<服务器地址>/api/notes/data`
+由于后端API可能演进，插件需要能够配置和适应API端点变化。
 
-### 2. 更新插件代码
-如果插件不支持多端点配置，需要修改发送逻辑，根据数据类型动态选择API端点：
+### 1. API端点配置
+-   插件应允许用户在配置页面 ([xhs_chrome_plugin/options.html](mdc:xhs_chrome_plugin/options.html)) 中设置后端API的基础URL。
+-   具体的API路径 (如 `/api/v1/plugin/comments`) 应基于基础URL拼接，或从后端获取配置 (如果后端支持)。
+
+### 2. 更新插件发送逻辑
+-   插件中的数据发送函数 (示例见下方) 应灵活处理API端点和认证。
+-   参考OpenAPI文档来确定正确的请求格式和端点。
 
 ```javascript
-// 修改后的数据发送函数
-async function sendData(type, data) {
-  let baseApiUrl = localStorage.getItem('baseApiUrl') || DEFAULT_BASE_API_URL;
-  // 确保baseApiUrl不包含trailing slash
-  baseApiUrl = baseApiUrl.replace(/\/$/, '');
-  
-  // 根据数据类型选择不同的API端点
-  let apiUrl;
-  if (type === "评论") {
-    apiUrl = `${baseApiUrl}/api/comments/data`;
-  } else if (type === "通知") {
-    apiUrl = `${baseApiUrl}/api/notifications/data`;
-  } else if (type === "笔记") {
-    apiUrl = `${baseApiUrl}/api/notes/data`;
-  } else {
-    throw new Error(`不支持的数据类型: ${type}`);
+// 示例：插件中的数据发送函数 (位于 popup.js 或 background.js)
+async function sendDataToBackend(endpointPath, dataPayload) {
+  // 从存储中获取API基础URL和认证Token
+  const baseApiUrl = await getStorage('baseApiUrl'); // Implement getStorage
+  const authToken = await getStorage('authToken');    // Implement getStorage
+
+  if (!baseApiUrl) {
+    console.error('API Base URL not configured in plugin settings.');
+    return { success: false, error: 'API Base URL not configured.' };
   }
-  
-  const token = localStorage.getItem('apiToken') || '';
-  
-  const payload = {
-    type: type,
-    data: data
-  };
-  
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(payload)
-  });
-  
-  return response.json();
+
+  const apiUrl = `${baseApiUrl.replace(/\/$/, '')}${endpointPath}`;
+
+  try {
+    const response = await fetch(apiUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken || ''}`
+      },
+      body: JSON.stringify(dataPayload)
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
+      console.error(`API Error (${response.status}):`, errorData);
+      return { success: false, status: response.status, error: errorData.detail || 'Unknown API error' };
+    }
+
+    return { success: true, data: await response.json() };
+  } catch (error) {
+    console.error('Network or other error sending data:', error);
+    return { success: false, error: error.message || 'Network error' };
+  }
 }
+
+// 调用示例:
+// sendDataToBackend('/api/v1/plugin/comments', [commentObject1, commentObject2]);
+```

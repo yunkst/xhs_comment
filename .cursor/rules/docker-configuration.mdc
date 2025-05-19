@@ -1,62 +1,103 @@
 ---
-description:
-globs:
+description: 
+globs: 
 alwaysApply: false
 ---
-# Docker环境配置指南
+# Docker 环境配置指南
 
-本项目使用Docker Compose进行容器化管理，主要配置文件包括：
+本项目使用Docker和Docker Compose进行开发、测试和生产环境的容器化管理。
 
-- [docker-compose.yml](mdc:xhs_backend/docker-compose.yml)：定义服务组合
-- [Dockerfile](mdc:xhs_backend/Dockerfile)：生产环境镜像构建
-- [Dockerfile.dev](mdc:xhs_backend/Dockerfile.dev)：开发环境镜像构建
+## 主要配置文件 (位于 `xhs_backend` 目录)
 
-## 环境变量配置
+- **[xhs_backend/docker-compose.yml](mdc:xhs_backend/docker-compose.yml)**: 生产环境的服务组合定义。
+- **[xhs_backend/docker-compose.dev.yml](mdc:xhs_backend/docker-compose.dev.yml)**: 开发环境的服务组合定义，通常包含热重载等开发便利功能。
+- **[xhs_backend/Dockerfile](mdc:xhs_backend/Dockerfile)**: 用于构建后端应用生产镜像的指令。
+- **[xhs_backend/Dockerfile.dev](mdc:xhs_backend/Dockerfile.dev)**: 用于构建后端应用开发镜像的指令。
 
-后端服务依赖的环境变量（`.env`文件）包括：
+## 环境变量配置 (`.env` 文件)
 
+后端服务 ([xhs_backend](mdc:xhs_backend)) 依赖于 `.env` 文件进行配置。根目录下应有 `.env.example` 作为模板。 **切勿将实际的 `.env` 文件提交到版本控制系统。**
+
+关键环境变量示例 (详见 `.env.example` 和代码中的实际使用)：
+
+```env
+# MongoDB 配置 (与 database.py 中的常量对应)
+MONGODB_URL="mongodb://mongodb:27017/" # 在Docker Compose网络中，mongodb是服务名
+DATABASE_NAME="xhs_comments"
+
+# Keycloak 配置 (如果通过环境变量配置后端客户端)
+# KEYCLOAK_SERVER_URL="http://keycloak:8080/auth/"
+# KEYCLOAK_REALM="your-realm"
+# KEYCLOAK_CLIENT_ID="your-backend-client-id"
+# KEYCLOAK_CLIENT_SECRET_KEY="your-client-secret" # 或其他客户端认证方式
+# KEYCLOAK_ALGORITHM="RS256"
+# KEYCLOAK_AUDIENCE="account"
+
+# API 安全与杂项 (部分可能已由Keycloak管理)
+# API_SECRET_TOKEN="your_secure_api_token_for_specific_clients_if_any" # 如有非Keycloak认证的客户端
+# JWT_SECRET_KEY="..." # Keycloak通常使用公钥验证，此项可能用于其他JWT场景
+ALLOW_REGISTER="false" # 是否允许通过API直接注册 (若Keycloak管理用户则通常为false)
+
+# FastAPI 应用配置
+FASTAPI_HOST="0.0.0.0"
+FASTAPI_PORT="8000"
 ```
-# 必需设置
-API_SECRET_TOKEN="your_secure_api_token_here"
 
-# 可选配置（有默认值）
-MONGODB_CONNECTION_STRING="mongodb://mongodb:27017"
-MONGODB_DATABASE="xhs_data"
-JWT_SECRET_KEY="change_this_secret"
-ALLOW_REGISTER="true"
+## 服务构成 (示例，具体依赖于 `docker-compose.*.yml` 文件)
+
+### 开发环境 (`docker-compose.dev.yml`)
+-   `xhs_backend`: FastAPI应用服务，通常配置了卷挂载以支持热重载 (端口如 `8000`)。
+-   `mongodb`: MongoDB数据库服务 (端口如 `27017`)。
+-   `mongo-express`: MongoDB管理界面 (端口如 `8081`)。
+-   (可选) `keycloak`: Keycloak服务实例。
+-   (可选) `xhs_admin_ui_dev`: 前端Vue开发服务器 (端口如 `5173`)，如果也通过Docker Compose管理。
+
+### 生产环境 (`docker-compose.yml`)
+-   `xhs_backend`: FastAPI应用服务，使用生产镜像。
+-   `mongodb`: MongoDB数据库服务。
+-   (可选) `nginx`: 作为反向代理和静态文件服务器 (服务 `xhs_admin_ui` 构建后的静态文件)。
+
+## 常用Docker Compose命令
+
+**开发环境:**
+```bash
+# 启动所有开发服务 (后台运行)
+docker-compose -f xhs_backend/docker-compose.dev.yml up -d
+
+# 重建并启动开发服务
+docker-compose -f xhs_backend/docker-compose.dev.yml up -d --build
+
+# 查看特定开发服务的日志
+docker-compose -f xhs_backend/docker-compose.dev.yml logs -f xhs_backend
+
+# 停止所有开发服务
+docker-compose -f xhs_backend/docker-compose.dev.yml down
+
+# 进入开发后端容器的Shell
+docker-compose -f xhs_backend/docker-compose.dev.yml exec xhs_backend bash
 ```
 
-## 服务构成
+**生产环境:**
+```bash
+# 启动所有生产服务 (后台运行)
+docker-compose -f xhs_backend/docker-compose.yml up -d
 
-Docker Compose环境包含以下服务：
+# (通常在CI/CD流程中) 构建并启动生产服务
+docker-compose -f xhs_backend/docker-compose.yml up -d --build 
 
-1. **xhs_backend**：FastAPI应用服务（默认端口8000）
-2. **mongodb**：MongoDB数据库，用于数据存储
-3. **mongo-express**：MongoDB管理界面（默认端口8081）
-
-## 常用Docker命令
-
-```
-# 启动所有服务
-docker-compose up -d
-
-# 重建并启动服务
-docker-compose up -d --build
-
-# 查看日志
-docker-compose logs -f xhs_backend
-
-# 停止所有服务
-docker-compose down
-
-# 进入容器Shell
-docker-compose exec xhs_backend bash
+# 停止所有生产服务
+docker-compose -f xhs_backend/docker-compose.yml down
 ```
 
 ## 数据持久化
 
-MongoDB数据存储在命名卷中，确保数据持久化。若需要备份，可以使用：
+MongoDB数据通常通过Docker命名卷进行持久化 (在 `docker-compose.*.yml` 中配置)。
+备份示例 (在MongoDB容器内执行 `mongodump`):
+```bash
+# 假设使用开发环境的compose文件
+docker-compose -f xhs_backend/docker-compose.dev.yml exec mongodb mongodump --archive --db=xhs_comments > xhs_comments_backup.archive
+# 恢复 (示例)
+# cat xhs_comments_backup.archive | docker-compose -f xhs_backend/docker-compose.dev.yml exec -T mongodb mongorestore --archive --db=xhs_comments
+```
 
-```
-docker-compose exec mongodb mongodump --out=/backup
-```
+确保理解卷的配置以避免数据丢失。
