@@ -3,6 +3,9 @@
 // 全局变量，用于跟踪当前弹框状态
 let currentDialogElement = null;
 let currentDialogContent = null;
+let isDragging = false;
+let dragOffsetX = 0;
+let dragOffsetY = 0;
 
 // 显示通知弹出框
 function showNotificationDialog(index) {
@@ -33,23 +36,139 @@ function showNotificationDialog(index) {
   // 创建弹出框
   const dialog = document.createElement('div');
   dialog.className = 'xhs-plugin-dialog';
+  // 设置弹框的样式，使其悬浮在页面侧边
+  dialog.style.cssText = `
+    position: fixed;
+    top: 50%;
+    right: 5%;
+    transform: translateY(-50%);
+    width: 400px;
+    max-width: 90vw;
+    height: 80vh;
+    max-height: 90vh;
+    background-color: #222;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    z-index: 999999;
+    display: flex;
+    flex-direction: column;
+    color: white;
+    overflow: hidden;
+    transition: box-shadow 0.3s;
+  `;
   
   // 创建弹出框头部
   const header = document.createElement('div');
   header.className = 'xhs-plugin-dialog-header';
+  header.style.cssText = `
+    padding: 12px 16px;
+    border-bottom: 1px solid #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #333;
+    cursor: move;
+    user-select: none;
+  `;
+  
+  // 添加拖拽功能
+  header.addEventListener('mousedown', (e) => {
+    // 只在鼠标左键点击时启用拖拽
+    if (e.button !== 0) return;
+    
+    // 开始拖拽
+    isDragging = true;
+    
+    // 计算鼠标点击位置与弹窗左上角的偏移
+    const rect = dialog.getBoundingClientRect();
+    dragOffsetX = e.clientX - rect.left;
+    dragOffsetY = e.clientY - rect.top;
+    
+    // 给弹框添加正在拖拽的样式
+    dialog.style.boxShadow = '0 6px 30px rgba(0, 0, 0, 0.7)';
+    dialog.style.transition = 'none';
+    
+    // 阻止默认行为和冒泡
+    e.preventDefault();
+    e.stopPropagation();
+  });
+  
+  // 添加全局鼠标移动事件处理
+  const mouseMoveHandler = (e) => {
+    if (!isDragging) return;
+    
+    // 计算新位置
+    const newX = e.clientX - dragOffsetX;
+    const newY = e.clientY - dragOffsetY;
+    
+    // 应用新位置
+    dialog.style.left = `${newX}px`;
+    dialog.style.top = `${newY}px`;
+    dialog.style.right = 'auto';
+    dialog.style.transform = 'none';
+    
+    // 阻止默认行为和冒泡
+    e.preventDefault();
+    e.stopPropagation();
+  };
+  
+  // 添加全局鼠标松开事件处理
+  const mouseUpHandler = () => {
+    if (!isDragging) return;
+    
+    // 结束拖拽
+    isDragging = false;
+    
+    // 恢复弹框样式
+    dialog.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.5)';
+    dialog.style.transition = 'box-shadow 0.3s';
+  };
+  
+  // 注册事件
+  document.addEventListener('mousemove', mouseMoveHandler);
+  document.addEventListener('mouseup', mouseUpHandler);
+  
+  // 在弹框关闭时移除事件监听器
+  dialog.addEventListener('remove', () => {
+    document.removeEventListener('mousemove', mouseMoveHandler);
+    document.removeEventListener('mouseup', mouseUpHandler);
+  });
   
   // 创建标题
   const title = document.createElement('div');
   title.className = 'xhs-plugin-dialog-title';
   title.textContent = '历史评论';
+  title.style.cssText = `
+    font-weight: bold;
+    color: white;
+    font-size: 16px;
+  `;
   
   // 创建关闭按钮
   const closeBtn = document.createElement('div');
   closeBtn.className = 'xhs-plugin-dialog-close';
   closeBtn.textContent = '×';
+  closeBtn.style.cssText = `
+    cursor: pointer;
+    font-size: 24px;
+    color: #ccc;
+    line-height: 1;
+    padding: 0 5px;
+    transition: color 0.2s;
+  `;
+  closeBtn.addEventListener('mouseenter', () => {
+    closeBtn.style.color = 'white';
+  });
+  closeBtn.addEventListener('mouseleave', () => {
+    closeBtn.style.color = '#ccc';
+  });
   closeBtn.addEventListener('click', () => {
     console.log('点击关闭按钮');
     document.body.removeChild(dialog);
+    
+    // 移除事件监听器
+    document.removeEventListener('mousemove', mouseMoveHandler);
+    document.removeEventListener('mouseup', mouseUpHandler);
     
     // 清空全局变量
     currentDialogElement = null;
@@ -59,6 +178,13 @@ function showNotificationDialog(index) {
   // 创建内容区域
   const content = document.createElement('div');
   content.className = 'xhs-plugin-dialog-content';
+  content.style.cssText = `
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background-color: #222;
+    color: white;
+  `;
   
   // 创建加载提示
   const loadingIndicator = document.createElement('div');
@@ -145,14 +271,21 @@ function renderHistoricalComments(container, historicalComments) {
   // 创建总容器
   const commentsContainer = document.createElement('div');
   commentsContainer.className = 'xhs-plugin-comments-container';
-  commentsContainer.style.color = 'white';
+  commentsContainer.style.cssText = `
+    color: white;
+    width: 100%;
+    font-size: 14px;
+  `;
   
   if (historicalComments.length === 0) {
     const emptyMessage = document.createElement('p');
     emptyMessage.textContent = '没有历史评论';
-    emptyMessage.style.color = 'white';
-    emptyMessage.style.textAlign = 'center';
-    emptyMessage.style.padding = '20px';
+    emptyMessage.style.cssText = `
+      color: #ccc;
+      text-align: center;
+      padding: 20px 0;
+      font-size: 15px;
+    `;
     commentsContainer.appendChild(emptyMessage);
     container.appendChild(commentsContainer);
     return;
@@ -166,11 +299,13 @@ function renderHistoricalComments(container, historicalComments) {
     // 创建笔记容器
     const noteContainer = document.createElement('div');
     noteContainer.className = 'xhs-plugin-note-container';
-    noteContainer.style.marginBottom = '15px';
-    noteContainer.style.padding = '10px';
-    noteContainer.style.border = '1px solid #333';
-    noteContainer.style.borderRadius = '8px';
-    noteContainer.style.backgroundColor = '#111';
+    noteContainer.style.cssText = `
+      margin-bottom: 15px;
+      padding: 10px;
+      border: 1px solid #333;
+      border-radius: 8px;
+      background-color: #2a2a2a;
+    `;
     
     // 格式化发布时间
     let publishTimeDisplay = '未知时间';
@@ -194,15 +329,17 @@ function renderHistoricalComments(container, historicalComments) {
     // 创建笔记标题
     const noteHeader = document.createElement('div');
     noteHeader.className = 'xhs-plugin-note-header';
-    noteHeader.style.fontWeight = 'bold';
-    noteHeader.style.padding = '5px 0';
-    noteHeader.style.borderBottom = '1px solid #333';
-    noteHeader.style.marginBottom = '8px';
-    noteHeader.style.color = 'white';
+    noteHeader.style.cssText = `
+      font-weight: bold;
+      padding: 5px 0;
+      border-bottom: 1px solid #444;
+      margin-bottom: 10px;
+      color: white;
+    `;
     noteHeader.innerHTML = `
       <div style="display: flex; justify-content: space-between;">
         <div>${noteIndex + 1}. ${noteData.title || '无标题笔记'}</div>
-        <div style="font-size: 0.85em; font-weight: normal;">${publishTimeDisplay}</div>
+        <div style="font-size: 0.85em; font-weight: normal; color: #aaa;">${publishTimeDisplay}</div>
       </div>
     `;
     noteContainer.appendChild(noteHeader);
@@ -211,9 +348,12 @@ function renderHistoricalComments(container, historicalComments) {
     if (!noteData.comments || !Array.isArray(noteData.comments) || noteData.comments.length === 0) {
       const noCommentsMsg = document.createElement('div');
       noCommentsMsg.textContent = '该笔记下没有评论';
-      noCommentsMsg.style.color = 'white';
-      noCommentsMsg.style.textAlign = 'center';
-      noCommentsMsg.style.padding = '10px';
+      noCommentsMsg.style.cssText = `
+        color: #aaa;
+        text-align: center;
+        padding: 10px;
+        font-style: italic;
+      `;
       noteContainer.appendChild(noCommentsMsg);
       commentsContainer.appendChild(noteContainer);
       return;
@@ -224,6 +364,9 @@ function renderHistoricalComments(container, historicalComments) {
     // 创建评论列表
     const commentsList = document.createElement('div');
     commentsList.className = 'xhs-plugin-comments-list';
+    commentsList.style.cssText = `
+      margin-top: 5px;
+    `;
     
     // 构建评论树结构
     const commentsMap = new Map(); // 所有评论的映射
@@ -303,9 +446,12 @@ function renderHistoricalComments(container, historicalComments) {
 function createCommentElement(comment) {
   const commentElem = document.createElement('div');
   commentElem.className = 'xhs-plugin-comment';
-  commentElem.style.padding = '5px 0';
-  commentElem.style.marginBottom = '5px';
-  commentElem.style.color = 'white';
+  commentElem.style.cssText = `
+    padding: 8px 0;
+    margin-bottom: 8px;
+    color: white;
+    border-bottom: 1px dashed #3a3a3a;
+  `;
   
   // 格式化评论时间
   let commentTimeDisplay = '';
@@ -315,20 +461,26 @@ function createCommentElement(comment) {
   
   // 评论元数据行
   const metaRow = document.createElement('div');
-  metaRow.style.display = 'flex';
-  metaRow.style.justifyContent = 'space-between';
-  metaRow.style.fontSize = '0.9em';
-  metaRow.style.color = '#aaa';
+  metaRow.style.cssText = `
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9em;
+    color: #aaa;
+    margin-bottom: 4px;
+  `;
   metaRow.innerHTML = `
     <div style="font-weight: bold; color: #ddd;">${comment.userName || '未知用户'}</div>
-    <div>${commentTimeDisplay}</div>
+    <div style="color: #888; font-size: 0.9em;">${commentTimeDisplay}</div>
   `;
   
   // 评论内容
   const contentRow = document.createElement('div');
-  contentRow.style.margin = '3px 0';
-  contentRow.style.wordBreak = 'break-word';
-  contentRow.style.color = 'white';
+  contentRow.style.cssText = `
+    margin: 4px 0;
+    word-break: break-word;
+    color: #eee;
+    line-height: 1.4;
+  `;
   contentRow.textContent = comment.content || '无内容';
   
   commentElem.appendChild(metaRow);
