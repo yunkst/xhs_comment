@@ -3,6 +3,13 @@ from fastapi import APIRouter
 # 创建主路由
 api_router = APIRouter()
 
+# 项目结构说明：
+# - models包: 存放数据模型定义
+# - services包: 存放业务逻辑和服务功能
+# - endpoints包: 存放API端点定义和路由
+# 
+# 以上包都不需要在这里直接导入，它们会在各模块中按需导入
+
 # 在运行时导入各个端点路由
 from .endpoints import users, comments, notes, notifications, system, user_notes, keycloak_auth
 

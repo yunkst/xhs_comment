@@ -21,6 +21,15 @@ document.addEventListener('DOMContentLoaded', function() {
   const otpQrcodeGroup = document.getElementById('otpQrcodeGroup');
   const otpQrcodeDiv = document.getElementById('otpQrcode');
   const otpCodeGroup = document.getElementById('otpCodeGroup');
+  const ssoStartLoginButton = document.getElementById('ssoStartLogin');
+  const ssoCheckLoginButton = document.getElementById('ssoCheckLogin');
+  
+  // SSO会话信息
+  let ssoSession = {
+    id: null,
+    status: 'idle', // 'idle', 'pending', 'completed', 'failed'
+    pollInterval: null
+  };
   
   // 通过background.js代理API请求，解决跨域问题
   async function proxyFetch(url, options = {}) {
@@ -79,6 +88,234 @@ document.addEventListener('DOMContentLoaded', function() {
     
     console.log('从存储加载配置:', result);
   });
+  
+  // SSO启动登录按钮事件
+  ssoStartLoginButton.addEventListener('click', function() {
+    startSsoLogin();
+  });
+  
+  // SSO检查登录按钮事件
+  ssoCheckLoginButton.addEventListener('click', function() {
+    checkSsoLoginStatus();
+  });
+  
+  // 启动SSO登录流程
+  async function startSsoLogin() {
+    const apiBaseUrl = apiHostInput.value.trim();
+    
+    if (!apiBaseUrl) {
+      showStatus('请先设置API地址', 'error');
+      return;
+    }
+    
+    if (!apiBaseUrl.startsWith('http')) {
+      showStatus('API接口地址必须以http://或https://开头', 'error');
+      return;
+    }
+    
+    // 更新状态
+    showStatus('正在准备SSO登录...', '');
+    ssoStartLoginButton.disabled = true;
+    ssoStartLoginButton.innerHTML = '<span class="spinner"></span>初始化SSO...';
+    
+    try {
+      // 创建SSO会话
+      const response = await fetch(`${apiBaseUrl}/api/auth/sso-session`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          client_type: 'plugin'
+        })
+      });
+      
+      if (!response.ok) {
+        throw new Error(`服务器返回错误状态: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // 保存会话ID
+      ssoSession.id = data.session_id;
+      ssoSession.status = 'pending';
+      
+      // 显示已完成登录按钮
+      ssoCheckLoginButton.style.display = 'inline-block';
+      
+      // 打开SSO登录URL
+      const loginUrl = data.login_url;
+      
+      // 打开新标签页
+      chrome.tabs.create({ url: loginUrl });
+      
+      showStatus('已打开SSO登录页面，请在新标签页完成登录后返回此处点击"已完成登录"按钮', 'success');
+      ssoStartLoginButton.disabled = false;
+      ssoStartLoginButton.innerHTML = '重新发起SSO登录';
+      
+      // 自动开始轮询（可选，也可以等用户点击"已完成登录"按钮）
+      // startPollingLoginStatus();
+      
+    } catch (error) {
+      console.error('SSO登录初始化失败:', error);
+      ssoStartLoginButton.disabled = false;
+      ssoStartLoginButton.innerHTML = '单点登录 (SSO)';
+      showStatus(`SSO登录失败: ${error.message || '未知错误'}`, 'error');
+      ssoSession.status = 'failed';
+    }
+  }
+  
+  // 检查SSO登录状态
+  async function checkSsoLoginStatus() {
+    const apiBaseUrl = apiHostInput.value.trim();
+    
+    if (ssoSession.id === null) {
+      showStatus('无效的SSO会话，请重新发起登录', 'error');
+      ssoCheckLoginButton.style.display = 'none';
+      return;
+    }
+    
+    // 更新UI
+    ssoCheckLoginButton.disabled = true;
+    ssoCheckLoginButton.innerHTML = '<span class="spinner"></span>正在检查登录状态...';
+    showStatus('正在检查SSO登录状态...', '');
+    
+    try {
+      const response = await fetch(`${apiBaseUrl}/api/auth/sso-session/${ssoSession.id}`);
+      
+      if (!response.ok) {
+        throw new Error(`服务器返回错误状态: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      if (data.status === 'completed' && data.tokens) {
+        // 登录成功，保存token
+        const accessToken = data.tokens.access_token;
+        const refreshToken = data.tokens.refresh_token;
+        
+        // 保存token到storage
+        chrome.storage.local.set({
+          apiBaseUrl: apiBaseUrl,
+          apiToken: accessToken,
+          refreshToken: refreshToken || ''
+        }, function() {
+          if (chrome.runtime.lastError) {
+            showStatus('保存Token失败: ' + chrome.runtime.lastError.message, 'error');
+          } else {
+            showStatus('SSO登录成功！', 'success');
+            
+            // 重置会话状态
+            ssoSession = {
+              id: null,
+              status: 'idle',
+              pollInterval: null
+            };
+            
+            // 更新UI
+            ssoCheckLoginButton.style.display = 'none';
+            ssoStartLoginButton.innerHTML = '单点登录 (SSO)';
+            
+            // 更新登录按钮状态
+            loginBtn.textContent = '已登录';
+            loginBtn.style.backgroundColor = '#00994d';
+            logoutBtn.style.display = 'inline-block';
+            
+            // 通知popup页面刷新API配置
+            chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
+          }
+          // 启用按钮
+          ssoCheckLoginButton.disabled = false;
+          ssoCheckLoginButton.innerHTML = '已完成登录，点击继续';
+        });
+      } else if (data.status === 'pending') {
+        // 会话仍在等待完成
+        showStatus('您尚未完成SSO登录，请在新标签页完成登录后返回', '');
+        ssoCheckLoginButton.disabled = false;
+        ssoCheckLoginButton.innerHTML = '已完成登录，点击继续';
+      } else {
+        showStatus('会话状态异常，请重新发起登录', 'error');
+        ssoCheckLoginButton.disabled = false;
+        ssoCheckLoginButton.innerHTML = '已完成登录，点击继续';
+      }
+    } catch (error) {
+      console.error('检查SSO登录状态失败:', error);
+      showStatus(`检查登录状态失败: ${error.message || '未知错误'}`, 'error');
+      ssoCheckLoginButton.disabled = false;
+      ssoCheckLoginButton.innerHTML = '已完成登录，点击继续';
+    }
+  }
+  
+  // 开始轮询登录状态（可选，如果希望自动检测）
+  function startPollingLoginStatus() {
+    const apiBaseUrl = apiHostInput.value.trim();
+    
+    // 清除可能已存在的轮询
+    if (ssoSession.pollInterval) {
+      clearInterval(ssoSession.pollInterval);
+    }
+    
+    // 每3秒检查一次登录状态
+    ssoSession.pollInterval = setInterval(async () => {
+      if (ssoSession.id === null || ssoSession.status !== 'pending') {
+        clearInterval(ssoSession.pollInterval);
+        return;
+      }
+      
+      try {
+        const response = await fetch(`${apiBaseUrl}/api/auth/sso-session/${ssoSession.id}`);
+        
+        if (!response.ok) {
+          throw new Error(`服务器返回错误状态: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        
+        if (data.status === 'completed' && data.tokens) {
+          // 登录成功，保存token并停止轮询
+          clearInterval(ssoSession.pollInterval);
+          
+          const accessToken = data.tokens.access_token;
+          const refreshToken = data.tokens.refresh_token;
+          
+          // 保存token到storage
+          chrome.storage.local.set({
+            apiBaseUrl: apiBaseUrl,
+            apiToken: accessToken,
+            refreshToken: refreshToken || ''
+          }, function() {
+            if (chrome.runtime.lastError) {
+              showStatus('保存Token失败: ' + chrome.runtime.lastError.message, 'error');
+            } else {
+              showStatus('SSO登录成功！', 'success');
+              
+              // 重置会话状态
+              ssoSession = {
+                id: null,
+                status: 'idle',
+                pollInterval: null
+              };
+              
+              // 更新UI
+              ssoCheckLoginButton.style.display = 'none';
+              ssoStartLoginButton.innerHTML = '单点登录 (SSO)';
+              
+              // 更新登录按钮状态
+              loginBtn.textContent = '已登录';
+              loginBtn.style.backgroundColor = '#00994d';
+              logoutBtn.style.display = 'inline-block';
+              
+              // 通知popup页面刷新API配置
+              chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
+            }
+          });
+        }
+      } catch (error) {
+        console.error('轮询SSO状态失败:', error);
+        // 出错时不停止轮询，继续尝试
+      }
+    }, 3000);
+  }
   
   // 保存按钮点击事件
   saveBtn.addEventListener('click', function() {

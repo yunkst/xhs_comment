@@ -199,6 +199,7 @@ document.addEventListener('DOMContentLoaded', function() {
       apiConfig.host = result.apiBaseUrl || '';
       apiConfig.token = result.apiToken || '';
       
+      // 更新模式信息
       updateModeInfo();
     });
   }
@@ -206,9 +207,14 @@ document.addEventListener('DOMContentLoaded', function() {
   // 更新模式信息
   function updateModeInfo() {
     if (apiConfig.host && apiConfig.token) {
-      modeInfoElement.textContent = `数据将发送到: ${apiConfig.host}`;
+      modeInfoElement.textContent = `API已配置: ${apiConfig.host.substring(0, 20)}... (已登录)`;
+      modeInfoElement.style.backgroundColor = '#e6fff2';
+    } else if (apiConfig.host) {
+      modeInfoElement.textContent = `API已配置: ${apiConfig.host.substring(0, 20)}... (未登录)`;
+      modeInfoElement.style.backgroundColor = '#fff8e6';
     } else {
       modeInfoElement.textContent = '尚未配置API，将下载到本地';
+      modeInfoElement.style.backgroundColor = '#f5f5f5';
     }
   }
   

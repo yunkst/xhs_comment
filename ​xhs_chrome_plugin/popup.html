@@ -29,6 +29,20 @@
     button.secondary:hover {
       background-color: #e0e0e0;
     }
+    button.blue {
+      background-color: #4285f4;
+      color: white;
+    }
+    button.blue:hover {
+      background-color: #3367d6;
+    }
+    button.green {
+      background-color: #00994d;
+      color: white;
+    }
+    button.green:hover {
+      background-color: #007a3d;
+    }
     #status {
       margin-top: 10px;
       color: #333;
@@ -68,6 +82,28 @@
       padding: 5px;
       background-color: #f5f5f5;
       border-radius: 4px;
+    }
+    .sso-container {
+      margin-bottom: 15px;
+    }
+    .sso-container.hidden {
+      display: none;
+    }
+    #ssoStartLogin {
+      margin-bottom: 5px;
+    }
+    .spinner {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-radius: 50%;
+      border-top-color: #fff;
+      animation: spin 1s ease-in-out infinite;
+      margin-right: 8px;
+    }
+    @keyframes spin {
+      to { transform: rotate(360deg); }
     }
   </style>
 </head>
