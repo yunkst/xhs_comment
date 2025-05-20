@@ -11,7 +11,8 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentData = [];
   let apiConfig = {
     host: '',
-    token: ''
+    token: '',
+    autoUploadComments: false // 添加自动上传评论设置
   };
   
   // 上传评论缓存标记，防止重复提交
@@ -28,9 +29,9 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 获取评论按钮点击事件
   getCommentsButton.addEventListener('click', function() {
-    // 防止重复点击：检查是否正在上传或者距离上次上传时间太短(0.5秒内)
+    // 防止重复点击：检查是否正在上传或者距离上次上传时间太短(5秒内)
     const now = Date.now();
-    if (commentsUploadInProgress || (now - lastUploadTime < 500)) {
+    if (commentsUploadInProgress || (now - lastUploadTime < 5000)) {
       // 通知用户操作太频繁
       showToastOnPage('请勿频繁点击，正在处理上一个请求', 'info');
       return;
@@ -63,10 +64,98 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // 监听来自options页面的消息
-  chrome.runtime.onMessage.addListener(function(message) {
+  chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    console.log('popup.js收到消息:', message, '来源:', sender?.id || '未知来源');
+    
+    // 处理ping消息，用于检测popup是否打开
+    if (message.action === 'ping') {
+      console.log('收到ping消息，立即响应');
+      sendResponse({pong: true, source: 'popup.js', timestamp: Date.now()});
+      return false; // 同步响应
+    }
+    
     if (message.action === 'refreshApiConfig') {
       loadApiConfig(); // 收到消息后刷新API配置
+      console.log('已刷新API配置');
+      sendResponse({success: true, action: 'refreshed'});
     }
+    // 处理来自content.js的上传评论请求
+    else if (message.action === 'uploadComments') {
+      console.log('popup收到自动上传评论请求, popup状态:', {
+        isVisible: document.visibilityState === 'visible',
+        commentsButtonEnabled: getCommentsButton && !getCommentsButton.disabled,
+        isUploading: commentsUploadInProgress,
+        lastUploadTime: new Date(lastUploadTime).toLocaleString(),
+        requestURL: message.url || '未提供URL'
+      });
+      
+      // 如果popup未打开或不在焦点，则激活popup
+      if (document.visibilityState !== 'visible') {
+        console.log('Popup未在焦点，激活后执行上传');
+        // 激活后执行操作 - 这里其实不需要特别处理，因为消息会触发此监听
+      }
+      
+      // 模拟点击获取评论按钮，如果按钮可用
+      if (getCommentsButton && !getCommentsButton.disabled) {
+        console.log('模拟点击获取评论按钮');
+        // 添加延迟，确保页面已完全加载
+        setTimeout(() => {
+          getCommentsButton.click();
+          sendResponse({success: true, action: 'clicked', timestamp: Date.now()});
+        }, 100);
+      } else {
+        console.log('获取评论按钮不可用，无法自动上传', {
+          buttonExists: !!getCommentsButton,
+          isDisabled: getCommentsButton ? getCommentsButton.disabled : true
+        });
+        sendResponse({success: false, error: '按钮不可用', timestamp: Date.now()});
+      }
+      
+      return true; // 保持连接开启
+    }
+    // 处理重试上传评论请求
+    else if (message.action === 'retryUploadComments') {
+      console.log('收到重试上传评论请求, popup状态:', {
+        isInitialized: !!getCommentsButton,
+        isUploading: commentsUploadInProgress,
+        lastUploadTime: new Date(lastUploadTime).toLocaleString(),
+        requestURL: message.url || '未提供URL'
+      });
+      
+      // 如果popup未初始化完成，延迟执行
+      if (!getCommentsButton) {
+        console.log('Popup尚未初始化，延迟执行上传');
+        setTimeout(() => {
+          // 再次检查按钮是否已初始化
+          if (getCommentsButton && !getCommentsButton.disabled) {
+            console.log('延迟后模拟点击获取评论按钮');
+            getCommentsButton.click();
+            sendResponse({success: true, action: 'delayed_clicked', timestamp: Date.now()});
+          } else {
+            console.log('延迟后获取评论按钮仍不可用', {
+              buttonExists: !!getCommentsButton,
+              isDisabled: getCommentsButton ? getCommentsButton.disabled : true
+            });
+            sendResponse({success: false, error: '延迟后按钮仍不可用', timestamp: Date.now()});
+          }
+        }, 800);  // 增加更长的延迟
+      } else if (!getCommentsButton.disabled) {
+        console.log('执行重试上传，模拟点击获取评论按钮');
+        getCommentsButton.click();
+        sendResponse({success: true, action: 'retry_clicked', timestamp: Date.now()});
+      } else {
+        console.log('重试上传失败，获取评论按钮不可用', {
+          isDisabled: getCommentsButton.disabled
+        });
+        sendResponse({success: false, error: '重试时按钮不可用', timestamp: Date.now()});
+      }
+      
+      return true; // 保持连接开启
+    }
+    
+    // 对于未处理的消息，返回默认响应
+    sendResponse({received: true, action: message.action, timestamp: Date.now()});
+    return true;
   });
   
   // 在当前页面显示Toast
@@ -291,27 +380,41 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 加载API配置
   function loadApiConfig() {
-    chrome.storage.local.get(['apiBaseUrl', 'apiToken'], function(result) {
+    chrome.storage.local.get(['apiBaseUrl', 'apiToken', 'autoUploadComments'], function(result) {
       apiConfig.host = result.apiBaseUrl || '';
       apiConfig.token = result.apiToken || '';
+      apiConfig.autoUploadComments = result.autoUploadComments === true;
       
       // 更新模式信息
       updateModeInfo();
+      
+      console.log('已加载API配置:', apiConfig);
     });
   }
   
   // 更新模式信息
   function updateModeInfo() {
+    let modeText = '';
+    let bgColor = '';
+    
     if (apiConfig.host && apiConfig.token) {
-      modeInfoElement.textContent = `API已配置: ${apiConfig.host.substring(0, 20)}... (已登录)`;
-      modeInfoElement.style.backgroundColor = '#e6fff2';
+      modeText = `API已配置: ${apiConfig.host.substring(0, 20)}... (已登录)`;
+      bgColor = '#e6fff2';
     } else if (apiConfig.host) {
-      modeInfoElement.textContent = `API已配置: ${apiConfig.host.substring(0, 20)}... (未登录)`;
-      modeInfoElement.style.backgroundColor = '#fff8e6';
+      modeText = `API已配置: ${apiConfig.host.substring(0, 20)}... (未登录)`;
+      bgColor = '#fff8e6';
     } else {
-      modeInfoElement.textContent = '尚未配置API，将下载到本地';
-      modeInfoElement.style.backgroundColor = '#f5f5f5';
+      modeText = '尚未配置API，将下载到本地';
+      bgColor = '#f5f5f5';
     }
+    
+    // 添加自动上传评论状态
+    if (apiConfig.autoUploadComments) {
+      modeText += ' | 已启用自动上传评论';
+    }
+    
+    modeInfoElement.textContent = modeText;
+    modeInfoElement.style.backgroundColor = bgColor;
   }
   
   // 更新状态信息

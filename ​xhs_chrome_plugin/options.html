@@ -112,6 +112,54 @@
     @keyframes spin {
       to { transform: rotate(360deg); }
     }
+    /* 开关样式 */
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 50px;
+      height: 24px;
+    }
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    input:checked + .slider {
+      background-color: #2196F3;
+    }
+    input:checked + .slider:before {
+      transform: translateX(26px);
+    }
+    .toggle-container {
+      display: flex;
+      align-items: center;
+    }
+    .toggle-container label {
+      margin-right: 10px;
+      display: inline;
+    }
   </style>
 </head>
 <body>
@@ -122,6 +170,18 @@
       <label for="apiHost">后端API地址</label>
       <input type="text" id="apiHost" placeholder="例如: http://localhost:8000">
       <div class="note">请输入完整的API地址，包括http://或https://前缀，不包含末尾的斜杠</div>
+    </div>
+    
+    <!-- 自动上传评论开关 -->
+    <div class="form-group">
+      <div class="toggle-container">
+        <label for="autoUploadComments">自动上传评论内容:</label>
+        <label class="toggle-switch">
+          <input type="checkbox" id="autoUploadComments">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div class="note">启用后将自动上传浏览的评论内容（功能尚未实现）</div>
     </div>
     
     <div class="form-group">
@@ -185,7 +245,7 @@
     </div>
 
     <div style="margin-top: 20px; border-top: 1px solid #eee; padding-top: 15px;">
-      <button id="saveBtn">保存API地址</button>
+      <button id="saveBtn">保存设置</button>
     </div>
     
     <div id="status" class="status"></div>
