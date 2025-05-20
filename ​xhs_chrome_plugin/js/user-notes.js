@@ -249,13 +249,15 @@ function refreshAllNoteInputs() {
 
 // 生成通知哈希值作为唯一标识
 function generateNotificationHash(notification) {
-  // 从通知中提取关键信息
-  const userId = notification.userInfo?.id || '';
-  const content = notification.content || '';
+  if (!notification || !notification.userInfo) return '';
+  
+  // 使用用户ID、内容摘要和交互类型作为哈希基础
+  const userId = notification.userInfo.id || '';
+  const contentPreview = (notification.content || '').substring(0, 20).replace(/\s+/g, '');
   const interactionType = notification.interaction?.type || '';
   
-  // 组合关键信息生成唯一标识 (不使用time，因为time可能会变化)
-  return `${userId}_${content.substring(0, 20)}_${interactionType}`.replace(/\s+/g, '_');
+  // 组合成哈希字符串，格式: userId_contentPreview_interactionType
+  return `${userId}_${contentPreview}_${interactionType}`;
 }
 
 // 导出函数

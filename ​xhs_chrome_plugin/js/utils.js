@@ -14,21 +14,16 @@ function extractUserIdFromUrl(url) {
 
 // 从图片URL中提取笔记信息
 function extractNoteInfo(imageUrl) {
-  // 如果没有图片URL，返回空对象
-  if (!imageUrl) return {};
+  if (!imageUrl) return null;
   
-  // 尝试从URL中提取笔记ID等信息
   try {
-    // 这里是一个示例，实际提取逻辑可能需要根据小红书的具体URL格式调整
-    const noteIdMatch = imageUrl.match(/\/([^\/]+)$/);
-    const noteId = noteIdMatch ? noteIdMatch[1] : '';
+    // 从图片URL中提取笔记ID
+    const match = imageUrl.match(/\/([^/]+)\.(jpg|jpeg|png|webp)/);
+    const noteId = match ? match[1] : '';
     
-    return {
-      id: noteId,
-      url: '' // 由于图片URL不一定包含笔记URL，可能需要其他方式获取
-    };
+    return noteId ? { noteId } : null;
   } catch (error) {
-    return {};
+    return null;
   }
 }
 
@@ -49,9 +44,90 @@ function extractTextContent(element) {
   return clone.textContent.trim();
 }
 
-// 导出函数
+// Toast通知组件
+const toastManager = (function() {
+  // 创建Toast容器（如果尚不存在）
+  function ensureToastContainer() {
+    if (!document.querySelector('.xhs-plugin-toast-container')) {
+      const toastContainer = document.createElement('div');
+      toastContainer.className = 'xhs-plugin-toast-container';
+      toastContainer.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 10000;
+        width: 90%;
+        max-width: 280px;
+      `;
+      document.body.appendChild(toastContainer);
+      
+      // 添加Toast样式
+      const style = document.createElement('style');
+      style.textContent = `
+        .xhs-plugin-toast {
+          padding: 10px 15px;
+          margin-bottom: 10px;
+          border-radius: 4px;
+          font-size: 14px;
+          text-align: center;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+          animation: xhs-plugin-fadeInOut 3s ease forwards;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+        }
+        .xhs-plugin-toast.success {
+          background-color: #00994d;
+          color: white;
+        }
+        .xhs-plugin-toast.error {
+          background-color: #ff3b30;
+          color: white;
+        }
+        .xhs-plugin-toast.info {
+          background-color: #0084ff;
+          color: white;
+        }
+        @keyframes xhs-plugin-fadeInOut {
+          0% { opacity: 0; transform: translateY(20px); }
+          10% { opacity: 1; transform: translateY(0); }
+          80% { opacity: 1; transform: translateY(0); }
+          100% { opacity: 0; transform: translateY(-20px); }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    return document.querySelector('.xhs-plugin-toast-container');
+  }
+
+  // 显示Toast通知
+  function showToast(message, type = 'info') {
+    const container = ensureToastContainer();
+    
+    const toast = document.createElement('div');
+    toast.className = `xhs-plugin-toast ${type}`;
+    toast.textContent = message;
+    
+    container.appendChild(toast);
+    
+    // 3秒后自动移除
+    setTimeout(() => {
+      toast.remove();
+    }, 3000);
+  }
+
+  return {
+    success: (msg) => showToast(msg, 'success'),
+    error: (msg) => showToast(msg, 'error'),
+    info: (msg) => showToast(msg, 'info')
+  };
+})();
+
+// 导出对象
 window.xhsUtils = {
   extractUserIdFromUrl,
+  extractTextContent,
   extractNoteInfo,
-  extractTextContent
+  toastManager
 }; 

@@ -241,7 +241,7 @@ async function saveUserNote(userId, notificationHash, noteContent) {
     
     // 如果使用的是转换后的哈希值，也更新原始哈希对应的备注（向后兼容）
     if (finalHash !== notificationHash) {
-      userNotes[notificationHash] = noteContent;
+    userNotes[notificationHash] = noteContent;
     }
     
     return true;

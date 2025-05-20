@@ -109,4 +109,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     
     return true; // 异步响应
   }
+
+  // 监听消息
+  if (message.action === 'autoUploadComments') {
+    // 转发消息到活动标签页的popup
+    chrome.runtime.sendMessage(message);
+  }
 }); 

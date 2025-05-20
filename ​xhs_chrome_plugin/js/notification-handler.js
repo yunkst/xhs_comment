@@ -286,44 +286,51 @@ function getActiveTabType() {
   return activeTab ? activeTab.textContent.trim() : '未知';
 }
 
-// 导航到通知页面
+// 跳转到通知页面
 function navigateToNotificationPage() {
-  window.location.href = 'https://www.xiaohongshu.com/notification';
+  if (!window.location.href.includes('xiaohongshu.com/notification')) {
+    console.log('跳转到小红书通知页面');
+    window.location.href = 'https://www.xiaohongshu.com/notification';
+    return true;
+  }
+  return false;
 }
 
-// 导出函数
-window.xhsNotificationHandler = {
-  extractNotificationsFromDOM,
-  addButtonsToNotifications,
-  getActiveTabType,
-  navigateToNotificationPage
-}; 
-
-// 添加备注状态动画样式
+// 添加保存动画样式
 (function addSaveAnimationStyles() {
-  // 检查样式是否已存在
-  if (document.querySelector('#xhs-note-animation-styles')) {
-    return;
-  }
+  // 如果样式已存在，则不重复添加
+  if (document.getElementById('xhs-plugin-animation-styles')) return;
   
-  const animationStyles = document.createElement('style');
-  animationStyles.id = 'xhs-note-animation-styles';
-  animationStyles.textContent = `
+  // 创建样式元素
+  const styleElement = document.createElement('style');
+  styleElement.id = 'xhs-plugin-animation-styles';
+  
+  // 定义CSS样式
+  styleElement.textContent = `
     @keyframes xhs-note-saving-pulse {
       0% { transform: scale(1); opacity: 0.7; }
       50% { transform: scale(1.2); opacity: 1; }
       100% { transform: scale(1); opacity: 0.7; }
     }
     
-    .xhs-note-container {
-      position: relative !important;
+    .xhs-note-status {
+      transition: all 0.3s ease;
     }
     
-    .xhs-note-status {
-      z-index: 1000 !important;
+    .xhs-save-success-icon, .xhs-save-fail-icon {
+      transition: all 0.3s ease;
     }
   `;
   
-  document.head.appendChild(animationStyles);
-  console.log('添加备注状态动画样式');
-})(); 
+  // 添加到文档头部
+  document.head.appendChild(styleElement);
+  console.log('已添加备注保存动画样式');
+})();
+
+// 导出对象
+window.xhsNotificationHandler = {
+  extractNotificationsFromDOM,
+  addButtonsToNotifications,
+  getActiveTabType,
+  navigateToNotificationPage
+}; 
