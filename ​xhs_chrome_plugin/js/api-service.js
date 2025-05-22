@@ -183,9 +183,9 @@ async function fetchUserNotes(userId) {
 }
 
 // 保存用户备注到后端
-async function saveUserNote(userId, notificationHash, noteContent) {
+async function saveUserNote(userId, notificationHash, noteContent, userInfo, content) {
   try {
-    console.log(`开始保存用户 ${userId} 的备注数据`);
+    console.log(`开始保存用户 ${userId} 的备注数据`, { notificationHash, noteContent, userInfo, content });
     
     // 检查是否是旧格式哈希，如果是则转换为新格式
     let finalHash = notificationHash;
@@ -224,7 +224,9 @@ async function saveUserNote(userId, notificationHash, noteContent) {
       body: {
         userId: userId,
         notificationHash: finalHash,
-        noteContent: noteContent
+        noteContent: noteContent,
+        userInfo: userInfo,
+        content: content
       }
     });
     

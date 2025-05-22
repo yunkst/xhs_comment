@@ -7,6 +7,8 @@ from typing import Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 
+from .common import UserInfo
+
 # --- 用户认证相关模型 ---
 class User(BaseModel):
     """用户模型"""
@@ -42,4 +44,6 @@ class UserNote(BaseModel):
     userId: str  # 用户ID
     notificationHash: str  # 通知的唯一哈希值
     noteContent: str  # 备注内容
+    userInfo: Optional[UserInfo] = None  # 新增用户基本信息
+    content: Optional[str] = None  # 新增通知内容
     updatedAt: datetime = Field(default_factory=datetime.utcnow)  # 更新时间 

@@ -35,6 +35,7 @@ class StructuredComment(BaseModel):
     timestamp: Optional[datetime] = None  # 解析后的评论时间
     repliedId: Optional[str] = None  # 回复的评论ID（父评论或兄弟评论）
     repliedOrder: Optional[int] = None  # 在父评论下的回复顺序 (从0开始)
+    isRepliedByAuthor: Optional[bool] = None  # 是否被笔记作者回复
     fetchTimestamp: datetime = Field(default_factory=datetime.utcnow)  # 获取时间
 
 # --- 笔记模型 ---

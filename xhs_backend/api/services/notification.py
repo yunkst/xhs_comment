@@ -6,6 +6,8 @@
 import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
+from api.models.common import UserInfo # 假设 UserInfo 在这里或 common.py 中定义
+from pydantic import BaseModel # 确保 BaseModel 已导入
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -124,7 +126,7 @@ async def get_notification_by_id(notification_id: str) -> Optional[Dict[str, Any
     return notification
 
 # --- 用户备注相关功能 ---
-async def save_user_note(user_id: str, notification_hash: str, note_content: str):
+async def save_user_note(user_id: str, notification_hash: str, note_content: str, user_info: Optional[UserInfo] = None, content: Optional[str] = None):
     """保存或更新用户备注"""
     # 在函数内部导入模块
     from database import get_database, USER_NOTES_COLLECTION
@@ -143,6 +145,11 @@ async def save_user_note(user_id: str, notification_hash: str, note_content: str
         "noteContent": note_content,
         "updatedAt": datetime.utcnow()
     }
+    
+    if user_info:
+        note_data["userInfo"] = user_info.dict() if isinstance(user_info, BaseModel) else user_info
+    if content:
+        note_data["content"] = content
     
     # 更新或插入备注
     result = await collection.update_one(

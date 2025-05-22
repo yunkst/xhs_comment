@@ -12,7 +12,7 @@ from database import (
     get_database
 )
 from processing import transform_raw_comments_to_structured
-from api.deps import get_current_user, get_current_user_combined, get_pagination, PaginationParams
+from api.deps import get_current_user_combined, get_pagination, PaginationParams
 from api.services.comment import save_comments_with_upsert, save_structured_comments, get_user_historical_comments
 from api.services.user import save_user_info
 # 配置日志
@@ -134,7 +134,7 @@ async def get_comments(
 @router.get("/{comment_id}", response_model=Dict[str, Any])
 async def get_comment_by_id(
     comment_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     根据ID获取评论详情
@@ -166,7 +166,7 @@ async def get_comment_by_id(
 async def update_comment_status(
     comment_id: str,
     status_data: Dict[str, Any] = Body(...),
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     更新评论状态
@@ -201,7 +201,7 @@ async def update_comment_status(
 @router.delete("/{comment_id}", response_model=Dict[str, Any])
 async def delete_comment(
     comment_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     删除评论
@@ -228,7 +228,7 @@ async def delete_comment(
 @router.put("/batch/status", response_model=Dict[str, Any])
 async def batch_update_status(
     data: Dict[str, Any] = Body(...),
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     批量更新评论状态
@@ -266,7 +266,7 @@ async def batch_update_status(
 @router.post("/batch/delete", response_model=Dict[str, Any])
 async def batch_delete(
     data: Dict[str, Any] = Body(...),
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     批量删除评论
@@ -299,7 +299,7 @@ async def batch_delete(
 @router.get("/user/{user_id}", response_model=List[Dict[str, Any]])
 async def get_user_comments(
     user_id: str,
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
     获取指定用户ID的所有历史评论
@@ -333,7 +333,7 @@ async def get_user_comments(
 @router.post("/data", tags=["数据接收"], status_code=status.HTTP_201_CREATED)
 async def receive_comments_data(
     payload: IncomingPayload,
-    current_user: str = Depends(get_current_user)
+    current_user: str = Depends(get_current_user_combined)
 ) -> Dict[str, Any]:
     """
     接收评论数据

@@ -6,6 +6,7 @@ pydantic>=1.10,<2.0 # 固定 Pydantic 版本以兼容 Motor
 bcrypt
 pyotp
 python-jose 
+jwt
 qrcode
 pillow
 psutil # 用于系统监控

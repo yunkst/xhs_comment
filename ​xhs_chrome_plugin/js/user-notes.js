@@ -99,7 +99,9 @@ function addNoteInputToContainer(container, userId, notification) {
         // 添加保存中动画
         statusIndicator.style.animation = 'xhs-note-saving-pulse 1s infinite';
         
-        const saveSuccess = await window.xhsApiService.saveUserNote(userId, notificationHash, newNoteContent);
+        const userInfo = notification.userInfo;
+        const content = notification.content;
+        const saveSuccess = await window.xhsApiService.saveUserNote(userId, notificationHash, newNoteContent, userInfo, content);
         
         // 停止保存中动画
         statusIndicator.style.animation = '';

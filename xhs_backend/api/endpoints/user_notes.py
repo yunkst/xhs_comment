@@ -10,6 +10,7 @@ from database import (
 )
 from api.deps import get_current_user, get_current_user_combined
 from api.services.notification import save_user_note, get_user_notes
+from api.models.common import UserInfo
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -21,6 +22,8 @@ class UserNoteCreate(BaseModel):
     userId: str
     notificationHash: str
     noteContent: str
+    userInfo: Optional[UserInfo] = None
+    content: Optional[str] = None
 
 @router.post("", response_model=Dict[str, Any])
 async def create_user_note(
@@ -44,7 +47,9 @@ async def create_user_note(
         result = await save_user_note(
             note_data.userId, 
             note_data.notificationHash, 
-            note_data.noteContent
+            note_data.noteContent,
+            note_data.userInfo,
+            note_data.content
         )
         
         if result:
