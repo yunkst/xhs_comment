@@ -126,7 +126,7 @@ async def get_notification_by_id(notification_id: str) -> Optional[Dict[str, Any
     return notification
 
 # --- 用户备注相关功能 ---
-async def save_user_note(user_id: str, notification_hash: str, note_content: str, user_info: Optional[UserInfo] = None, content: Optional[str] = None):
+async def save_user_note(user_id: str, notification_hash: str, note_content: str, content: Optional[str] = None, editor: Optional[str] = None):
     """保存或更新用户备注"""
     # 在函数内部导入模块
     from database import get_database, USER_NOTES_COLLECTION
@@ -146,10 +146,10 @@ async def save_user_note(user_id: str, notification_hash: str, note_content: str
         "updatedAt": datetime.utcnow()
     }
     
-    if user_info:
-        note_data["userInfo"] = user_info.dict() if isinstance(user_info, BaseModel) else user_info
     if content:
         note_data["content"] = content
+    if editor:
+        note_data["editor"] = editor
     
     # 更新或插入备注
     result = await collection.update_one(

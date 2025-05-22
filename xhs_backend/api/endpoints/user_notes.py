@@ -22,7 +22,6 @@ class UserNoteCreate(BaseModel):
     userId: str
     notificationHash: str
     noteContent: str
-    userInfo: Optional[UserInfo] = None
     content: Optional[str] = None
 
 @router.post("", response_model=Dict[str, Any])
@@ -41,15 +40,15 @@ async def create_user_note(
     Returns:
         操作结果
     """
-    logger.info(f"创建/更新用户备注: userId={note_data.userId}, hash={note_data.notificationHash}")
+    logger.info(f"创建/更新用户备注: userId={note_data.userId}, hash={note_data.notificationHash}, editor={current_user}")
     
     try:
         result = await save_user_note(
             note_data.userId, 
             note_data.notificationHash, 
             note_data.noteContent,
-            note_data.userInfo,
-            note_data.content
+            note_data.content,
+            current_user
         )
         
         if result:

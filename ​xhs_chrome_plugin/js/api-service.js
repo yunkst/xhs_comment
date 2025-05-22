@@ -183,37 +183,37 @@ async function fetchUserNotes(userId) {
 }
 
 // 保存用户备注到后端
-async function saveUserNote(userId, notificationHash, noteContent, userInfo, content) {
+async function saveUserNote(userId, notificationHash, noteContent, content) {
   try {
-    console.log(`开始保存用户 ${userId} 的备注数据`, { notificationHash, noteContent, userInfo, content });
+    console.log(`开始保存用户 ${userId} 的备注数据`, { notificationHash, noteContent, content });
     
     // 检查是否是旧格式哈希，如果是则转换为新格式
     let finalHash = notificationHash;
     if (notificationHash.split('_').length > 3) {
       // 提取旧格式哈希中的基础部分（不包含时间）
       const hashParts = notificationHash.split('_');
-      const userId = hashParts[0];
+      const userIdFromHash = hashParts[0]; // Renamed to avoid conflict with function param
       const contentPart = hashParts.length > 1 ? hashParts[1] : '';
       const typePart = hashParts.length > 2 ? hashParts[2] : '';
-      
+
       // 构建新格式的哈希
-      finalHash = `${userId}_${contentPart}_${typePart}`;
+      finalHash = `${userIdFromHash}_${contentPart}_${typePart}`;
       console.log(`保存备注时将旧格式哈希 ${notificationHash} 转换为新格式 ${finalHash}`);
     }
-    
+
     // 从storage获取API地址和令牌
     const { apiBaseUrl, apiToken } = await getApiConfig();
-    
+
     if (!apiBaseUrl) {
       throw new Error('未配置API地址，请在插件选项中设置');
     }
-    
+
     if (!apiToken) {
       throw new Error('未配置API令牌，请在插件选项中设置');
     }
-    
+
     const url = `${apiBaseUrl}/api/user-notes`;
-    
+
     // 使用代理请求替代直接fetch
     const response = await proxyFetch(url, {
       method: 'POST',
@@ -225,7 +225,6 @@ async function saveUserNote(userId, notificationHash, noteContent, userInfo, con
         userId: userId,
         notificationHash: finalHash,
         noteContent: noteContent,
-        userInfo: userInfo,
         content: content
       }
     });
@@ -234,18 +233,18 @@ async function saveUserNote(userId, notificationHash, noteContent, userInfo, con
       const errorText = await response.text();
       throw new Error(`API请求失败 (${response.status}): ${errorText}`);
     }
-    
+
     const data = await response.json();
     console.log(`成功保存用户 ${userId} 的备注数据:`, data);
-    
+
     // 更新全局备注数据
     userNotes[finalHash] = noteContent;
-    
+
     // 如果使用的是转换后的哈希值，也更新原始哈希对应的备注（向后兼容）
     if (finalHash !== notificationHash) {
-    userNotes[notificationHash] = noteContent;
+      userNotes[notificationHash] = noteContent;
     }
-    
+
     return true;
   } catch (error) {
     console.error(`保存用户 ${userId} 的备注数据时出错:`, error);

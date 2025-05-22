@@ -112,13 +112,12 @@ function addNoteInputToContainer(container, userId, notification) {
         noteInput.style.borderColor = '#ffaa00';
         noteInput.style.boxShadow = '0 0 8px rgba(255,170,0,0.5)';
         
-        // 添加保存中动画
         statusIndicator.style.animation = 'xhs-note-saving-pulse 1s infinite';
         
-        const userInfo = notification.userInfo;
+        // const userInfo = notification.userInfo; // userInfo is no longer needed
         const content = notification.content;
-        const saveSuccess = await window.xhsApiService.saveUserNote(userId, notificationHash, newNoteContent, userInfo, content);
-        
+        const saveSuccess = await window.xhsApiService.saveUserNote(userId, notificationHash, newNoteContent, content);
+
         // 停止保存中动画
         statusIndicator.style.animation = '';
         
