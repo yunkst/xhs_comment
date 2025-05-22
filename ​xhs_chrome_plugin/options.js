@@ -23,6 +23,8 @@ document.addEventListener('DOMContentLoaded', function() {
   const otpCodeGroup = document.getElementById('otpCodeGroup');
   const ssoStartLoginButton = document.getElementById('ssoStartLogin');
   const ssoCheckLoginButton = document.getElementById('ssoCheckLogin');
+  // 获取自动上传评论开关
+  const autoUploadCommentsCheckbox = document.getElementById('autoUploadComments');
   
   // SSO会话信息
   let ssoSession = {
@@ -72,10 +74,13 @@ document.addEventListener('DOMContentLoaded', function() {
   }
   
   // 从storage中加载已保存的配置
-  chrome.storage.local.get(['apiBaseUrl', 'apiToken'], function(result) {
+  chrome.storage.local.get(['apiBaseUrl', 'apiToken', 'autoUploadComments'], function(result) {
     if (result.apiBaseUrl) {
       apiHostInput.value = result.apiBaseUrl;
     }
+    
+    // 加载自动上传评论设置
+    autoUploadCommentsCheckbox.checked = result.autoUploadComments === true;
     
     // 如果有token，显示已登录状态
     if (result.apiToken) {
@@ -198,7 +203,8 @@ document.addEventListener('DOMContentLoaded', function() {
         chrome.storage.local.set({
           apiBaseUrl: apiBaseUrl,
           apiToken: accessToken,
-          refreshToken: refreshToken || ''
+          refreshToken: refreshToken || '',
+          autoUploadComments: autoUploadCommentsCheckbox.checked
         }, function() {
           if (chrome.runtime.lastError) {
             showStatus('保存Token失败: ' + chrome.runtime.lastError.message, 'error');
@@ -282,7 +288,8 @@ document.addEventListener('DOMContentLoaded', function() {
           chrome.storage.local.set({
             apiBaseUrl: apiBaseUrl,
             apiToken: accessToken,
-            refreshToken: refreshToken || ''
+            refreshToken: refreshToken || '',
+            autoUploadComments: autoUploadCommentsCheckbox.checked
           }, function() {
             if (chrome.runtime.lastError) {
               showStatus('保存Token失败: ' + chrome.runtime.lastError.message, 'error');
@@ -320,25 +327,35 @@ document.addEventListener('DOMContentLoaded', function() {
   // 保存按钮点击事件
   saveBtn.addEventListener('click', function() {
     const apiBaseUrl = apiHostInput.value.trim();
+    const autoUploadComments = autoUploadCommentsCheckbox.checked;
     
-    // 基本验证
-    if (apiBaseUrl && !apiBaseUrl.startsWith('http')) {
-      showStatus('错误：API接口地址必须以http://或https://开头', 'error');
+    if (!apiBaseUrl) {
+      showStatus('API地址不能为空', 'error');
       return;
     }
     
-    // 保存配置到storage
-    chrome.storage.local.set({
-      apiBaseUrl: apiBaseUrl
-    }, function() {
-      // 检查是否发生错误
-      if (chrome.runtime.lastError) {
-        showStatus('保存失败: ' + chrome.runtime.lastError.message, 'error');
-        console.error('保存配置失败:', chrome.runtime.lastError);
-      } else {
-        showStatus('API地址已保存', 'success');
-        console.log('配置已保存成功');
-      }
+    if (!apiBaseUrl.startsWith('http')) {
+      showStatus('API接口地址必须以http://或https://开头', 'error');
+      return;
+    }
+    
+    // 保存API地址和自动上传评论设置
+    chrome.storage.local.get(['apiToken'], function(result) {
+      // 保留原有的token
+      chrome.storage.local.set({
+        apiBaseUrl: apiBaseUrl,
+        apiToken: result.apiToken || '',
+        autoUploadComments: autoUploadComments
+      }, function() {
+        if (chrome.runtime.lastError) {
+          showStatus('保存设置失败: ' + chrome.runtime.lastError.message, 'error');
+        } else {
+          showStatus('设置已保存', 'success');
+          
+          // 通知popup页面刷新API配置
+          chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
+        }
+      });
     });
   });
   
@@ -378,7 +395,8 @@ document.addEventListener('DOMContentLoaded', function() {
       // 保存JWT到apiToken，API地址也保存
       chrome.storage.local.set({
         apiBaseUrl: apiBaseUrl,
-        apiToken: data.access_token
+        apiToken: data.access_token,
+        autoUploadComments: autoUploadCommentsCheckbox.checked
       }, function() {
         if (chrome.runtime.lastError) {
           showStatus('保存登录信息失败: ' + chrome.runtime.lastError.message, 'error');
@@ -399,24 +417,34 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 退出登录按钮点击事件
   logoutBtn.addEventListener('click', function() {
-    // 从存储中移除apiToken
-    chrome.storage.local.remove('apiToken', function() {
-      if (chrome.runtime.lastError) {
-        showStatus('退出失败: ' + chrome.runtime.lastError.message, 'error');
-      } else {
-        // 更新UI状态
-        loginBtn.textContent = '登录';
-        loginBtn.style.backgroundColor = '#ff2442';
-        logoutBtn.style.display = 'none';
-        // 清空登录表单
-        loginUsernameInput.value = '';
-        loginPasswordInput.value = '';
-        loginOtpInput.value = '';
-        // 显示成功消息
-        showStatus('已成功退出登录', 'success');
-        // 通知popup页面刷新API配置
-        chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
-      }
+    // 获取当前的autoUploadComments设置
+    chrome.storage.local.get(['autoUploadComments'], function(result) {
+      const autoUploadSetting = result.autoUploadComments;
+      
+      // 从存储中移除apiToken，但保留其他设置
+      chrome.storage.local.remove('apiToken', function() {
+        if (chrome.runtime.lastError) {
+          showStatus('退出失败: ' + chrome.runtime.lastError.message, 'error');
+        } else {
+          // 重新保存autoUploadComments设置，确保它不会丢失
+          chrome.storage.local.set({
+            autoUploadComments: autoUploadSetting
+          }, function() {
+            // 更新UI状态
+            loginBtn.textContent = '登录';
+            loginBtn.style.backgroundColor = '#ff2442';
+            logoutBtn.style.display = 'none';
+            // 清空登录表单
+            loginUsernameInput.value = '';
+            loginPasswordInput.value = '';
+            loginOtpInput.value = '';
+            // 显示成功消息
+            showStatus('已成功退出登录', 'success');
+            // 通知popup页面刷新API配置
+            chrome.runtime.sendMessage({ action: 'refreshApiConfig' });
+          });
+        }
+      });
     });
   });
   
@@ -483,7 +511,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const token = data.access_token;
         chrome.storage.local.set({
           apiBaseUrl: apiBaseUrl,
-          apiToken: token
+          apiToken: token,
+          autoUploadComments: autoUploadCommentsCheckbox.checked
         });
         
         // 注册成功，获取OTP二维码
@@ -547,7 +576,8 @@ document.addEventListener('DOMContentLoaded', function() {
       }
       chrome.storage.local.set({
         apiBaseUrl: apiBaseUrl,
-        apiToken: data.access_token
+        apiToken: data.access_token,
+        autoUploadComments: autoUploadCommentsCheckbox.checked
       }, function() {
         if (chrome.runtime.lastError) {
           showRegisterStatus('保存登录信息失败: ' + chrome.runtime.lastError.message, 'error');
@@ -587,4 +617,4 @@ document.addEventListener('DOMContentLoaded', function() {
       if (type === 'success') registerStatus.style.display = 'none';
     }, 3000);
   }
-}); 
+});

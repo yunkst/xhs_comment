@@ -34,8 +34,8 @@ function addNoteInputToContainer(container, userId, notification) {
   noteInput.dataset.notificationHash = notificationHash; // 存储哈希值到DOM中
   noteInput.dataset.userId = userId; // 存储用户ID到DOM中
   noteInput.style.cssText = `
-    width: 150px;
-    height: 60px;
+    width: 200px;
+    min-height: 60px;
     padding: 5px 8px;
     border: 1px solid #ddd;
     border-radius: 4px;
@@ -49,6 +49,22 @@ function addNoteInputToContainer(container, userId, notification) {
     font-family: Arial, sans-serif;
     box-shadow: 0 1px 3px rgba(0,0,0,0.1);
   `;
+  
+  // 自动调整高度
+  const adjustHeight = () => {
+    // 重置高度为最小高度，以便准确计算所需的新高度
+    noteInput.style.height = 'auto';
+    
+    // 计算内容的实际高度，并设置文本框高度
+    const newHeight = Math.max(60, noteInput.scrollHeight);
+    noteInput.style.height = `${newHeight}px`;
+  };
+  
+  // 首次加载时调整高度
+  setTimeout(adjustHeight, 0);
+  
+  // 当输入内容变化时调整高度
+  noteInput.addEventListener('input', adjustHeight);
   
   // 创建状态指示器
   const statusIndicator = document.createElement('div');
@@ -191,6 +207,16 @@ function updateExistingNoteInput(container, userId, notification) {
     // 更新数据属性
     noteInput.dataset.notificationHash = notificationHash;
     noteInput.dataset.userId = userId;
+    
+    // 自动调整高度
+    setTimeout(() => {
+      // 重置高度为最小高度，以便准确计算所需的新高度
+      noteInput.style.height = 'auto';
+      
+      // 计算内容的实际高度，并设置文本框高度
+      const newHeight = Math.max(60, noteInput.scrollHeight);
+      noteInput.style.height = `${newHeight}px`;
+    }, 0);
   }
 }
 
@@ -208,6 +234,16 @@ function refreshAllNoteInputs() {
       if (currentValue !== newValue) {
         console.log(`刷新备注输入框内容: ${currentValue} -> ${newValue}`);
         input.value = newValue;
+        
+        // 自动调整高度
+        setTimeout(() => {
+          // 重置高度为最小高度，以便准确计算所需的新高度
+          input.style.height = 'auto';
+          
+          // 计算内容的实际高度，并设置文本框高度
+          const newHeight = Math.max(60, input.scrollHeight);
+          input.style.height = `${newHeight}px`;
+        }, 0);
       }
     }
   });
@@ -215,13 +251,15 @@ function refreshAllNoteInputs() {
 
 // 生成通知哈希值作为唯一标识
 function generateNotificationHash(notification) {
-  // 从通知中提取关键信息
-  const userId = notification.userInfo?.id || '';
-  const content = notification.content || '';
+  if (!notification || !notification.userInfo) return '';
+  
+  // 使用用户ID、内容摘要和交互类型作为哈希基础
+  const userId = notification.userInfo.id || '';
+  const contentPreview = (notification.content || '').substring(0, 20).replace(/\s+/g, '');
   const interactionType = notification.interaction?.type || '';
   
-  // 组合关键信息生成唯一标识 (不使用time，因为time可能会变化)
-  return `${userId}_${content.substring(0, 20)}_${interactionType}`.replace(/\s+/g, '_');
+  // 组合成哈希字符串，格式: userId_contentPreview_interactionType
+  return `${userId}_${contentPreview}_${interactionType}`;
 }
 
 // 导出函数

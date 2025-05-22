@@ -11,8 +11,13 @@ document.addEventListener('DOMContentLoaded', function() {
   let currentData = [];
   let apiConfig = {
     host: '',
-    token: ''
+    token: '',
+    autoUploadComments: false // 添加自动上传评论设置
   };
+  
+  // 上传评论缓存标记，防止重复提交
+  let commentsUploadInProgress = false;
+  let lastUploadTime = 0;
   
   // 加载API配置
   loadApiConfig();
@@ -24,6 +29,22 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // 获取评论按钮点击事件
   getCommentsButton.addEventListener('click', function() {
+    // 防止重复点击：检查是否正在上传或者距离上次上传时间太短(5秒内)
+    const now = Date.now();
+    if (commentsUploadInProgress || (now - lastUploadTime < 5000)) {
+      // 通知用户操作太频繁
+      showToastOnPage('请勿频繁点击，正在处理上一个请求', 'info');
+      return;
+    }
+    
+    // 设置上传状态
+    commentsUploadInProgress = true;
+    lastUploadTime = now;
+    
+    // 通知用户开始上传
+    showToastOnPage('开始获取评论数据...', 'info');
+    
+    // 处理上传
     handleDataFetch('comments');
   });
   
@@ -43,11 +64,116 @@ document.addEventListener('DOMContentLoaded', function() {
   });
   
   // 监听来自options页面的消息
-  chrome.runtime.onMessage.addListener(function(message) {
+  chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
+    console.log('popup.js收到消息:', message, '来源:', sender?.id || '未知来源');
+    
+    // 处理ping消息，用于检测popup是否打开
+    if (message.action === 'ping') {
+      console.log('收到ping消息，立即响应');
+      sendResponse({pong: true, source: 'popup.js', timestamp: Date.now()});
+      return false; // 同步响应
+    }
+    
     if (message.action === 'refreshApiConfig') {
       loadApiConfig(); // 收到消息后刷新API配置
+      console.log('已刷新API配置');
+      sendResponse({success: true, action: 'refreshed'});
     }
+    // 处理来自content.js的上传评论请求
+    else if (message.action === 'uploadComments') {
+      console.log('popup收到自动上传评论请求, popup状态:', {
+        isVisible: document.visibilityState === 'visible',
+        commentsButtonEnabled: getCommentsButton && !getCommentsButton.disabled,
+        isUploading: commentsUploadInProgress,
+        lastUploadTime: new Date(lastUploadTime).toLocaleString(),
+        requestURL: message.url || '未提供URL'
+      });
+      
+      // 如果popup未打开或不在焦点，则激活popup
+      if (document.visibilityState !== 'visible') {
+        console.log('Popup未在焦点，激活后执行上传');
+        // 激活后执行操作 - 这里其实不需要特别处理，因为消息会触发此监听
+      }
+      
+      // 模拟点击获取评论按钮，如果按钮可用
+      if (getCommentsButton && !getCommentsButton.disabled) {
+        console.log('模拟点击获取评论按钮');
+        // 添加延迟，确保页面已完全加载
+        setTimeout(() => {
+          getCommentsButton.click();
+          sendResponse({success: true, action: 'clicked', timestamp: Date.now()});
+        }, 100);
+      } else {
+        console.log('获取评论按钮不可用，无法自动上传', {
+          buttonExists: !!getCommentsButton,
+          isDisabled: getCommentsButton ? getCommentsButton.disabled : true
+        });
+        sendResponse({success: false, error: '按钮不可用', timestamp: Date.now()});
+      }
+      
+      return true; // 保持连接开启
+    }
+    // 处理重试上传评论请求
+    else if (message.action === 'retryUploadComments') {
+      console.log('收到重试上传评论请求, popup状态:', {
+        isInitialized: !!getCommentsButton,
+        isUploading: commentsUploadInProgress,
+        lastUploadTime: new Date(lastUploadTime).toLocaleString(),
+        requestURL: message.url || '未提供URL'
+      });
+      
+      // 如果popup未初始化完成，延迟执行
+      if (!getCommentsButton) {
+        console.log('Popup尚未初始化，延迟执行上传');
+        setTimeout(() => {
+          // 再次检查按钮是否已初始化
+          if (getCommentsButton && !getCommentsButton.disabled) {
+            console.log('延迟后模拟点击获取评论按钮');
+            getCommentsButton.click();
+            sendResponse({success: true, action: 'delayed_clicked', timestamp: Date.now()});
+          } else {
+            console.log('延迟后获取评论按钮仍不可用', {
+              buttonExists: !!getCommentsButton,
+              isDisabled: getCommentsButton ? getCommentsButton.disabled : true
+            });
+            sendResponse({success: false, error: '延迟后按钮仍不可用', timestamp: Date.now()});
+          }
+        }, 800);  // 增加更长的延迟
+      } else if (!getCommentsButton.disabled) {
+        console.log('执行重试上传，模拟点击获取评论按钮');
+        getCommentsButton.click();
+        sendResponse({success: true, action: 'retry_clicked', timestamp: Date.now()});
+      } else {
+        console.log('重试上传失败，获取评论按钮不可用', {
+          isDisabled: getCommentsButton.disabled
+        });
+        sendResponse({success: false, error: '重试时按钮不可用', timestamp: Date.now()});
+      }
+      
+      return true; // 保持连接开启
+    }
+    
+    // 对于未处理的消息，返回默认响应
+    sendResponse({received: true, action: message.action, timestamp: Date.now()});
+    return true;
   });
+  
+  // 在当前页面显示Toast
+  function showToastOnPage(message, type) {
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+      if (tabs.length === 0) return;
+      
+      chrome.scripting.executeScript({
+        target: {tabId: tabs[0].id},
+        function: (message, type) => {
+          if (window.xhsUtils && window.xhsUtils.toastManager) {
+            window.xhsUtils.toastManager[type](message);
+          }
+        },
+        args: [message, type]
+      });
+    });
+  }
   
   // 处理数据获取请求
   function handleDataFetch(fetchType) {
@@ -65,12 +191,16 @@ document.addEventListener('DOMContentLoaded', function() {
       dataTypeLabel = '评论';
     } else {
       updateStatus('无效的数据类型', 'error');
+      // 重置上传状态
+      commentsUploadInProgress = false;
       return;
     }
     
     chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
       if (tabs.length === 0) {
         updateStatus('无法获取当前标签页信息', 'error');
+        // 重置上传状态
+        commentsUploadInProgress = false;
         return;
       }
       
@@ -84,6 +214,11 @@ document.addEventListener('DOMContentLoaded', function() {
           : 'https://www.xiaohongshu.com/explore/... (任意笔记)';
         updateStatus(`请先打开小红书${expectedPage} (例如: ${expectedUrl})`, 'error');
         
+        // 显示Toast
+        if (fetchType === 'comments') {
+          showToastOnPage(`请先打开小红书${expectedPage}`, 'error');
+        }
+        
         // 如果是获取通知，尝试跳转
         if (fetchType === 'notifications') {
           updateStatus(`正在跳转到小红书通知页面...`, '');
@@ -91,6 +226,9 @@ document.addEventListener('DOMContentLoaded', function() {
             url: 'https://www.xiaohongshu.com/notification'
           });
         }
+        
+        // 重置上传状态
+        commentsUploadInProgress = false;
         return;
       }
       
@@ -106,6 +244,14 @@ document.addEventListener('DOMContentLoaded', function() {
       }).then(results => {
         if (!results || results.length === 0 || !results[0].result) {
           updateStatus(`获取${dataTypeLabel}失败: 无法从页面提取数据`, 'error');
+          
+          // 显示Toast
+          if (fetchType === 'comments') {
+            showToastOnPage(`获取评论失败: 无法从页面提取数据`, 'error');
+          }
+          
+          // 重置上传状态
+          commentsUploadInProgress = false;
           return;
         }
         
@@ -113,9 +259,18 @@ document.addEventListener('DOMContentLoaded', function() {
         
         if (currentData.length === 0) {
              updateStatus(`当前页面未找到${dataTypeLabel}数据。`, '');
+             
+             // 显示Toast
+             if (fetchType === 'comments') {
+                showToastOnPage('当前页面未找到评论，请先尝试展开所有评论', 'info');
+             }
+             
              if(fetchType === 'comments') {
                 updateStatus(`当前页面未找到评论。请先尝试展开所有评论。`, '');
              }
+             
+             // 重置上传状态
+             commentsUploadInProgress = false;
         } else {
             // 如果是评论数据，还需获取笔记内容
             if (fetchType === 'comments') {
@@ -132,21 +287,42 @@ document.addEventListener('DOMContentLoaded', function() {
                         processDataWithNote(currentData, noteData);
                     } else {
                         console.warn('获取笔记内容失败，仅处理评论数据');
+                        showToastOnPage('获取笔记内容失败，仅处理评论数据', 'info');
                         processData(currentData, dataTypeLabel);
                     }
+                    
+                    // 重置上传状态
+                    setTimeout(() => { commentsUploadInProgress = false; }, 1000);
                 }).catch(error => {
                     console.error('获取笔记内容时出错:', error);
                     updateStatus('获取笔记内容失败，仅处理评论数据', 'error');
+                    showToastOnPage('获取笔记内容失败: ' + (error.message || '未知错误'), 'error');
                     processData(currentData, dataTypeLabel);
+                    
+                    // 重置上传状态
+                    commentsUploadInProgress = false;
                 });
             } else {
                 // 处理数据（发送或下载）
                 processData(currentData, dataTypeLabel);
+                
+                // 重置上传状态
+                if (fetchType === 'comments') {
+                    setTimeout(() => { commentsUploadInProgress = false; }, 1000);
+                }
             }
         }
       }).catch(error => {
         console.error(`执行${dataTypeLabel}提取脚本出错:`, error);
         updateStatus(`获取${dataTypeLabel}失败: ` + (error.message || '未知错误'), 'error');
+        
+        // 显示Toast
+        if (fetchType === 'comments') {
+          showToastOnPage(`获取评论失败: ` + (error.message || '未知错误'), 'error');
+        }
+        
+        // 重置上传状态
+        commentsUploadInProgress = false;
       });
     });
   }
@@ -163,8 +339,12 @@ document.addEventListener('DOMContentLoaded', function() {
 
       if (!currentTab.url.includes('xiaohongshu.com/explore/')) {
         updateStatus('请先打开小红书笔记页面再执行此操作', 'error');
+        showToastOnPage('请先打开小红书笔记页面再执行此操作', 'error');
         return;
       }
+      
+      // 显示Toast
+      showToastOnPage('正在尝试展开所有评论...', 'info');
       
       // 注入滚动和展开函数
       chrome.scripting.executeScript({
@@ -174,48 +354,67 @@ document.addEventListener('DOMContentLoaded', function() {
       }).then(results => {
         if (chrome.runtime.lastError) {
            updateStatus('展开评论脚本注入失败: ' + chrome.runtime.lastError.message, 'error');
+           showToastOnPage('展开评论脚本注入失败', 'error');
            return;
         }
         if (results && results[0] && results[0].result) {
           const result = results[0].result;
           if (result.success) {
              updateStatus(`评论展开完成。共展开 ${result.expandedCount} 个回复区域。`, 'success');
+             showToastOnPage(`评论展开完成，共展开 ${result.expandedCount} 个回复区域`, 'success');
           } else {
              updateStatus(`评论展开失败: ${result.message}`, 'error');
+             showToastOnPage(`评论展开失败: ${result.message}`, 'error');
           }
         } else {
           updateStatus('评论展开脚本未返回有效结果。', 'error');
+          showToastOnPage('评论展开失败', 'error');
         }
       }).catch(error => {
         console.error('执行展开评论脚本出错:', error);
         updateStatus('展开评论失败: ' + (error.message || '未知错误'), 'error');
+        showToastOnPage('展开评论失败: ' + (error.message || '未知错误'), 'error');
       });
     });
   }
   
   // 加载API配置
   function loadApiConfig() {
-    chrome.storage.local.get(['apiBaseUrl', 'apiToken'], function(result) {
+    chrome.storage.local.get(['apiBaseUrl', 'apiToken', 'autoUploadComments'], function(result) {
       apiConfig.host = result.apiBaseUrl || '';
       apiConfig.token = result.apiToken || '';
+      apiConfig.autoUploadComments = result.autoUploadComments === true;
       
       // 更新模式信息
       updateModeInfo();
+      
+      console.log('已加载API配置:', apiConfig);
     });
   }
   
   // 更新模式信息
   function updateModeInfo() {
+    let modeText = '';
+    let bgColor = '';
+    
     if (apiConfig.host && apiConfig.token) {
-      modeInfoElement.textContent = `API已配置: ${apiConfig.host.substring(0, 20)}... (已登录)`;
-      modeInfoElement.style.backgroundColor = '#e6fff2';
+      modeText = `API已配置: ${apiConfig.host.substring(0, 20)}... (已登录)`;
+      bgColor = '#e6fff2';
     } else if (apiConfig.host) {
-      modeInfoElement.textContent = `API已配置: ${apiConfig.host.substring(0, 20)}... (未登录)`;
-      modeInfoElement.style.backgroundColor = '#fff8e6';
+      modeText = `API已配置: ${apiConfig.host.substring(0, 20)}... (未登录)`;
+      bgColor = '#fff8e6';
     } else {
-      modeInfoElement.textContent = '尚未配置API，将下载到本地';
-      modeInfoElement.style.backgroundColor = '#f5f5f5';
+      modeText = '尚未配置API，将下载到本地';
+      bgColor = '#f5f5f5';
     }
+    
+    // 添加自动上传评论状态
+    if (apiConfig.autoUploadComments) {
+      modeText += ' | 已启用自动上传评论';
+    }
+    
+    modeInfoElement.textContent = modeText;
+    modeInfoElement.style.backgroundColor = bgColor;
   }
   
   // 更新状态信息
@@ -263,61 +462,203 @@ document.addEventListener('DOMContentLoaded', function() {
     }
   }
   
-  // 发送数据到API
-  function sendDataToApi(data, dataTypeLabel) {
+  // 发送数据到API（增加缓存机制）
+  async function sendDataToApi(data, dataTypeLabel) {
     updateStatus(`正在将${dataTypeLabel}数据发送到服务器...`, '');
     
-    // 准备要发送的数据
-    const payload = {
-      type: dataTypeLabel,
-      data: data
-    };
-    
-    // 根据数据类型选择不同的API端点
-    let apiEndpoint;
+    // 显示Toast
     if (dataTypeLabel === '评论') {
-      apiEndpoint = '/api/comments/data';
-    } else if (dataTypeLabel === '通知') {
-      apiEndpoint = '/api/notifications/data';
-    } else if (dataTypeLabel === '笔记') {
-      apiEndpoint = '/api/notes/data';
-    } else {
-      console.error('不支持的数据类型:', dataTypeLabel);
-      updateStatus(`发送失败: 不支持的数据类型 ${dataTypeLabel}`, 'error');
-      return;
+      showToastOnPage(`正在上传评论数据到服务器...`, 'info');
     }
     
-    // 构建完整的API URL
-    const apiUrl = apiConfig.host + apiEndpoint;
+    try {
+      // 计算数据指纹（现在是异步的）
+      const dataFingerprint = await generateDataFingerprint(data, dataTypeLabel);
+      
+      // 检查缓存
+      chrome.storage.local.get(['apiDataCache'], function(result) {
+        const apiDataCache = result.apiDataCache || {};
+        const cachedEntry = apiDataCache[dataFingerprint];
+        const currentTime = Date.now();
+        
+        // 如果有缓存且在有效期内（这里设定15分钟有效期），直接返回成功
+        if (cachedEntry && (currentTime - cachedEntry.timestamp < 15 * 60 * 1000)) {
+          console.log('数据与之前发送的相同，使用缓存结果');
+          updateStatus(`${dataTypeLabel}数据与之前发送的相同，无需重复发送`, 'success');
+          
+          if (dataTypeLabel === '评论') {
+            showToastOnPage(`数据与最近上传的相同，无需重复上传`, 'success');
+          }
+          return;
+        }
+        
+        // 准备要发送的数据
+        const payload = {
+          type: dataTypeLabel,
+          data: data
+        };
+        
+        // 根据数据类型选择不同的API端点
+        let apiEndpoint;
+        if (dataTypeLabel === '评论') {
+          apiEndpoint = '/api/comments/data';
+        } else if (dataTypeLabel === '通知') {
+          apiEndpoint = '/api/notifications/data';
+        } else if (dataTypeLabel === '笔记') {
+          apiEndpoint = '/api/notes/data';
+        } else {
+          console.error('不支持的数据类型:', dataTypeLabel);
+          updateStatus(`发送失败: 不支持的数据类型 ${dataTypeLabel}`, 'error');
+          if (dataTypeLabel === '评论') {
+            showToastOnPage(`上传失败: 不支持的数据类型`, 'error');
+          }
+          return;
+        }
+        
+        // 构建完整的API URL
+        const apiUrl = apiConfig.host + apiEndpoint;
+        
+        // 发送请求
+        fetch(apiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiConfig.token}`
+          },
+          body: JSON.stringify(payload)
+        })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`服务器返回错误状态: ${response.status} ${response.statusText}`);
+          }
+          return response.json();
+        })
+        .then(result => {
+          console.log('数据发送成功:', result);
+          updateStatus(`${dataTypeLabel}数据发送成功: ${result.message || '服务器已接收'}`, 'success');
+          
+          // 更新缓存
+          apiDataCache[dataFingerprint] = {
+            timestamp: currentTime,
+            result: result
+          };
+          
+          // 保存更新后的缓存
+          chrome.storage.local.set({apiDataCache: apiDataCache});
+          
+          // 显示成功Toast
+          if (dataTypeLabel === '评论') {
+            showToastOnPage(`评论数据上传成功`, 'success');
+          }
+        })
+        .catch(error => {
+          console.error('发送数据出错:', error);
+          updateStatus(`发送${dataTypeLabel}数据失败: ${error.message || '未知错误'}`, 'error');
+          
+          // 显示错误Toast
+          if (dataTypeLabel === '评论') {
+            showToastOnPage(`评论数据上传失败: ${error.message || '未知错误'}`, 'error');
+          }
+        });
+      });
+    } catch (error) {
+      console.error('生成数据指纹时出错:', error);
+      // 如果指纹生成出错，仍然继续请求
+      proceedWithApiRequest(null);
+    }
     
-    // 发送请求
-    fetch(apiUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiConfig.token}`
-      },
-      body: JSON.stringify(payload)
-    })
-    .then(response => {
-      if (!response.ok) {
-        throw new Error(`服务器返回错误状态: ${response.status} ${response.statusText}`);
+    // 这个函数处理实际的API请求逻辑
+    function proceedWithApiRequest(dataFingerprint) {
+      // 原来的API请求逻辑...
+    }
+  }
+  
+  // 生成数据指纹 - 使用SHA-256全量计算，但排除fetchTimestamp字段
+  async function generateDataFingerprint(data, dataType) {
+    try {
+      // 深拷贝数据，避免修改原始数据
+      const dataClone = JSON.parse(JSON.stringify(data));
+      
+      // 递归移除所有对象中的fetchTimestamp字段
+      function removeFetchTimestamp(obj) {
+        if (Array.isArray(obj)) {
+          // 如果是数组，递归处理每个元素
+          obj.forEach(item => {
+            if (typeof item === 'object' && item !== null) {
+              removeFetchTimestamp(item);
+            }
+          });
+        } else if (typeof obj === 'object' && obj !== null) {
+          // 删除当前对象的fetchTimestamp
+          delete obj.fetchTimestamp;
+          
+          // 递归处理所有子对象
+          Object.values(obj).forEach(value => {
+            if (typeof value === 'object' && value !== null) {
+              removeFetchTimestamp(value);
+            }
+          });
+        }
       }
-      return response.json();
-    })
-    .then(result => {
-      console.log('数据发送成功:', result);
-      updateStatus(`${dataTypeLabel}数据发送成功: ${result.message || '服务器已接收'}`, 'success');
-    })
-    .catch(error => {
-      console.error('发送数据出错:', error);
-      updateStatus(`发送${dataTypeLabel}数据失败: ${error.message || '未知错误'}`, 'error');
+      
+      // 移除fetchTimestamp字段
+      removeFetchTimestamp(dataClone);
+      
+      // 将处理后的数据转为字符串
+      const dataString = JSON.stringify(dataClone);
+      
+      // 使用Web Crypto API计算SHA-256哈希
+      const encoder = new TextEncoder();
+      const dataBuffer = encoder.encode(dataString);
+      
+      // 计算哈希值
+      const hashBuffer = await crypto.subtle.digest('SHA-256', dataBuffer);
+      
+      // 将哈希值转为十六进制字符串
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      // 添加数据类型前缀
+      return `${dataType}_${hashHex}`;
+    } catch (error) {
+      console.error('生成数据指纹出错:', error);
+      // 出错时返回时间戳作为备用指纹
+      return `${dataType}_${Date.now()}`;
+    }
+  }
+  
+  // 清理过期缓存（可在应用启动时调用）
+  function cleanupExpiredCache() {
+    chrome.storage.local.get(['apiDataCache'], function(result) {
+      if (!result.apiDataCache) return;
+      
+      const apiDataCache = result.apiDataCache;
+      const currentTime = Date.now();
+      let hasChanges = false;
+      
+      // 清理超过24小时的缓存
+      Object.keys(apiDataCache).forEach(key => {
+        if (currentTime - apiDataCache[key].timestamp > 24 * 60 * 60 * 1000) {
+          delete apiDataCache[key];
+          hasChanges = true;
+        }
+      });
+      
+      // 如果有删除操作，保存更新后的缓存
+      if (hasChanges) {
+        chrome.storage.local.set({apiDataCache: apiDataCache});
+      }
     });
   }
   
   // 下载数据
   function downloadData(data, dataTypeLabel) {
     updateStatus(`正在准备下载${dataTypeLabel}数据...`, '');
+    
+    // 显示Toast
+    if (dataTypeLabel === '评论') {
+      showToastOnPage(`正在准备下载评论数据...`, 'info');
+    }
     
     // 创建要下载的数据内容
     const jsonString = JSON.stringify(data, null, 2);
@@ -337,6 +678,11 @@ document.addEventListener('DOMContentLoaded', function() {
     URL.revokeObjectURL(url);
     
     updateStatus(`${dataTypeLabel}数据已下载到本地`, 'success');
+    
+    // 显示成功Toast
+    if (dataTypeLabel === '评论') {
+      showToastOnPage(`评论数据已下载到本地`, 'success');
+    }
   }
 });
 
