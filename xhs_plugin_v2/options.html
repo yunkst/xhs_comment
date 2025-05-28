@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>小红书监控插件 - 配置</title>
+    <link rel="stylesheet" href="options.css">
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>🔍 小红书网络监控插件配置</h1>
+            <p class="subtitle">自定义要监控的URL模式和拦截规则</p>
+            <div class="config-status" id="configStatus">
+                <span class="status-indicator"></span>
+                <span class="status-text">配置已同步</span>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <!-- 全局开关 -->
+            <section class="config-section">
+                <h2>🔧 全局设置</h2>
+                <div class="setting-item">
+                    <label class="switch-container">
+                        <span class="setting-label">启用监控</span>
+                        <input type="checkbox" id="enableMonitoring" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                    <p class="setting-description">关闭后将停止所有网络请求监控</p>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="switch-container">
+                        <span class="setting-label">启用增强拦截</span>
+                        <input type="checkbox" id="enableEnhanced" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                    <p class="setting-description">启用隐蔽版JavaScript API拦截，获取完整响应内容且不被检测</p>
+                </div>
+            </section>
+
+            <!-- URL模式配置 -->
+            <section class="config-section">
+                <h2>🌐 URL监控规则</h2>
+                <div class="url-patterns-container">
+                    <div class="add-pattern-form">
+                        <input type="text" id="newPatternInput" placeholder="输入URL模式，如：*.xiaohongshu.com/*" class="pattern-input">
+                        <button id="addPatternBtn" class="add-btn">+ 添加</button>
+                    </div>
+                    
+                    <div class="patterns-list" id="patternsList">
+                        <!-- 动态生成的URL模式列表 -->
+                    </div>
+                </div>
+                
+                <div class="pattern-help">
+                    <h4>📚 URL模式示例：</h4>
+                    <ul>
+                        <li><code>*.xiaohongshu.com/*</code> - 匹配小红书所有子域名</li>
+                        <li><code>*://edith.xiaohongshu.com/api/*</code> - 匹配API接口</li>
+                        <li><code>*.xhscdn.com/*</code> - 匹配CDN资源</li>
+                        <li><code>*://www.xiaohongshu.com/explore*</code> - 匹配探索页面</li>
+                    </ul>
+                    <div style="margin-top: 12px; padding: 12px; background: #e8f5e8; border-left: 4px solid #28a745; border-radius: 4px;">
+                        <strong>✅ 自动注入：</strong>插件会自动在所有小红书页面（*.xiaohongshu.com、*.xhscdn.com、*.fegine.com）注入监控脚本，
+                        无需额外配置。URL模式主要用于控制哪些请求会被记录和显示。
+                    </div>
+                </div>
+            </section>
+
+            <!-- 监控类型配置 -->
+            <section class="config-section">
+                <h2>📊 监控类型</h2>
+                <div class="monitor-types">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="monitorXHR" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">XMLHttpRequest (AJAX)</span>
+                    </label>
+                    
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="monitorFetch" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">Fetch API</span>
+                    </label>
+                    
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="monitorImages" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">图片资源</span>
+                    </label>
+                    
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="monitorScripts" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">JavaScript脚本</span>
+                    </label>
+                    
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="monitorStyles" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">CSS样式</span>
+                    </label>
+                    
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="monitorDocuments" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">HTML文档</span>
+                    </label>
+                </div>
+            </section>
+
+            <!-- 高级设置 -->
+            <section class="config-section">
+                <h2>⚙️ 高级设置</h2>
+                <div class="setting-item">
+                    <label class="number-setting">
+                        <span class="setting-label">最大记录数量</span>
+                        <input type="number" id="maxLogSize" min="100" max="10000" value="1000" class="number-input">
+                    </label>
+                    <p class="setting-description">超过此数量时将自动删除最旧的记录</p>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="switch-container">
+                        <span class="setting-label">记录请求体</span>
+                        <input type="checkbox" id="logRequestBody" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                    <p class="setting-description">是否记录POST/PUT请求的请求体内容</p>
+                </div>
+                
+                <div class="setting-item">
+                    <label class="switch-container">
+                        <span class="setting-label">记录响应体</span>
+                        <input type="checkbox" id="logResponseBody" checked>
+                        <span class="switch-slider"></span>
+                    </label>
+                    <p class="setting-description">是否记录响应体内容（可能影响性能）</p>
+                </div>
+            </section>
+        </main>
+
+        <footer class="footer">
+            <div class="button-group">
+                <button id="saveBtn" class="save-btn">💾 保存配置</button>
+                <button id="resetBtn" class="reset-btn">🔄 恢复默认</button>
+                <button id="exportConfigBtn" class="export-btn">📤 导出配置</button>
+                <button id="importConfigBtn" class="import-btn">📥 导入配置</button>
+            </div>
+            <input type="file" id="importFileInput" accept=".json" style="display: none;">
+            
+            <div class="status-message" id="statusMessage"></div>
+        </footer>
+    </div>
+
+    <script src="options.js"></script>
+</body>
+</html> 

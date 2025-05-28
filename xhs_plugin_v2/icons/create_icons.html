@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>插件图标生成器</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .icon-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+            text-align: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .icon {
+            margin: 10px;
+            display: inline-block;
+        }
+        .icon svg {
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .instructions {
+            background: #e7f3ff;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+            border-left: 4px solid #007bff;
+        }
+        .download-btn {
+            margin: 10px;
+            padding: 8px 16px;
+            background: #007bff;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .download-btn:hover {
+            background: #0056b3;
+        }
+    </style>
+</head>
+<body>
+    <h1>小红书网络监控插件图标生成器</h1>
+    
+    <div class="instructions">
+        <h3>使用说明：</h3>
+        <ol>
+            <li>点击下面的"下载图标"按钮下载对应尺寸的PNG图标</li>
+            <li>将下载的文件重命名为对应的文件名</li>
+            <li>将这些文件放到 icons/ 目录下</li>
+        </ol>
+    </div>
+    
+    <div class="icon-container">
+        <h3>16x16 图标</h3>
+        <div class="icon">
+            <svg width="16" height="16" viewBox="0 0 16 16" xmlns="http://www.w3.org/2000/svg" id="icon16">
+                <rect width="16" height="16" fill="#FF6B6B" rx="3"/>
+                <circle cx="4" cy="4" r="1.5" fill="white"/>
+                <circle cx="12" cy="4" r="1.5" fill="white"/>
+                <circle cx="8" cy="8" r="1.5" fill="white"/>
+                <circle cx="4" cy="12" r="1.5" fill="white"/>
+                <circle cx="12" cy="12" r="1.5" fill="white"/>
+                <line x1="4" y1="4" x2="8" y2="8" stroke="white" stroke-width="1"/>
+                <line x1="12" y1="4" x2="8" y2="8" stroke="white" stroke-width="1"/>
+                <line x1="8" y1="8" x2="4" y2="12" stroke="white" stroke-width="1"/>
+                <line x1="8" y1="8" x2="12" y2="12" stroke="white" stroke-width="1"/>
+            </svg>
+        </div>
+        <br>
+        <button class="download-btn" onclick="downloadIcon('icon16', 16, 'icon16.png')">下载 icon16.png</button>
+    </div>
+    
+    <div class="icon-container">
+        <h3>48x48 图标</h3>
+        <div class="icon">
+            <svg width="48" height="48" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" id="icon48">
+                <rect width="48" height="48" fill="#FF6B6B" rx="8"/>
+                <circle cx="12" cy="12" r="4" fill="white"/>
+                <circle cx="36" cy="12" r="4" fill="white"/>
+                <circle cx="24" cy="24" r="4" fill="white"/>
+                <circle cx="12" cy="36" r="4" fill="white"/>
+                <circle cx="36" cy="36" r="4" fill="white"/>
+                <line x1="12" y1="12" x2="24" y2="24" stroke="white" stroke-width="2"/>
+                <line x1="36" y1="12" x2="24" y2="24" stroke="white" stroke-width="2"/>
+                <line x1="24" y1="24" x2="12" y2="36" stroke="white" stroke-width="2"/>
+                <line x1="24" y1="24" x2="36" y2="36" stroke="white" stroke-width="2"/>
+                <text x="24" y="32" text-anchor="middle" fill="white" font-size="8" font-weight="bold">XHS</text>
+            </svg>
+        </div>
+        <br>
+        <button class="download-btn" onclick="downloadIcon('icon48', 48, 'icon48.png')">下载 icon48.png</button>
+    </div>
+    
+    <div class="icon-container">
+        <h3>128x128 图标</h3>
+        <div class="icon">
+            <svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" id="icon128">
+                <defs>
+                    <linearGradient id="grad1" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" style="stop-color:#FF6B6B;stop-opacity:1" />
+                        <stop offset="100%" style="stop-color:#EE5A24;stop-opacity:1" />
+                    </linearGradient>
+                </defs>
+                <rect width="128" height="128" fill="url(#grad1)" rx="20"/>
+                <circle cx="32" cy="32" r="8" fill="white"/>
+                <circle cx="96" cy="32" r="8" fill="white"/>
+                <circle cx="64" cy="64" r="10" fill="white"/>
+                <circle cx="32" cy="96" r="8" fill="white"/>
+                <circle cx="96" cy="96" r="8" fill="white"/>
+                <line x1="32" y1="32" x2="64" y2="64" stroke="white" stroke-width="4"/>
+                <line x1="96" y1="32" x2="64" y2="64" stroke="white" stroke-width="4"/>
+                <line x1="64" y1="64" x2="32" y2="96" stroke="white" stroke-width="4"/>
+                <line x1="64" y1="64" x2="96" y2="96" stroke="white" stroke-width="4"/>
+                <circle cx="48" cy="48" r="3" fill="white" opacity="0.7"/>
+                <circle cx="80" cy="48" r="3" fill="white" opacity="0.7"/>
+                <circle cx="48" cy="80" r="3" fill="white" opacity="0.7"/>
+                <circle cx="80" cy="80" r="3" fill="white" opacity="0.7"/>
+                <text x="64" y="85" text-anchor="middle" fill="white" font-size="16" font-weight="bold">XHS</text>
+                <text x="64" y="105" text-anchor="middle" fill="white" font-size="12">Monitor</text>
+            </svg>
+        </div>
+        <br>
+        <button class="download-btn" onclick="downloadIcon('icon128', 128, 'icon128.png')">下载 icon128.png</button>
+    </div>
+
+    <script>
+        function downloadIcon(svgId, size, filename) {
+            const svg = document.getElementById(svgId);
+            const svgData = new XMLSerializer().serializeToString(svg);
+            
+            const canvas = document.createElement('canvas');
+            canvas.width = size;
+            canvas.height = size;
+            const ctx = canvas.getContext('2d');
+            
+            const img = new Image();
+            img.onload = function() {
+                ctx.drawImage(img, 0, 0);
+                
+                canvas.toBlob(function(blob) {
+                    const url = URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                }, 'image/png');
+            };
+            
+            const svgBlob = new Blob([svgData], {type: 'image/svg+xml;charset=utf-8'});
+            const url = URL.createObjectURL(svgBlob);
+            img.src = url;
+        }
+    </script>
+    
+    <div class="instructions">
+        <h3>备选方案：</h3>
+        <p>如果上面的下载按钮不工作，您可以：</p>
+        <ul>
+            <li>右键点击SVG图标，选择"另存为图像"</li>
+            <li>使用截图工具截取图标</li>
+            <li>使用在线SVG转PNG工具</li>
+        </ul>
+        <p><strong>重要提醒：</strong> 图标文件必须命名为 icon16.png、icon48.png 和 icon128.png</p>
+    </div>
+</body>
+</html> 

@@ -1,0 +1,555 @@
+/* 全局样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    min-height: 100vh;
+    padding: 20px;
+}
+
+.container {
+    max-width: 800px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 16px;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+/* 头部样式 */
+.header {
+    background: linear-gradient(135deg, #ff6b6b 0%, #ee5a52 100%);
+    color: white;
+    padding: 30px;
+    text-align: center;
+}
+
+.header h1 {
+    font-size: 28px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    font-size: 16px;
+    opacity: 0.9;
+}
+
+/* 配置状态指示器 */
+.config-status {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-top: 16px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 20px;
+    font-size: 14px;
+}
+
+.status-indicator {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #4CAF50;
+    animation: pulse 2s infinite;
+}
+
+.status-indicator.unsaved {
+    background: #ff6b6b;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); opacity: 1; }
+    50% { transform: scale(1.2); opacity: 0.7; }
+    100% { transform: scale(1); opacity: 1; }
+}
+
+/* 主要内容 */
+.main-content {
+    padding: 30px;
+}
+
+.config-section {
+    margin-bottom: 40px;
+    border-bottom: 1px solid #e1e8ed;
+    padding-bottom: 30px;
+}
+
+.config-section:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+}
+
+.config-section h2 {
+    font-size: 20px;
+    font-weight: 600;
+    color: #1a1a1a;
+    margin-bottom: 20px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 设置项样式 */
+.setting-item {
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #f8f9fa;
+    border-radius: 12px;
+    border: 1px solid #e1e8ed;
+}
+
+.setting-label {
+    font-size: 16px;
+    font-weight: 500;
+    color: #1a1a1a;
+}
+
+.setting-description {
+    font-size: 14px;
+    color: #657786;
+    margin-top: 8px;
+    line-height: 1.4;
+}
+
+/* 开关样式 */
+.switch-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    cursor: pointer;
+}
+
+.switch-container input[type="checkbox"] {
+    display: none;
+}
+
+.switch-slider {
+    position: relative;
+    width: 50px;
+    height: 26px;
+    background: #ccc;
+    border-radius: 13px;
+    transition: 0.3s;
+    cursor: pointer;
+}
+
+.switch-slider:before {
+    content: "";
+    position: absolute;
+    height: 20px;
+    width: 20px;
+    left: 3px;
+    top: 3px;
+    background: white;
+    border-radius: 50%;
+    transition: 0.3s;
+}
+
+.switch-container input:checked + .switch-slider {
+    background: #4CAF50;
+}
+
+.switch-container input:checked + .switch-slider:before {
+    transform: translateX(24px);
+}
+
+/* 数字输入框 */
+.number-setting {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.number-input {
+    width: 120px;
+    padding: 8px 12px;
+    border: 2px solid #e1e8ed;
+    border-radius: 8px;
+    font-size: 14px;
+    text-align: center;
+}
+
+.number-input:focus {
+    outline: none;
+    border-color: #ff6b6b;
+}
+
+/* 选择框样式 */
+.select-container {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.version-select {
+    min-width: 200px;
+    padding: 8px 12px;
+    border: 2px solid #e1e8ed;
+    border-radius: 8px;
+    font-size: 14px;
+    background: white;
+    cursor: pointer;
+}
+
+.version-select:focus {
+    outline: none;
+    border-color: #ff6b6b;
+}
+
+/* URL模式容器 */
+.url-patterns-container {
+    margin-bottom: 20px;
+}
+
+.add-pattern-form {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.pattern-input {
+    flex: 1;
+    padding: 12px 16px;
+    border: 2px solid #e1e8ed;
+    border-radius: 8px;
+    font-size: 14px;
+}
+
+.pattern-input:focus {
+    outline: none;
+    border-color: #ff6b6b;
+}
+
+.add-btn {
+    padding: 12px 20px;
+    background: #ff6b6b;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.add-btn:hover {
+    background: #ee5a52;
+    transform: translateY(-1px);
+}
+
+/* 模式列表 */
+.patterns-list {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    min-height: 60px;
+}
+
+.pattern-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    background: white;
+    border-radius: 8px;
+    margin-bottom: 8px;
+    border: 1px solid #e1e8ed;
+}
+
+.pattern-item:last-child {
+    margin-bottom: 0;
+}
+
+/* 禁用状态的模式项 */
+.pattern-item.disabled {
+    opacity: 0.6;
+    background: #f5f5f5;
+}
+
+.pattern-item.disabled .pattern-text {
+    color: #999;
+    text-decoration: line-through;
+}
+
+.pattern-text {
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    font-size: 14px;
+    color: #1a1a1a;
+    background: #f1f3f4;
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
+.pattern-enabled {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.remove-pattern {
+    background: #dc3545;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.remove-pattern:hover {
+    background: #c82333;
+}
+
+/* 帮助信息 */
+.pattern-help {
+    background: #e8f4f8;
+    border-left: 4px solid #1da1f2;
+    padding: 16px;
+    border-radius: 8px;
+    margin-top: 20px;
+}
+
+.pattern-help h4 {
+    font-size: 14px;
+    color: #1a1a1a;
+    margin-bottom: 12px;
+}
+
+.pattern-help ul {
+    list-style: none;
+    margin-left: 0;
+}
+
+.pattern-help li {
+    margin-bottom: 8px;
+    font-size: 14px;
+    color: #657786;
+}
+
+.pattern-help code {
+    background: #f1f3f4;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+    color: #1a1a1a;
+}
+
+/* 复选框样式 */
+.monitor-types {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 16px;
+}
+
+.checkbox-item {
+    display: flex;
+    align-items: center;
+    padding: 16px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border: 1px solid #e1e8ed;
+    cursor: pointer;
+    transition: 0.3s;
+}
+
+.checkbox-item:hover {
+    background: #e8f4f8;
+    border-color: #1da1f2;
+}
+
+.checkbox-item input[type="checkbox"] {
+    display: none;
+}
+
+.checkmark {
+    width: 20px;
+    height: 20px;
+    border: 2px solid #ccc;
+    border-radius: 4px;
+    margin-right: 12px;
+    position: relative;
+    transition: 0.3s;
+}
+
+.checkbox-item input:checked + .checkmark {
+    background: #4CAF50;
+    border-color: #4CAF50;
+}
+
+.checkbox-item input:checked + .checkmark:after {
+    content: "✓";
+    position: absolute;
+    top: -2px;
+    left: 3px;
+    color: white;
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.checkbox-label {
+    font-size: 14px;
+    color: #1a1a1a;
+    font-weight: 500;
+}
+
+/* 底部样式 */
+.footer {
+    background: #f8f9fa;
+    padding: 30px;
+    border-top: 1px solid #e1e8ed;
+}
+
+.button-group {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.footer button {
+    padding: 12px 24px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: 0.3s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.save-btn {
+    background: #28a745;
+    color: white;
+}
+
+.save-btn:hover {
+    background: #218838;
+    transform: translateY(-1px);
+}
+
+.reset-btn {
+    background: #ffc107;
+    color: #212529;
+}
+
+.reset-btn:hover {
+    background: #e0a800;
+    transform: translateY(-1px);
+}
+
+.export-btn {
+    background: #17a2b8;
+    color: white;
+}
+
+.export-btn:hover {
+    background: #138496;
+    transform: translateY(-1px);
+}
+
+.import-btn {
+    background: #6c757d;
+    color: white;
+}
+
+.import-btn:hover {
+    background: #5a6268;
+    transform: translateY(-1px);
+}
+
+/* 状态消息 */
+.status-message {
+    text-align: center;
+    padding: 12px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    opacity: 0;
+    transition: 0.3s;
+}
+
+.status-message.show {
+    opacity: 1;
+}
+
+.status-message.success {
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.status-message.error {
+    background: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+.status-message.info {
+    background: #d1ecf1;
+    color: #0c5460;
+    border: 1px solid #bee5eb;
+}
+
+/* 空状态 */
+.empty-patterns {
+    text-align: center;
+    color: #657786;
+    font-size: 14px;
+    padding: 20px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        border-radius: 8px;
+    }
+    
+    .header {
+        padding: 20px;
+    }
+    
+    .header h1 {
+        font-size: 24px;
+    }
+    
+    .main-content {
+        padding: 20px;
+    }
+    
+    .config-section {
+        margin-bottom: 30px;
+    }
+    
+    .button-group {
+        flex-direction: column;
+    }
+    
+    .footer button {
+        width: 100%;
+        justify-content: center;
+    }
+    
+    .add-pattern-form {
+        flex-direction: column;
+    }
+    
+    .monitor-types {
+        grid-template-columns: 1fr;
+    }
+} 
