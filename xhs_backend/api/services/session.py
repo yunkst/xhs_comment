@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 # 会话过期时间（分钟）
-SESSION_EXPIRY_MINUTES = 10
+SESSION_EXPIRY_MINUTES = 30
 
 # 会话存储（内存版本，实际生产应使用Redis等）
 # 格式: {session_id: {status: "pending"|"completed", tokens: {access_token, id_token, refresh_token}}}

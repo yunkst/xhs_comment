@@ -2,23 +2,10 @@
 (function() {
     'use strict';
 
-    // 默认配置
+    // 默认配置（移除URL模式配置）
     const DEFAULT_CONFIG = {
         enableMonitoring: true,
         enableEnhanced: true,
-        urlPatterns: [
-            { pattern: '*.xiaohongshu.com/*', enabled: true },
-            { pattern: '*.xhscdn.com/*', enabled: true },
-            { pattern: '*.fegine.com/*', enabled: true }
-        ],
-        monitorTypes: {
-            xhr: true,
-            fetch: true,
-            images: true,
-            scripts: true,
-            styles: true,
-            documents: true
-        },
         maxLogSize: 1000,
         logRequestBody: true,
         logResponseBody: true
@@ -31,6 +18,7 @@
         token: '',
         refreshToken: ''
     };
+    let captureRules = []; // 抓取规则
 
     // DOM 元素
     const elements = {
@@ -42,18 +30,15 @@
         testApiConnectionBtn: document.getElementById('testApiConnectionBtn'),
         logoutBtn: document.getElementById('logoutBtn'),
         
+        // 抓取规则显示元素
+        rulesContainer: document.getElementById('rulesContainer'),
+        rulesInfo: document.getElementById('rulesInfo'),
+        rulesList: document.getElementById('rulesList'),
+        refreshRulesBtn: document.getElementById('refreshRulesBtn'),
+        
         // 监控配置元素
         enableMonitoring: document.getElementById('enableMonitoring'),
         enableEnhanced: document.getElementById('enableEnhanced'),
-        newPatternInput: document.getElementById('newPatternInput'),
-        addPatternBtn: document.getElementById('addPatternBtn'),
-        patternsList: document.getElementById('patternsList'),
-        monitorXHR: document.getElementById('monitorXHR'),
-        monitorFetch: document.getElementById('monitorFetch'),
-        monitorImages: document.getElementById('monitorImages'),
-        monitorScripts: document.getElementById('monitorScripts'),
-        monitorStyles: document.getElementById('monitorStyles'),
-        monitorDocuments: document.getElementById('monitorDocuments'),
         maxLogSize: document.getElementById('maxLogSize'),
         logRequestBody: document.getElementById('logRequestBody'),
         logResponseBody: document.getElementById('logResponseBody'),
@@ -82,13 +67,10 @@
         elements.testApiConnectionBtn.addEventListener('click', testApiConnection);
         elements.logoutBtn.addEventListener('click', logoutFromApi);
 
-        // 添加URL模式
-        elements.addPatternBtn.addEventListener('click', addUrlPattern);
-        elements.newPatternInput.addEventListener('keypress', function(e) {
-            if (e.key === 'Enter') {
-                addUrlPattern();
-            }
-        });
+        // 刷新抓取规则
+        if (elements.refreshRulesBtn) {
+            elements.refreshRulesBtn.addEventListener('click', refreshCaptureRules);
+        }
 
         // 保存配置
         elements.saveBtn.addEventListener('click', saveConfig);
@@ -109,9 +91,6 @@
         });
 
         elements.importFileInput.addEventListener('change', importConfig);
-
-        // 实时验证URL模式
-        elements.newPatternInput.addEventListener('input', validatePatternInput);
     }
 
     // 加载API配置
@@ -122,6 +101,7 @@
             }
             
             updateApiUI();
+            loadCaptureRules(); // API配置加载后加载抓取规则
             showStatus('API配置加载完成', 'success');
         });
     }
@@ -180,11 +160,12 @@
             } else {
                 currentApiConfig = newApiConfig;
                 updateApiUI();
+                loadCaptureRules(); // 重新加载抓取规则
                 showStatus('API配置保存成功！', 'success');
                 
-                // 通知popup更新
+                // 通知background更新API配置
                 chrome.runtime.sendMessage({
-                    action: 'apiConfigUpdated',
+                    action: 'setApiConfig',
                     config: newApiConfig
                 });
             }
@@ -273,8 +254,6 @@
         chrome.storage.sync.get(['xhs_monitor_config'], function(result) {
             if (result.xhs_monitor_config) {
                 currentConfig = { ...DEFAULT_CONFIG, ...result.xhs_monitor_config };
-            } else {
-                currentConfig = { ...DEFAULT_CONFIG };
             }
             
             updateUI();
@@ -284,241 +263,26 @@
 
     // 更新UI
     function updateUI() {
-        // 全局设置
+        // 基本设置
         elements.enableMonitoring.checked = currentConfig.enableMonitoring;
         elements.enableEnhanced.checked = currentConfig.enableEnhanced;
-
-        // 监控类型
-        elements.monitorXHR.checked = currentConfig.monitorTypes.xhr;
-        elements.monitorFetch.checked = currentConfig.monitorTypes.fetch;
-        elements.monitorImages.checked = currentConfig.monitorTypes.images;
-        elements.monitorScripts.checked = currentConfig.monitorTypes.scripts;
-        elements.monitorStyles.checked = currentConfig.monitorTypes.styles;
-        elements.monitorDocuments.checked = currentConfig.monitorTypes.documents;
 
         // 高级设置
         elements.maxLogSize.value = currentConfig.maxLogSize;
         elements.logRequestBody.checked = currentConfig.logRequestBody;
         elements.logResponseBody.checked = currentConfig.logResponseBody;
-
-        // URL模式列表
-        renderPatternsList();
-    }
-
-    // 渲染URL模式列表
-    function renderPatternsList() {
-        if (currentConfig.urlPatterns.length === 0) {
-            elements.patternsList.innerHTML = '<div class="empty-patterns">暂无自定义URL监控规则。插件会自动监控所有小红书页面的请求。</div>';
-            return;
-        }
-
-        const html = currentConfig.urlPatterns.map((item, index) => `
-            <div class="pattern-item ${!item.enabled ? 'disabled' : ''}">
-                <div class="pattern-text">${escapeHtml(item.pattern)}</div>
-                <div style="display: flex; align-items: center; gap: 12px;">
-                    <label style="display: flex; align-items: center; gap: 4px; cursor: pointer;">
-                        <input type="checkbox" class="pattern-enabled" ${item.enabled ? 'checked' : ''} 
-                               data-index="${index}">
-                        <span style="font-size: 12px; color: #666;">${item.enabled ? '启用' : '禁用'}</span>
-                    </label>
-                    <button class="remove-pattern" data-index="${index}" title="删除此模式">删除</button>
-                </div>
-            </div>
-        `).join('');
-
-        elements.patternsList.innerHTML = html;
-        
-        // 绑定事件监听器
-        bindPatternListEvents();
-    }
-
-    // 绑定模式列表事件
-    function bindPatternListEvents() {
-        // 绑定复选框事件
-        const checkboxes = elements.patternsList.querySelectorAll('.pattern-enabled');
-        checkboxes.forEach(checkbox => {
-            checkbox.addEventListener('change', function() {
-                const index = parseInt(this.dataset.index);
-                togglePatternEnabled(index);
-            });
-        });
-        
-        // 绑定删除按钮事件
-        const deleteButtons = elements.patternsList.querySelectorAll('.remove-pattern');
-        deleteButtons.forEach(button => {
-            button.addEventListener('click', function() {
-                const index = parseInt(this.dataset.index);
-                removePattern(index);
-            });
-        });
-    }
-
-    // 添加URL模式
-    function addUrlPattern() {
-        const pattern = elements.newPatternInput.value.trim();
-        
-        if (!pattern) {
-            showStatus('请输入URL模式', 'error');
-            return;
-        }
-
-        if (!isValidUrlPattern(pattern)) {
-            showStatus('URL模式格式不正确', 'error');
-            return;
-        }
-
-        // 检查是否已存在
-        if (currentConfig.urlPatterns.some(item => item.pattern === pattern)) {
-            showStatus('该URL模式已存在', 'error');
-            return;
-        }
-
-        currentConfig.urlPatterns.push({
-            pattern: pattern,
-            enabled: true
-        });
-
-        elements.newPatternInput.value = '';
-        renderPatternsList();
-        
-        // 立即保存配置，避免添加后刷新页面丢失更改
-        chrome.storage.sync.set({
-            'xhs_monitor_config': currentConfig
-        }, function() {
-            if (chrome.runtime.lastError) {
-                showStatus('添加失败: ' + chrome.runtime.lastError.message, 'error');
-            } else {
-                showStatus(`URL模式 "${pattern}" 添加成功并保存`, 'success');
-                updateConfigStatus(true, '配置已自动保存');
-                
-                // 通知后台脚本配置已更新
-                chrome.runtime.sendMessage({
-                    action: 'configUpdated',
-                    config: currentConfig
-                });
-            }
-        });
-    }
-
-    // 验证URL模式格式
-    function isValidUrlPattern(pattern) {
-        // 基本验证：包含域名相关内容
-        return pattern.includes('.') || pattern.includes('*') || pattern.includes('://');
-    }
-
-    // 验证输入框中的URL模式
-    function validatePatternInput() {
-        const pattern = elements.newPatternInput.value.trim();
-        const input = elements.newPatternInput;
-        
-        if (pattern && !isValidUrlPattern(pattern)) {
-            input.style.borderColor = '#dc3545';
-        } else {
-            input.style.borderColor = '';
-        }
-    }
-
-    // 切换模式启用状态
-    function togglePatternEnabled(index) {
-        if (currentConfig.urlPatterns[index]) {
-            currentConfig.urlPatterns[index].enabled = !currentConfig.urlPatterns[index].enabled;
-            
-            // 重新渲染列表以更新视觉效果
-            renderPatternsList();
-            
-            const pattern = currentConfig.urlPatterns[index].pattern;
-            const status = currentConfig.urlPatterns[index].enabled ? '启用' : '禁用';
-            
-            // 立即保存配置，避免状态切换后刷新页面丢失更改
-            chrome.storage.sync.set({
-                'xhs_monitor_config': currentConfig
-            }, function() {
-                if (chrome.runtime.lastError) {
-                    showStatus('状态更新失败: ' + chrome.runtime.lastError.message, 'error');
-                } else {
-                    showStatus(`模式 "${pattern}" 已${status}并保存`, 'info');
-                    updateConfigStatus(true, '配置已自动保存');
-                    
-                    // 通知后台脚本配置已更新
-                    chrome.runtime.sendMessage({
-                        action: 'configUpdated',
-                        config: currentConfig
-                    });
-                }
-            });
-        }
-    }
-
-    // 删除模式
-    function removePattern(index) {
-        if (confirm('确定要删除这个URL模式吗？')) {
-            const deletedPattern = currentConfig.urlPatterns[index].pattern;
-            currentConfig.urlPatterns.splice(index, 1);
-            renderPatternsList();
-            
-            // 立即保存配置，避免删除后刷新页面丢失更改
-            chrome.storage.sync.set({
-                'xhs_monitor_config': currentConfig
-            }, function() {
-                if (chrome.runtime.lastError) {
-                    showStatus('删除失败: ' + chrome.runtime.lastError.message, 'error');
-                } else {
-                    showStatus(`URL模式 "${deletedPattern}" 已删除并保存`, 'success');
-                    updateConfigStatus(true, '配置已自动保存');
-                    
-                    // 通知后台脚本配置已更新
-                    chrome.runtime.sendMessage({
-                        action: 'configUpdated',
-                        config: currentConfig
-                    });
-                }
-            });
-        }
     }
 
     // 保存配置
     function saveConfig() {
-        // 收集URL模式的最新状态
-        const patternCheckboxes = document.querySelectorAll('.pattern-enabled');
-        patternCheckboxes.forEach((checkbox, index) => {
-            if (currentConfig.urlPatterns[index]) {
-                currentConfig.urlPatterns[index].enabled = checkbox.checked;
-            }
-        });
-        
         // 收集所有配置
         const config = {
             enableMonitoring: elements.enableMonitoring.checked,
             enableEnhanced: elements.enableEnhanced.checked,
-            urlPatterns: currentConfig.urlPatterns,
-            monitorTypes: {
-                xhr: elements.monitorXHR.checked,
-                fetch: elements.monitorFetch.checked,
-                images: elements.monitorImages.checked,
-                scripts: elements.monitorScripts.checked,
-                styles: elements.monitorStyles.checked,
-                documents: elements.monitorDocuments.checked
-            },
             maxLogSize: parseInt(elements.maxLogSize.value) || 1000,
             logRequestBody: elements.logRequestBody.checked,
             logResponseBody: elements.logResponseBody.checked
         };
-
-        // 验证配置
-        if (config.urlPatterns.length === 0) {
-            // 如果没有URL模式，添加默认的小红书模式
-            config.urlPatterns = [
-                { pattern: '*.xiaohongshu.com/*', enabled: true },
-                { pattern: '*.xhscdn.com/*', enabled: true },
-                { pattern: '*.fegine.com/*', enabled: true }
-            ];
-            showStatus('已自动添加默认的小红书URL模式', 'info');
-        }
-
-        if (config.maxLogSize < 100 || config.maxLogSize > 10000) {
-            showStatus('最大记录数量必须在100-10000之间', 'error');
-            return;
-        }
 
         // 保存到存储
         chrome.storage.sync.set({
@@ -615,8 +379,7 @@
     // 验证导入的配置
     function validateImportedConfig(config) {
         if (!config || typeof config !== 'object') return false;
-        if (config.monitor && config.monitor.urlPatterns && !Array.isArray(config.monitor.urlPatterns)) return false;
-        if (config.monitor && config.monitor.monitorTypes && typeof config.monitor.monitorTypes !== 'object') return false;
+        if (config.monitor && config.monitor.maxLogSize && (config.monitor.maxLogSize < 100 || config.monitor.maxLogSize > 10000)) return false;
         return true;
     }
 
@@ -629,13 +392,6 @@
         setTimeout(() => {
             statusEl.classList.remove('show');
         }, 3000);
-    }
-
-    // HTML转义
-    function escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
 
     // 监听来自其他脚本的消息
@@ -659,6 +415,140 @@
             indicator.classList.add('unsaved');
             text.textContent = message || '配置未保存';
         }
+    }
+
+    // 加载抓取规则
+    function loadCaptureRules() {
+        if (!currentApiConfig.host) {
+            updateCaptureRulesDisplay();
+            return;
+        }
+
+        chrome.runtime.sendMessage({ action: 'getCaptureRules' }, function(response) {
+            if (response && response.success) {
+                captureRules = response.data || [];
+                console.log('已加载抓取规则:', captureRules.length, '条');
+            } else {
+                captureRules = [];
+                console.log('未加载到抓取规则');
+            }
+            updateCaptureRulesDisplay();
+        });
+    }
+
+    // 刷新抓取规则
+    async function refreshCaptureRules() {
+        if (!currentApiConfig.host) {
+            showStatus('请先配置API服务器地址', 'error');
+            return;
+        }
+
+        if (elements.refreshRulesBtn) {
+            elements.refreshRulesBtn.disabled = true;
+            elements.refreshRulesBtn.textContent = '刷新中...';
+        }
+
+        try {
+            const response = await new Promise((resolve) => {
+                chrome.runtime.sendMessage({ action: 'refreshCaptureRules' }, resolve);
+            });
+
+            if (response && response.success) {
+                captureRules = response.data || [];
+                updateCaptureRulesDisplay();
+                showStatus('抓取规则已刷新', 'success');
+            } else {
+                showStatus('刷新抓取规则失败: ' + (response?.error || '未知错误'), 'error');
+            }
+        } catch (error) {
+            console.error('刷新抓取规则时出错:', error);
+            showStatus('刷新抓取规则时出错', 'error');
+        } finally {
+            if (elements.refreshRulesBtn) {
+                elements.refreshRulesBtn.disabled = false;
+                elements.refreshRulesBtn.textContent = '🔄 刷新规则';
+            }
+        }
+    }
+
+    // 更新抓取规则显示
+    function updateCaptureRulesDisplay() {
+        if (!elements.rulesContainer) {
+            return;
+        }
+
+        if (!currentApiConfig.host) {
+            elements.rulesContainer.style.display = 'none';
+            return;
+        }
+
+        elements.rulesContainer.style.display = 'block';
+
+        if (!elements.rulesInfo || !elements.rulesList) {
+            return;
+        }
+
+        // 更新规则数量信息
+        const enabledRules = captureRules.filter(rule => rule.enabled);
+        const totalRules = captureRules.length;
+        elements.rulesInfo.textContent = `当前共有 ${totalRules} 条抓取规则，其中 ${enabledRules.length} 条已启用`;
+
+        // 清空规则列表
+        elements.rulesList.innerHTML = '';
+
+        if (totalRules === 0) {
+            const noRulesDiv = document.createElement('div');
+            noRulesDiv.className = 'no-rules-message';
+            noRulesDiv.innerHTML = `
+                <div class="icon">📋</div>
+                <div class="message">暂无抓取规则</div>
+                <div class="description">请在后端系统中配置抓取规则，或检查API连接状态</div>
+            `;
+            elements.rulesList.appendChild(noRulesDiv);
+            return;
+        }
+
+        // 按优先级排序显示规则
+        const sortedRules = [...captureRules].sort((a, b) => b.priority - a.priority);
+        
+        sortedRules.forEach(rule => {
+            const ruleDiv = document.createElement('div');
+            ruleDiv.className = `rule-item ${rule.enabled ? 'enabled' : 'disabled'}`;
+            
+            const priorityClass = rule.priority >= 10 ? 'high' : rule.priority >= 5 ? 'medium' : 'low';
+            
+            ruleDiv.innerHTML = `
+                <div class="rule-header">
+                    <div class="rule-name">${escapeHtml(rule.name)}</div>
+                    <div class="rule-status ${rule.enabled ? 'enabled' : 'disabled'}">
+                        ${rule.enabled ? '已启用' : '已禁用'}
+                    </div>
+                </div>
+                <div class="rule-pattern">
+                    <code>${escapeHtml(rule.pattern)}</code>
+                </div>
+                ${rule.description ? `<div class="rule-description">${escapeHtml(rule.description)}</div>` : ''}
+                <div class="rule-meta">
+                    <span class="rule-type">${rule.data_type || 'general'}</span>
+                    <span class="rule-priority priority-${priorityClass}">优先级: ${rule.priority}</span>
+                    ${rule.created_at ? `<span class="rule-date">创建: ${new Date(rule.created_at).toLocaleDateString()}</span>` : ''}
+                </div>
+            `;
+            
+            elements.rulesList.appendChild(ruleDiv);
+        });
+    }
+
+    // HTML转义函数
+    function escapeHtml(text) {
+        const map = {
+            '&': '&amp;',
+            '<': '&lt;',
+            '>': '&gt;',
+            '"': '&quot;',
+            "'": '&#039;'
+        };
+        return text.replace(/[&<>"']/g, function(m) { return map[m]; });
     }
 
     console.log('小红书监控插件配置页面已加载');

@@ -146,6 +146,24 @@
             color: white;
         }
 
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-danger:hover:not(:disabled) {
+            background: #c82333;
+        }
+
+        .logout-container {
+            margin-top: 8px;
+            display: none;
+        }
+
+        .logout-container.show {
+            display: block;
+        }
+
         .spinner {
             width: 14px;
             height: 14px;
@@ -247,6 +265,78 @@
             font-size: 12px;
             margin-bottom: 12px;
         }
+
+        /* 抓取规则样式 */
+        .rules-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .rules-info {
+            font-size: 14px;
+            font-weight: 500;
+            color: #333;
+        }
+
+        .btn-small {
+            padding: 6px 12px;
+            font-size: 12px;
+            min-width: auto;
+        }
+
+        .rules-list {
+            max-height: 200px;
+            overflow-y: auto;
+            border: 1px solid #e9ecef;
+            border-radius: 6px;
+            background: #f8f9fa;
+        }
+
+        .rule-item {
+            padding: 8px 12px;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .rule-item:last-child {
+            border-bottom: none;
+        }
+
+        .rule-content {
+            flex: 1;
+        }
+
+        .rule-name {
+            font-size: 12px;
+            font-weight: 500;
+            color: #007bff;
+            margin-bottom: 2px;
+        }
+
+        .rule-pattern {
+            font-size: 11px;
+            font-family: monospace;
+            color: #6c757d;
+            margin-bottom: 2px;
+            word-break: break-all;
+        }
+
+        .rule-description {
+            font-size: 10px;
+            color: #666;
+        }
+
+        .rule-priority {
+            font-size: 10px;
+            color: #28a745;
+            font-weight: 500;
+            margin-left: 8px;
+            white-space: nowrap;
+        }
     </style>
 </head>
 <body>
@@ -271,6 +361,12 @@
                 <button class="btn btn-success hidden" id="ssoCheckLogin">
                     ✅ 已完成登录，点击继续
                 </button>
+                <!-- 退出登录容器 -->
+                <div class="logout-container" id="logoutContainer">
+                    <button class="btn btn-danger" id="logoutBtn">
+                        🚪 退出登录
+                    </button>
+                </div>
             </div>
         </div>
 
@@ -294,6 +390,19 @@
             <button class="btn btn-secondary" id="clearLogsBtn">
                 🗑️ 清空日志
             </button>
+        </div>
+
+        <!-- 抓取规则 -->
+        <div class="status-card">
+            <div class="rules-header">
+                <div class="rules-info" id="captureRulesInfo">正在加载抓取规则...</div>
+                <button class="btn btn-outline btn-small" id="refreshRulesBtn">
+                    🔄 刷新规则
+                </button>
+            </div>
+            <div class="rules-list" id="rulesList">
+                <!-- 规则列表将动态填充 -->
+            </div>
         </div>
 
         <!-- 空状态提示 -->

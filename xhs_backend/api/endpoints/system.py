@@ -1,3 +1,8 @@
+"""
+系统管理相关端点
+
+提供系统状态查询、配置管理、抓取规则管理等功能
+"""
 from fastapi import APIRouter, HTTPException, Depends, status, Request
 from typing import Dict, Any, List
 import logging
@@ -8,12 +13,272 @@ from datetime import datetime, timedelta
 
 from database import get_database, COMMENTS_COLLECTION, NOTES_COLLECTION, NOTIFICATIONS_COLLECTION, STRUCTURED_COMMENTS_COLLECTION, USER_INFO_COLLECTION, USERS_COLLECTION
 from api.deps import get_current_user, get_current_user_combined
+from api.models.common import CaptureRule, CaptureRulesResponse, NetworkDataPayload
 
 # 配置日志
 logger = logging.getLogger(__name__)
 
 # 创建路由器
 router = APIRouter()
+
+# 默认抓取规则配置
+DEFAULT_CAPTURE_RULES = [
+    {
+        "name": "通知接口",
+        "pattern": "*/api/sns/web/v1/notify/*",
+        "enabled": True,
+        "description": "小红书通知相关API",
+        "data_type": "notification",
+        "priority": 10
+    },
+    {
+        "name": "评论接口",
+        "pattern": "*/api/sns/web/v1/comment/*",
+        "enabled": True,
+        "description": "小红书评论相关API",
+        "data_type": "comment",
+        "priority": 10
+    },
+    {
+        "name": "用户信息接口",
+        "pattern": "*/api/sns/web/v1/user/*",
+        "enabled": True,
+        "description": "小红书用户信息API",
+        "data_type": "user",
+        "priority": 8
+    },
+    {
+        "name": "笔记内容接口",
+        "pattern": "*/api/sns/web/v1/feed/*",
+        "enabled": True,
+        "description": "小红书笔记内容API",
+        "data_type": "note",
+        "priority": 9
+    },
+    {
+        "name": "搜索接口",
+        "pattern": "*/api/sns/web/v1/search/*",
+        "enabled": True,
+        "description": "小红书搜索API",
+        "data_type": "search",
+        "priority": 5
+    },
+    {
+        "name": "热门推荐接口",
+        "pattern": "*/api/sns/web/v1/homefeed/*",
+        "enabled": True,
+        "description": "小红书首页推荐API",
+        "data_type": "recommendation",
+        "priority": 3
+    }
+]
+
+# === 抓取规则管理接口 ===
+
+@router.get("/capture-rules", response_model=CaptureRulesResponse)
+async def get_capture_rules(db=Depends(get_database)):
+    """
+    获取URL抓取规则配置
+    
+    此接口供插件调用，获取需要监控的URL规则
+    无需认证，以便插件快速获取配置
+    """
+    try:
+        # 从数据库获取抓取规则
+        collection = db.capture_rules
+        
+        # 如果数据库中没有规则，初始化默认规则
+        if collection.count_documents({}) == 0:
+            # 插入默认规则
+            rules_to_insert = []
+            for rule_data in DEFAULT_CAPTURE_RULES:
+                rule_data['created_at'] = datetime.utcnow()
+                rule_data['updated_at'] = datetime.utcnow()
+                rules_to_insert.append(rule_data)
+            
+            collection.insert_many(rules_to_insert)
+        
+        # 查询启用的规则，按优先级排序
+        rules_cursor = collection.find(
+            {"enabled": True}
+        ).sort("priority", -1)
+        
+        rules = []
+        for rule_doc in rules_cursor:
+            # 移除MongoDB的_id字段
+            rule_doc.pop('_id', None)
+            rules.append(CaptureRule(**rule_doc))
+        
+        return CaptureRulesResponse(
+            success=True,
+            rules=rules,
+            total_count=len(rules),
+            message=f"成功获取 {len(rules)} 条抓取规则"
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取抓取规则失败: {str(e)}"
+        )
+
+@router.get("/capture-rules/all", response_model=CaptureRulesResponse)
+async def get_all_capture_rules(
+    current_user: str = Depends(get_current_user),
+    db=Depends(get_database)
+):
+    """
+    获取所有抓取规则（包括禁用的）
+    
+    管理员接口，需要认证
+    """
+    try:
+        collection = db.capture_rules
+        
+        # 查询所有规则，按优先级排序
+        rules_cursor = collection.find().sort("priority", -1)
+        
+        rules = []
+        for rule_doc in rules_cursor:
+            rule_doc.pop('_id', None)
+            rules.append(CaptureRule(**rule_doc))
+        
+        return CaptureRulesResponse(
+            success=True,
+            rules=rules,
+            total_count=len(rules),
+            message=f"成功获取 {len(rules)} 条抓取规则"
+        )
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取抓取规则失败: {str(e)}"
+        )
+
+@router.post("/capture-rules")
+async def create_capture_rule(
+    rule: CaptureRule,
+    current_user: str = Depends(get_current_user),
+    db=Depends(get_database)
+):
+    """
+    创建新的抓取规则
+    
+    管理员接口，需要认证
+    """
+    try:
+        collection = db.capture_rules
+        
+        # 检查规则名称是否已存在
+        existing_rule = collection.find_one({"name": rule.name})
+        if existing_rule:
+            raise HTTPException(
+                status_code=400,
+                detail=f"规则名称 '{rule.name}' 已存在"
+            )
+        
+        # 插入新规则
+        rule_dict = rule.dict()
+        rule_dict['created_at'] = datetime.utcnow()
+        rule_dict['updated_at'] = datetime.utcnow()
+        
+        result = collection.insert_one(rule_dict)
+        
+        return {
+            "success": True,
+            "message": f"成功创建抓取规则: {rule.name}",
+            "rule_id": str(result.inserted_id)
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"创建抓取规则失败: {str(e)}"
+        )
+
+@router.put("/capture-rules/{rule_name}")
+async def update_capture_rule(
+    rule_name: str,
+    rule_update: CaptureRule,
+    current_user: str = Depends(get_current_user),
+    db=Depends(get_database)
+):
+    """
+    更新抓取规则
+    
+    管理员接口，需要认证
+    """
+    try:
+        collection = db.capture_rules
+        
+        # 更新规则
+        rule_dict = rule_update.dict()
+        rule_dict['updated_at'] = datetime.utcnow()
+        
+        result = collection.update_one(
+            {"name": rule_name},
+            {"$set": rule_dict}
+        )
+        
+        if result.matched_count == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到规则: {rule_name}"
+            )
+        
+        return {
+            "success": True,
+            "message": f"成功更新抓取规则: {rule_name}",
+            "modified_count": result.modified_count
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新抓取规则失败: {str(e)}"
+        )
+
+@router.delete("/capture-rules/{rule_name}")
+async def delete_capture_rule(
+    rule_name: str,
+    current_user: str = Depends(get_current_user),
+    db=Depends(get_database)
+):
+    """
+    删除抓取规则
+    
+    管理员接口，需要认证
+    """
+    try:
+        collection = db.capture_rules
+        
+        result = collection.delete_one({"name": rule_name})
+        
+        if result.deleted_count == 0:
+            raise HTTPException(
+                status_code=404,
+                detail=f"未找到规则: {rule_name}"
+            )
+        
+        return {
+            "success": True,
+            "message": f"成功删除抓取规则: {rule_name}"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"删除抓取规则失败: {str(e)}"
+        )
+
+# === 系统状态接口 ===
 
 @router.get("/status", response_model=Dict[str, Any])
 async def system_status(
@@ -92,12 +357,6 @@ async def database_stats(
 ):
     """
     获取数据库统计信息
-    
-    Args:
-        current_user: 当前用户
-        
-    Returns:
-        数据库统计信息
     """
     try:
         # 获取数据库
@@ -109,6 +368,7 @@ async def database_stats(
         notes_count = await db[NOTES_COLLECTION].count_documents({})
         notifications_count = await db[NOTIFICATIONS_COLLECTION].count_documents({})
         users_count = await db[USERS_COLLECTION].count_documents({})
+        capture_rules_count = await db.capture_rules.count_documents({})
         
         # 获取最近统计
         now = datetime.utcnow()
@@ -129,7 +389,8 @@ async def database_stats(
                 "structured_comments": structured_comments_count,
                 "notes": notes_count,
                 "notifications": notifications_count,
-                "users": users_count
+                "users": users_count,
+                "capture_rules": capture_rules_count
             },
             "daily_stats": {
                 "comments": recent_comments,
@@ -150,91 +411,78 @@ async def database_stats(
             detail=f"获取数据库统计时出错: {str(e)}"
         )
 
-@router.get("/settings", response_model=Dict[str, Any])
-async def get_system_settings_for_dashboard(
-    request: Request, current_user: str = Depends(get_current_user_combined)
-):
-    """
-    获取用于仪表盘的系统统计信息。
-    """
-    try:
-        db = await get_database()
-
-        total_structured_comments = await db[STRUCTURED_COMMENTS_COLLECTION].count_documents({})
-        # 假设 totalUsers 指的是小红书用户信息数量
-        total_xhs_users = await db[USER_INFO_COLLECTION].count_documents({})
-        # total_system_users = await db[USERS_COLLECTION].count_documents({}) # 系统注册用户
-
-        # TODO: 实现待回复评论的统计逻辑
-        pending_reply_comments = 0 # 暂时为0
-
-        # TODO: 实现较昨日变化率的计算逻辑
-        comments_change_percentage = 0 # 暂时为0
-        users_change_percentage = 0    # 暂时为0
-        pending_reply_change_percentage = 0 # 暂时为0
-
-        return {
-            "totalComments": total_structured_comments,
-            "commentsChange": comments_change_percentage, # 较昨日变化百分比
-            "totalUsers": total_xhs_users, # 使用小红书用户数
-            "usersChange": users_change_percentage,
-            "pendingReplyComments": pending_reply_comments,
-            "pendingReplyChange": pending_reply_change_percentage,
-            "lastUpdated": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.exception("获取仪表盘系统设置时发生错误")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"获取仪表盘设置时出错: {str(e)}"
-        )
-
 @router.get("/version", response_model=Dict[str, Any])
 async def version_info():
     """
-    获取系统版本信息（无需认证）
-    
-    Returns:
-        系统版本信息
+    获取系统版本信息
     """
     return {
-        "name": "小红书评论维护系统",
-        "version": "1.0.0",
-        "api_version": "v1",
-        "build_date": "2023-11-10"
+        "version": "2.0.0",
+        "api_version": "v1", 
+        "build_date": "2024-12-01",
+        "description": "小红书评论维护系统",
+        "features": [
+            "用户认证与管理",
+            "评论数据采集与管理",
+            "通知数据处理", 
+            "笔记数据分析",
+            "URL抓取规则管理",
+            "系统监控与状态查询"
+        ]
     }
 
 @router.get("/health", response_model=Dict[str, Any])
 async def health_check():
     """
-    健康检查接口（无需认证）
+    健康检查接口
     
-    Returns:
-        服务健康状态
+    无需认证的健康检查接口，用于负载均衡器和监控系统
     """
     try:
-        # 检查数据库连接
-        db = await get_database()
-        # 简单的数据库连接测试
-        await db.list_collection_names()
-        
+        # 简单的健康检查
         return {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "service": "小红书评论维护系统",
-            "version": "1.0.0",
-            "database": "connected"
+            "version": "2.0.0"
         }
     except Exception as e:
-        logger.error(f"健康检查失败: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "unhealthy",
-                "timestamp": datetime.utcnow().isoformat(),
-                "service": "小红书评论维护系统",
-                "version": "1.0.0",
-                "database": "disconnected",
-                "error": str(e)
-            }
+            detail=f"服务不可用: {str(e)}"
+        )
+
+# === 网络数据接收接口 ===
+
+@router.post("/network-data")
+async def receive_network_data(
+    data: NetworkDataPayload,
+    db=Depends(get_database)
+):
+    """
+    接收插件发送的网络请求数据
+    
+    插件无需认证即可发送数据，方便数据采集
+    """
+    try:
+        # 保存原始网络数据
+        network_data_dict = data.dict()
+        network_data_dict['received_at'] = datetime.utcnow()
+        
+        # 保存到网络数据集合
+        result = db.network_requests.insert_one(network_data_dict)
+        
+        return {
+            "success": True,
+            "message": f"成功接收网络数据，规则: {data.rule_name}",
+            "data_id": str(result.inserted_id),
+            "rule_name": data.rule_name,
+            "url": data.url
+        }
+        
+    except Exception as e:
+        logger.exception("接收网络数据时发生错误")
+        raise HTTPException(
+            status_code=500,
+            detail=f"接收网络数据失败: {str(e)}"
         )
