@@ -239,6 +239,46 @@ export const systemApi = {
   // 删除备份文件
   deleteBackup: (filename) => {
     return api.delete(`/api/system/backup/${filename}`);
+  },
+  // 获取系统状态
+  getSystemStatus: () => {
+    return api.get('/api/system/status');
+  },
+  // 获取数据库统计
+  getDatabaseStats: () => {
+    return api.get('/api/system/database-stats');
+  },
+  // 获取版本信息
+  getVersionInfo: () => {
+    return api.get('/api/system/version');
+  },
+  // 健康检查
+  healthCheck: () => {
+    return api.get('/api/system/health');
+  }
+};
+
+// 抓取规则管理接口
+export const captureRuleApi = {
+  // 获取所有抓取规则（管理员）
+  getAllCaptureRules: () => {
+    return api.get('/api/system/capture-rules/all');
+  },
+  // 获取启用的抓取规则（插件用）
+  getCaptureRules: () => {
+    return api.get('/api/system/capture-rules');
+  },
+  // 创建抓取规则
+  createCaptureRule: (data) => {
+    return api.post('/api/system/capture-rules', data);
+  },
+  // 更新抓取规则
+  updateCaptureRule: (ruleName, data) => {
+    return api.put(`/api/system/capture-rules/${ruleName}`, data);
+  },
+  // 删除抓取规则
+  deleteCaptureRule: (ruleName) => {
+    return api.delete(`/api/system/capture-rules/${ruleName}`);
   }
 };
 
@@ -269,11 +309,25 @@ export const getUserList = async (page = 1, pageSize = 10) => {
   return response; // 直接返回拦截器处理后的完整响应
 };
 
+// 网络数据监控接口
+export const networkDataApi = {
+  // 获取网络请求数据
+  getNetworkData: (params) => {
+    return api.get('/api/network-data', { params });
+  },
+  // 接收网络数据
+  receiveNetworkData: (data) => {
+    return api.post('/api/system/network-data', data);
+  }
+};
+
 export default {
   userApi,
   commentApi,
   userManagementApi,
   systemApi,
   userNoteApi,
-  ssoApi
+  ssoApi,
+  captureRuleApi,
+  networkDataApi
 }; 

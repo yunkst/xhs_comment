@@ -486,3 +486,109 @@ async def receive_network_data(
             status_code=500,
             detail=f"接收网络数据失败: {str(e)}"
         )
+
+@router.get("/network-data")
+async def get_network_data(
+    page: int = 1,
+    page_size: int = 20,
+    rule_name: str = None,
+    data_type: str = None,
+    start_time: str = None,
+    end_time: str = None,
+    current_user: str = Depends(get_current_user),
+    db=Depends(get_database)
+):
+    """
+    查询网络请求数据
+    
+    管理员接口，需要认证
+    """
+    try:
+        collection = db.network_requests
+        
+        # 构建查询条件
+        query = {}
+        
+        if rule_name:
+            query['rule_name'] = rule_name
+            
+        if data_type:
+            query['data_type'] = data_type
+            
+        if start_time and end_time:
+            try:
+                start_dt = datetime.strptime(start_time, "%Y-%m-%d %H:%M:%S")
+                end_dt = datetime.strptime(end_time, "%Y-%m-%d %H:%M:%S")
+                query['received_at'] = {
+                    "$gte": start_dt,
+                    "$lte": end_dt
+                }
+            except ValueError:
+                raise HTTPException(
+                    status_code=400,
+                    detail="时间格式错误，请使用 YYYY-MM-DD HH:MM:SS 格式"
+                )
+        
+        # 计算分页
+        skip = (page - 1) * page_size
+        
+        # 查询数据
+        cursor = collection.find(query).sort("received_at", -1).skip(skip).limit(page_size)
+        data_list = []
+        
+        for doc in cursor:
+            doc['_id'] = str(doc['_id'])
+            data_list.append(doc)
+        
+        # 获取总数
+        total = collection.count_documents(query)
+        
+        # 统计数据
+        now = datetime.utcnow()
+        today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+        hour_ago = now - timedelta(hours=1)
+        
+        total_requests = collection.count_documents({})
+        today_requests = collection.count_documents({"received_at": {"$gte": today_start}})
+        recent_hour_requests = collection.count_documents({"received_at": {"$gte": hour_ago}})
+        
+        # 获取活跃规则数
+        active_rules_pipeline = [
+            {"$group": {"_id": "$rule_name"}},
+            {"$count": "count"}
+        ]
+        active_rules_result = list(collection.aggregate(active_rules_pipeline))
+        active_rules_count = active_rules_result[0]["count"] if active_rules_result else 0
+        
+        # 获取所有可用规则
+        available_rules_pipeline = [
+            {"$group": {"_id": "$rule_name"}},
+            {"$project": {"rule_name": "$_id", "_id": 0}}
+        ]
+        available_rules_result = list(collection.aggregate(available_rules_pipeline))
+        available_rules = [item["rule_name"] for item in available_rules_result]
+        
+        return {
+            "success": True,
+            "data": data_list,
+            "total": total,
+            "page": page,
+            "page_size": page_size,
+            "stats": {
+                "total": total_requests,
+                "today": today_requests,
+                "recent_hour": recent_hour_requests,
+                "active_rules": active_rules_count
+            },
+            "available_rules": available_rules,
+            "message": f"成功获取 {len(data_list)} 条网络数据"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception("查询网络数据时发生错误")
+        raise HTTPException(
+            status_code=500,
+            detail=f"查询网络数据失败: {str(e)}"
+        )

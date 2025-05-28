@@ -62,6 +62,18 @@ const router = createRouter({
           name: 'system',
           component: () => import('../views/system/SystemView.vue'),
           meta: { title: '系统设置' }
+        },
+        {
+          path: 'system/capture-rules',
+          name: 'captureRules',
+          component: () => import('../views/system/CaptureRuleView.vue'),
+          meta: { title: '抓取规则管理' }
+        },
+        {
+          path: 'system/network-data',
+          name: 'networkData',
+          component: () => import('../views/system/NetworkDataView.vue'),
+          meta: { title: '网络数据监控' }
         }
       ]
     },

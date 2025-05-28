@@ -33,10 +33,15 @@
             </template>
             <el-menu-item index="/user/list">用户列表</el-menu-item>
           </el-sub-menu>
-          <el-menu-item index="/system">
-            <el-icon><Setting /></el-icon>
-            <span>系统设置</span>
-          </el-menu-item>
+          <el-sub-menu index="system">
+            <template #title>
+              <el-icon><Setting /></el-icon>
+              <span>系统管理</span>
+            </template>
+            <el-menu-item index="/system">系统设置</el-menu-item>
+            <el-menu-item index="/system/capture-rules">抓取规则管理</el-menu-item>
+            <el-menu-item index="/system/network-data">网络数据监控</el-menu-item>
+          </el-sub-menu>
         </el-menu>
       </el-aside>
       
