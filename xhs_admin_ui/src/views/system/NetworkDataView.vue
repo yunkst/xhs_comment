@@ -243,7 +243,7 @@
         <div class="detail-section">
           <h4>响应数据</h4>
           <el-input
-            v-model="formatJsonData(selectedItem.response_data)"
+            :model-value="formatJsonData(selectedItem.response_data)"
             type="textarea"
             :rows="10"
             readonly
