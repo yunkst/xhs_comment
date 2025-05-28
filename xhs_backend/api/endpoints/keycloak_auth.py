@@ -7,6 +7,7 @@ import logging
 import uuid
 import time
 from datetime import datetime
+from pydantic import BaseModel
 
 from ..auth.keycloak import keycloak_openid, KEYCLOAK_ENABLED, KEYCLOAK_SERVER_URL, KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID
 from ..models import (
@@ -34,6 +35,10 @@ FRONTEND_REDIRECT_URL = os.getenv("FRONTEND_REDIRECT_URL", "http://localhost:808
 # 固定的回调URL，确保使用HTTPS
 BASE_URL = os.getenv("BASE_URL", "https://note")
 CALLBACK_URL = f"{BASE_URL}/api/auth/sso-callback"
+
+class RefreshTokenRequest(BaseModel):
+    """刷新令牌请求模型"""
+    refresh_token: str
 
 # 创建会话并生成SSO登录URL
 @router.post("/sso-session", response_model=SSOSessionResponse, tags=["SSO认证"])
@@ -275,12 +280,12 @@ async def sso_callback(
         )
 
 @router.post("/sso-refresh", response_model=SSOCallbackResponse, tags=["SSO认证"])
-async def refresh_sso_token(refresh_token: str):
+async def refresh_sso_token(request: RefreshTokenRequest):
     """
     刷新SSO令牌
     
     Args:
-        refresh_token: 刷新令牌
+        request: 包含刷新令牌的请求
         
     Returns:
         新的令牌
@@ -293,7 +298,7 @@ async def refresh_sso_token(refresh_token: str):
     
     try:
         # 刷新令牌
-        token_response = keycloak_openid.refresh_token(refresh_token)
+        token_response = keycloak_openid.refresh_token(request.refresh_token)
         
         return SSOCallbackResponse(
             access_token=token_response.get("access_token"),

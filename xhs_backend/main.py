@@ -7,10 +7,11 @@ import os
 import logging
 from dotenv import load_dotenv
 from contextlib import asynccontextmanager
+from datetime import datetime
 
 
 # 导入数据库连接函数
-from database import connect_to_mongo, close_mongo_connection
+from database import connect_to_mongo, close_mongo_connection, get_database
 
 # 导入API路由
 from api import api_router
@@ -75,6 +76,43 @@ app.add_middleware(
 
 # --- 注册API路由 ---
 app.include_router(api_router, prefix="/api")
+
+# --- 健康检查接口（直接在API根路径下） ---
+@app.get("/api/health")
+async def health_check():
+    """
+    健康检查接口（无需认证）
+    
+    Returns:
+        服务健康状态
+    """
+    try:
+        # 检查数据库连接
+        db = await get_database()
+        # 简单的数据库连接测试
+        await db.list_collection_names()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "小红书评论维护系统",
+            "version": "1.0.0",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"健康检查失败: {str(e)}")
+        from fastapi import HTTPException, status
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unhealthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "service": "小红书评论维护系统",
+                "version": "1.0.0",
+                "database": "disconnected",
+                "error": str(e)
+            }
+        )
 
 # --- 服务前端静态文件 (根端点 /web) ---
 

@@ -26,9 +26,23 @@
 
     // 当前配置
     let currentConfig = { ...DEFAULT_CONFIG };
+    let currentApiConfig = {
+        host: '',
+        token: '',
+        refreshToken: ''
+    };
 
     // DOM 元素
     const elements = {
+        // API配置元素
+        apiHostInput: document.getElementById('apiHostInput'),
+        apiConnectionStatus: document.getElementById('apiConnectionStatus'),
+        apiLoginStatus: document.getElementById('apiLoginStatus'),
+        saveApiConfigBtn: document.getElementById('saveApiConfigBtn'),
+        testApiConnectionBtn: document.getElementById('testApiConnectionBtn'),
+        logoutBtn: document.getElementById('logoutBtn'),
+        
+        // 监控配置元素
         enableMonitoring: document.getElementById('enableMonitoring'),
         enableEnhanced: document.getElementById('enableEnhanced'),
         newPatternInput: document.getElementById('newPatternInput'),
@@ -43,6 +57,8 @@
         maxLogSize: document.getElementById('maxLogSize'),
         logRequestBody: document.getElementById('logRequestBody'),
         logResponseBody: document.getElementById('logResponseBody'),
+        
+        // 操作按钮
         saveBtn: document.getElementById('saveBtn'),
         resetBtn: document.getElementById('resetBtn'),
         exportConfigBtn: document.getElementById('exportConfigBtn'),
@@ -55,11 +71,17 @@
     // 初始化
     document.addEventListener('DOMContentLoaded', function() {
         loadConfig();
+        loadApiConfig();
         setupEventListeners();
     });
 
     // 设置事件监听器
     function setupEventListeners() {
+        // API配置事件
+        elements.saveApiConfigBtn.addEventListener('click', saveApiConfig);
+        elements.testApiConnectionBtn.addEventListener('click', testApiConnection);
+        elements.logoutBtn.addEventListener('click', logoutFromApi);
+
         // 添加URL模式
         elements.addPatternBtn.addEventListener('click', addUrlPattern);
         elements.newPatternInput.addEventListener('keypress', function(e) {
@@ -90,6 +112,160 @@
 
         // 实时验证URL模式
         elements.newPatternInput.addEventListener('input', validatePatternInput);
+    }
+
+    // 加载API配置
+    function loadApiConfig() {
+        chrome.storage.local.get(['xhs_api_config'], function(result) {
+            if (result.xhs_api_config) {
+                currentApiConfig = { ...currentApiConfig, ...result.xhs_api_config };
+            }
+            
+            updateApiUI();
+            showStatus('API配置加载完成', 'success');
+        });
+    }
+
+    // 更新API相关UI
+    function updateApiUI() {
+        // 更新输入框
+        elements.apiHostInput.value = currentApiConfig.host || '';
+        
+        // 更新连接状态
+        if (currentApiConfig.host) {
+            elements.apiConnectionStatus.textContent = '已配置';
+            elements.apiConnectionStatus.className = 'status-value connected';
+        } else {
+            elements.apiConnectionStatus.textContent = '未配置';
+            elements.apiConnectionStatus.className = 'status-value disconnected';
+        }
+        
+        // 更新登录状态
+        if (currentApiConfig.token) {
+            elements.apiLoginStatus.textContent = '已登录';
+            elements.apiLoginStatus.className = 'status-value logged-in';
+            elements.logoutBtn.style.display = 'inline-flex';
+        } else {
+            elements.apiLoginStatus.textContent = '未登录';
+            elements.apiLoginStatus.className = 'status-value logged-out';
+            elements.logoutBtn.style.display = 'none';
+        }
+    }
+
+    // 保存API配置
+    function saveApiConfig() {
+        const apiHost = elements.apiHostInput.value.trim();
+        
+        if (!apiHost) {
+            showStatus('请输入API服务器地址', 'error');
+            return;
+        }
+
+        if (!apiHost.startsWith('http://') && !apiHost.startsWith('https://')) {
+            showStatus('API地址必须以http://或https://开头', 'error');
+            return;
+        }
+
+        // 保存API配置（保留现有的token）
+        const newApiConfig = {
+            ...currentApiConfig,
+            host: apiHost
+        };
+
+        chrome.storage.local.set({
+            'xhs_api_config': newApiConfig
+        }, function() {
+            if (chrome.runtime.lastError) {
+                showStatus('保存API配置失败: ' + chrome.runtime.lastError.message, 'error');
+            } else {
+                currentApiConfig = newApiConfig;
+                updateApiUI();
+                showStatus('API配置保存成功！', 'success');
+                
+                // 通知popup更新
+                chrome.runtime.sendMessage({
+                    action: 'apiConfigUpdated',
+                    config: newApiConfig
+                });
+            }
+        });
+    }
+
+    // 测试API连接
+    async function testApiConnection() {
+        const apiHost = elements.apiHostInput.value.trim();
+        
+        if (!apiHost) {
+            showStatus('请先输入API服务器地址', 'error');
+            return;
+        }
+
+        if (!apiHost.startsWith('http://') && !apiHost.startsWith('https://')) {
+            showStatus('API地址格式不正确', 'error');
+            return;
+        }
+
+        // 更新按钮状态
+        elements.testApiConnectionBtn.disabled = true;
+        elements.testApiConnectionBtn.innerHTML = '<div class="spinner"></div>测试中...';
+
+        try {
+            // 测试连接到API服务器
+            const response = await fetch(`${apiHost}/api/health`, {
+                method: 'GET',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                showStatus(`连接成功！服务器状态: ${data.status || 'OK'}`, 'success');
+                
+                // 自动保存配置
+                saveApiConfig();
+            } else {
+                showStatus(`连接失败: HTTP ${response.status}`, 'error');
+            }
+
+        } catch (error) {
+            console.error('API连接测试失败:', error);
+            showStatus(`连接失败: ${error.message}`, 'error');
+        } finally {
+            // 恢复按钮状态
+            elements.testApiConnectionBtn.disabled = false;
+            elements.testApiConnectionBtn.innerHTML = '🔗 测试连接';
+        }
+    }
+
+    // 退出登录
+    function logoutFromApi() {
+        if (confirm('确定要退出登录吗？这将清除保存的登录凭据。')) {
+            // 清除token
+            const newApiConfig = {
+                ...currentApiConfig,
+                token: '',
+                refreshToken: ''
+            };
+
+            chrome.storage.local.set({
+                'xhs_api_config': newApiConfig
+            }, function() {
+                if (chrome.runtime.lastError) {
+                    showStatus('退出登录失败: ' + chrome.runtime.lastError.message, 'error');
+                } else {
+                    currentApiConfig = newApiConfig;
+                    updateApiUI();
+                    showStatus('已退出登录', 'success');
+                    
+                    // 通知popup更新
+                    chrome.runtime.sendMessage({
+                        action: 'apiConfigUpdated',
+                        config: newApiConfig
+                    });
+                }
+            });
+        }
     }
 
     // 加载配置
@@ -374,7 +550,8 @@
     // 导出配置
     function exportConfig() {
         const config = {
-            ...currentConfig,
+            monitor: currentConfig,
+            api: currentApiConfig,
             exportTime: new Date().toISOString(),
             version: '1.0'
         };
@@ -413,9 +590,17 @@
                     return;
                 }
 
-                // 合并配置
-                currentConfig = { ...DEFAULT_CONFIG, ...importedConfig };
-                updateUI();
+                // 合并监控配置
+                if (importedConfig.monitor) {
+                    currentConfig = { ...DEFAULT_CONFIG, ...importedConfig.monitor };
+                    updateUI();
+                }
+
+                // 合并API配置（不包含敏感信息）
+                if (importedConfig.api && importedConfig.api.host) {
+                    elements.apiHostInput.value = importedConfig.api.host;
+                }
+
                 showStatus('配置导入成功！请检查设置并保存', 'success');
                 
             } catch (error) {
@@ -430,8 +615,8 @@
     // 验证导入的配置
     function validateImportedConfig(config) {
         if (!config || typeof config !== 'object') return false;
-        if (config.urlPatterns && !Array.isArray(config.urlPatterns)) return false;
-        if (config.monitorTypes && typeof config.monitorTypes !== 'object') return false;
+        if (config.monitor && config.monitor.urlPatterns && !Array.isArray(config.monitor.urlPatterns)) return false;
+        if (config.monitor && config.monitor.monitorTypes && typeof config.monitor.monitorTypes !== 'object') return false;
         return true;
     }
 
@@ -457,6 +642,8 @@
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if (request.action === 'getConfig') {
             sendResponse({ config: currentConfig });
+        } else if (request.action === 'getApiConfig') {
+            sendResponse({ config: currentApiConfig });
         }
     });
 

@@ -203,3 +203,38 @@ async def version_info():
         "api_version": "v1",
         "build_date": "2023-11-10"
     }
+
+@router.get("/health", response_model=Dict[str, Any])
+async def health_check():
+    """
+    健康检查接口（无需认证）
+    
+    Returns:
+        服务健康状态
+    """
+    try:
+        # 检查数据库连接
+        db = await get_database()
+        # 简单的数据库连接测试
+        await db.list_collection_names()
+        
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "小红书评论维护系统",
+            "version": "1.0.0",
+            "database": "connected"
+        }
+    except Exception as e:
+        logger.error(f"健康检查失败: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail={
+                "status": "unhealthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "service": "小红书评论维护系统",
+                "version": "1.0.0",
+                "database": "disconnected",
+                "error": str(e)
+            }
+        )

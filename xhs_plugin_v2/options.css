@@ -119,6 +119,135 @@ body {
     line-height: 1.4;
 }
 
+/* API配置相关样式 */
+.input-setting {
+    display: block;
+    width: 100%;
+}
+
+.text-input {
+    width: 100%;
+    padding: 12px 16px;
+    border: 2px solid #e1e8ed;
+    border-radius: 8px;
+    font-size: 14px;
+    transition: all 0.2s ease;
+    background: #fff;
+    margin-top: 8px;
+}
+
+.text-input:focus {
+    outline: none;
+    border-color: #ff6b6b;
+    box-shadow: 0 0 0 3px rgba(255, 107, 107, 0.1);
+}
+
+.text-input:invalid {
+    border-color: #dc3545;
+}
+
+.api-status-display {
+    background: #f8f9fa;
+    border-radius: 8px;
+    padding: 16px;
+    margin: 16px 0;
+    border-left: 4px solid #ff6b6b;
+}
+
+.status-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+}
+
+.status-item:last-child {
+    margin-bottom: 0;
+}
+
+.status-label {
+    font-weight: 500;
+    color: #666;
+}
+
+.status-value {
+    font-weight: 600;
+    color: #333;
+}
+
+.status-value.connected {
+    color: #28a745;
+}
+
+.status-value.disconnected {
+    color: #dc3545;
+}
+
+.status-value.logged-in {
+    color: #28a745;
+}
+
+.status-value.logged-out {
+    color: #6c757d;
+}
+
+/* 按钮样式 */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
+
+.btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.btn:active {
+    transform: translateY(0);
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.btn-primary {
+    background: #ff6b6b;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #ee5a52;
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #545b62;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: #e0a800;
+}
+
 /* 开关样式 */
 .switch-container {
     display: flex;
@@ -204,7 +333,7 @@ body {
     border-color: #ff6b6b;
 }
 
-/* URL模式容器 */
+/* URL模式配置 */
 .url-patterns-container {
     margin-bottom: 20px;
 }
@@ -212,7 +341,7 @@ body {
 .add-pattern-form {
     display: flex;
     gap: 12px;
-    margin-bottom: 20px;
+    margin-bottom: 16px;
 }
 
 .pattern-input {
@@ -230,27 +359,26 @@ body {
 
 .add-btn {
     padding: 12px 20px;
-    background: #ff6b6b;
+    background: #28a745;
     color: white;
     border: none;
     border-radius: 8px;
-    font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: 0.3s;
+    transition: 0.2s;
 }
 
 .add-btn:hover {
-    background: #ee5a52;
-    transform: translateY(-1px);
+    background: #218838;
 }
 
-/* 模式列表 */
+/* URL模式列表 */
 .patterns-list {
-    background: #f8f9fa;
+    max-height: 300px;
+    overflow-y: auto;
+    border: 1px solid #e1e8ed;
     border-radius: 8px;
-    padding: 16px;
-    min-height: 60px;
+    background: #f8f9fa;
 }
 
 .pattern-item {
@@ -258,40 +386,34 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 12px 16px;
-    background: white;
-    border-radius: 8px;
-    margin-bottom: 8px;
-    border: 1px solid #e1e8ed;
+    border-bottom: 1px solid #e1e8ed;
+    transition: 0.2s;
 }
 
 .pattern-item:last-child {
-    margin-bottom: 0;
+    border-bottom: none;
 }
 
-/* 禁用状态的模式项 */
 .pattern-item.disabled {
     opacity: 0.6;
-    background: #f5f5f5;
+    background: #f1f3f4;
 }
 
 .pattern-item.disabled .pattern-text {
-    color: #999;
     text-decoration: line-through;
+    color: #6c757d;
 }
 
 .pattern-text {
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    font-size: 14px;
-    color: #1a1a1a;
-    background: #f1f3f4;
-    padding: 4px 8px;
-    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+    font-size: 13px;
+    color: #495057;
+    flex: 1;
+    margin-right: 12px;
 }
 
 .pattern-enabled {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
+    margin-right: 12px;
 }
 
 .remove-pattern {
@@ -302,68 +424,63 @@ body {
     padding: 4px 8px;
     font-size: 12px;
     cursor: pointer;
-    transition: 0.3s;
+    transition: 0.2s;
 }
 
 .remove-pattern:hover {
     background: #c82333;
 }
 
-/* 帮助信息 */
+/* 模式帮助 */
 .pattern-help {
-    background: #e8f4f8;
-    border-left: 4px solid #1da1f2;
-    padding: 16px;
+    background: #f8f9fa;
     border-radius: 8px;
-    margin-top: 20px;
+    padding: 16px;
+    margin-top: 16px;
 }
 
 .pattern-help h4 {
-    font-size: 14px;
-    color: #1a1a1a;
     margin-bottom: 12px;
+    color: #495057;
 }
 
 .pattern-help ul {
     list-style: none;
-    margin-left: 0;
+    padding: 0;
 }
 
 .pattern-help li {
     margin-bottom: 8px;
-    font-size: 14px;
-    color: #657786;
+    padding-left: 16px;
+    position: relative;
 }
 
 .pattern-help code {
-    background: #f1f3f4;
+    background: #e9ecef;
     padding: 2px 6px;
     border-radius: 4px;
-    font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-    color: #1a1a1a;
+    font-family: 'Courier New', monospace;
+    font-size: 12px;
 }
 
-/* 复选框样式 */
+/* 监控类型 */
 .monitor-types {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 16px;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 12px;
 }
 
 .checkbox-item {
     display: flex;
     align-items: center;
-    padding: 16px;
-    background: #f8f9fa;
-    border-radius: 8px;
-    border: 1px solid #e1e8ed;
     cursor: pointer;
-    transition: 0.3s;
+    padding: 8px;
+    border-radius: 6px;
+    transition: 0.2s;
 }
 
 .checkbox-item:hover {
-    background: #e8f4f8;
-    border-color: #1da1f2;
+    background: #f8f9fa;
 }
 
 .checkbox-item input[type="checkbox"] {
@@ -371,13 +488,13 @@ body {
 }
 
 .checkmark {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
     border: 2px solid #ccc;
     border-radius: 4px;
-    margin-right: 12px;
+    margin-right: 10px;
     position: relative;
-    transition: 0.3s;
+    transition: 0.2s;
 }
 
 .checkbox-item input:checked + .checkmark {
@@ -386,10 +503,10 @@ body {
 }
 
 .checkbox-item input:checked + .checkmark:after {
-    content: "✓";
+    content: '✓';
     position: absolute;
     top: -2px;
-    left: 3px;
+    left: 2px;
     color: white;
     font-size: 14px;
     font-weight: bold;
@@ -397,11 +514,10 @@ body {
 
 .checkbox-label {
     font-size: 14px;
-    color: #1a1a1a;
-    font-weight: 500;
+    color: #333;
 }
 
-/* 底部样式 */
+/* 底部 */
 .footer {
     background: #f8f9fa;
     padding: 30px;
@@ -423,10 +539,7 @@ body {
     font-size: 14px;
     font-weight: 500;
     cursor: pointer;
-    transition: 0.3s;
-    display: flex;
-    align-items: center;
-    gap: 6px;
+    transition: all 0.2s ease;
 }
 
 .save-btn {
@@ -436,17 +549,15 @@ body {
 
 .save-btn:hover {
     background: #218838;
-    transform: translateY(-1px);
 }
 
 .reset-btn {
-    background: #ffc107;
-    color: #212529;
+    background: #6c757d;
+    color: white;
 }
 
 .reset-btn:hover {
-    background: #e0a800;
-    transform: translateY(-1px);
+    background: #545b62;
 }
 
 .export-btn {
@@ -456,17 +567,15 @@ body {
 
 .export-btn:hover {
     background: #138496;
-    transform: translateY(-1px);
 }
 
 .import-btn {
-    background: #6c757d;
+    background: #17a2b8;
     color: white;
 }
 
 .import-btn:hover {
-    background: #5a6268;
-    transform: translateY(-1px);
+    background: #138496;
 }
 
 /* 状态消息 */
@@ -477,11 +586,13 @@ body {
     font-size: 14px;
     font-weight: 500;
     opacity: 0;
-    transition: 0.3s;
+    transform: translateY(10px);
+    transition: all 0.3s ease;
 }
 
 .status-message.show {
     opacity: 1;
+    transform: translateY(0);
 }
 
 .status-message.success {
@@ -504,10 +615,10 @@ body {
 
 /* 空状态 */
 .empty-patterns {
-    text-align: center;
-    color: #657786;
-    font-size: 14px;
     padding: 20px;
+    text-align: center;
+    color: #6c757d;
+    font-style: italic;
 }
 
 /* 响应式设计 */
@@ -542,7 +653,6 @@ body {
     
     .footer button {
         width: 100%;
-        justify-content: center;
     }
     
     .add-pattern-form {

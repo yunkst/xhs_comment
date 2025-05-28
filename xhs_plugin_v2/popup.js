@@ -1,523 +1,448 @@
-// DOM 元素
-const requestCountEl = document.getElementById('requestCount');
-const requestListEl = document.getElementById('requestList');
-const refreshBtn = document.getElementById('refreshBtn');
-const clearBtn = document.getElementById('clearBtn');
-const exportBtn = document.getElementById('exportBtn');
-const filterInput = document.getElementById('filterInput');
-const methodFilter = document.getElementById('methodFilter');
+// 小红书网络监控插件 - 弹出窗口脚本
+(function() {
+    'use strict';
 
-// 存储当前的请求数据
-let currentRequests = [];
-let filteredRequests = [];
+    // DOM 元素
+    const elements = {
+        apiStatusIndicator: document.getElementById('apiStatusIndicator'),
+        apiStatusText: document.getElementById('apiStatusText'),
+        ssoContainer: document.getElementById('ssoContainer'),
+        ssoStartLogin: document.getElementById('ssoStartLogin'),
+        ssoCheckLogin: document.getElementById('ssoCheckLogin'),
+        totalRequests: document.getElementById('totalRequests'),
+        todayRequests: document.getElementById('todayRequests'),
+        viewLogsBtn: document.getElementById('viewLogsBtn'),
+        clearLogsBtn: document.getElementById('clearLogsBtn'),
+        emptyState: document.getElementById('emptyState'),
+        configWarning: document.getElementById('configWarning'),
+        configPageLink: document.getElementById('configPageLink'),
+        configLink: document.getElementById('configLink'),
+        helpLink: document.getElementById('helpLink'),
+        aboutLink: document.getElementById('aboutLink')
+    };
 
-// 初始化
-document.addEventListener('DOMContentLoaded', function() {
-    loadRequestData();
-    setupEventListeners();
-    addConfigButton();
-});
+    // 应用状态
+    let appState = {
+        apiConfig: {
+            host: '',
+            token: '',
+            refreshToken: ''
+        },
+        ssoSession: {
+            id: null,
+            status: 'idle', // 'idle', 'pending', 'completed', 'failed'
+            pollInterval: null
+        },
+        requestStats: {
+            total: 0,
+            today: 0
+        },
+        config: null
+    };
 
-// 设置事件监听器
-function setupEventListeners() {
-    refreshBtn.addEventListener('click', loadRequestData);
-    clearBtn.addEventListener('click', clearRequestLog);
-    exportBtn.addEventListener('click', exportRequestLog);
-    
-    // 过滤器事件
-    filterInput.addEventListener('input', applyFilters);
-    methodFilter.addEventListener('change', applyFilters);
-}
-
-// 添加配置按钮
-function addConfigButton() {
-    const configBtn = document.createElement('button');
-    configBtn.innerHTML = '⚙️ 配置';
-    configBtn.className = 'config-btn';
-    configBtn.style.cssText = `
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        background: #667eea;
-        color: white;
-        border: none;
-        border-radius: 20px;
-        padding: 8px 16px;
-        font-size: 12px;
-        cursor: pointer;
-        box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-        z-index: 1000;
-        transition: 0.3s;
-    `;
-    
-    configBtn.addEventListener('click', function() {
-        chrome.runtime.openOptionsPage();
+    // 初始化
+    document.addEventListener('DOMContentLoaded', function() {
+        console.log('[XHS Monitor Popup] 初始化中...');
+        loadApiConfig();
+        loadMonitorConfig();
+        loadRequestStats();
+        setupEventListeners();
+        updateUI();
     });
-    
-    configBtn.addEventListener('mouseover', function() {
-        this.style.background = '#5a6fd8';
-        this.style.transform = 'translateY(-1px)';
-    });
-    
-    configBtn.addEventListener('mouseout', function() {
-        this.style.background = '#667eea';
-        this.style.transform = 'translateY(0)';
-    });
-    
-    document.body.appendChild(configBtn);
-}
 
-// 加载请求数据
-function loadRequestData() {
-    console.log('[Popup Debug] 开始加载请求数据...');
-    
-    chrome.runtime.sendMessage({action: 'getRequestLog'}, function(response) {
-        console.log('[Popup Debug] 收到background响应:', response);
-        
-        if (chrome.runtime.lastError) {
-            console.error('[Popup Debug] Chrome runtime错误:', chrome.runtime.lastError);
-            showEmptyState();
-            return;
-        }
-        
-        if (!response) {
-            console.warn('[Popup Debug] 响应为空');
-            showEmptyState();
-            return;
-        }
-        
-        if (response.log) {
-            console.log('[Popup Debug] 日志数据长度:', response.log.length);
-            console.log('[Popup Debug] 前3条记录:', response.log.slice(0, 3));
-            
-            currentRequests = response.log;
-            applyFilters();
-            updateRequestCount(response.totalCount);
-            
-            // 显示配置信息
-            if (response.config) {
-                console.log('[Popup Debug] 配置信息:', response.config);
-                showConfigStatus(response.config);
+    // 设置事件监听器
+    function setupEventListeners() {
+        // SSO登录按钮
+        elements.ssoStartLogin.addEventListener('click', startSsoLogin);
+        elements.ssoCheckLogin.addEventListener('click', checkSsoLoginStatus);
+
+        // 功能按钮
+        elements.viewLogsBtn.addEventListener('click', openLogsPage);
+        elements.clearLogsBtn.addEventListener('click', clearLogs);
+
+        // 配置链接
+        elements.configPageLink.addEventListener('click', openConfigPage);
+        elements.configLink.addEventListener('click', openConfigPage);
+        elements.helpLink.addEventListener('click', openHelpPage);
+        elements.aboutLink.addEventListener('click', openAboutPage);
+
+        // 监听来自background的消息
+        chrome.runtime.onMessage.addListener(handleMessage);
+    }
+
+    // 加载API配置
+    function loadApiConfig() {
+        chrome.storage.local.get(['xhs_api_config'], function(result) {
+            if (result.xhs_api_config) {
+                appState.apiConfig = { ...appState.apiConfig, ...result.xhs_api_config };
             }
-        } else {
-            console.warn('[Popup Debug] 响应中无log字段:', Object.keys(response));
-            showEmptyState();
-        }
-    });
-}
+            updateApiStatus();
+        });
+    }
 
-// 显示配置状态
-function showConfigStatus(config) {
-    if (!config.enableMonitoring) {
-        showConfigWarning('监控已禁用', '请在配置页面启用监控功能');
-    } else if (config.urlPatterns.length === 0) {
-        showConfigWarning('无监控规则', '请在配置页面添加URL监控规则');
-    } else {
-        const enabledPatterns = config.urlPatterns.filter(p => p.enabled);
-        if (enabledPatterns.length === 0) {
-            showConfigWarning('所有规则已禁用', '请在配置页面启用至少一个URL规则');
-        }
-    }
-}
-
-// 显示配置警告
-function showConfigWarning(title, message) {
-    const warningEl = document.createElement('div');
-    warningEl.className = 'config-warning';
-    warningEl.innerHTML = `
-        <div style="
-            background: #fff3cd;
-            border: 1px solid #ffeaa7;
-            border-radius: 8px;
-            padding: 12px;
-            margin: 10px 0;
-            color: #856404;
-            font-size: 12px;
-        ">
-            <strong>⚠️ ${title}</strong><br>
-            ${message}
-            <br><button onclick="chrome.runtime.openOptionsPage()" style="
-                background: #ffc107;
-                border: none;
-                border-radius: 4px;
-                padding: 4px 8px;
-                margin-top: 6px;
-                font-size: 11px;
-                cursor: pointer;
-            ">打开配置</button>
-        </div>
-    `;
-    
-    // 插入到请求计数后面
-    const targetEl = document.querySelector('.header') || document.body;
-    targetEl.appendChild(warningEl);
-}
-
-// 应用过滤器
-function applyFilters() {
-    const urlFilter = filterInput.value.toLowerCase().trim();
-    const method = methodFilter.value;
-    
-    filteredRequests = currentRequests.filter(request => {
-        const matchesUrl = !urlFilter || request.url.toLowerCase().includes(urlFilter);
-        const matchesMethod = !method || request.method === method;
-        return matchesUrl && matchesMethod;
-    });
-    
-    renderRequestList();
-}
-
-// 渲染请求列表
-function renderRequestList() {
-    if (filteredRequests.length === 0) {
-        showEmptyState();
-        return;
-    }
-    
-    const html = filteredRequests.map(request => createRequestItemHTML(request)).join('');
-    requestListEl.innerHTML = html;
-    
-    // 添加点击事件
-    const requestItems = requestListEl.querySelectorAll('.request-item');
-    requestItems.forEach((item, index) => {
-        item.addEventListener('click', () => toggleRequestDetails(index));
-    });
-}
-
-// 创建请求项HTML
-function createRequestItemHTML(request) {
-    const statusClass = getStatusClass(request.statusCode);
-    const methodClass = `method-${request.method}`;
-    const url = truncateUrl(request.url, 50);
-    
-    return `
-        <div class="request-item">
-            <div class="request-header">
-                <span class="request-method ${methodClass}">${request.method}</span>
-                <span class="request-url" title="${request.url}">${url}</span>
-                <div>
-                    <span class="request-time">${request.timeString}</span>
-                    ${request.responseTime ? `<span class="request-time">${request.responseTime}ms</span>` : ''}
-                    ${request.statusCode ? `<span class="request-status ${statusClass}">${request.statusCode}</span>` : ''}
-                    ${request.status === 'error' ? '<span class="request-status status-error">ERROR</span>' : ''}
-                </div>
-            </div>
-            <div class="request-details">
-                ${createRequestDetailsHTML(request)}
-            </div>
-        </div>
-    `;
-}
-
-// 创建请求详情HTML
-function createRequestDetailsHTML(request) {
-    let html = `
-        <div class="detail-section">
-            <div class="detail-title">请求URL</div>
-            <div class="detail-content">${request.url}</div>
-        </div>
-        
-        <div class="detail-section">
-            <div class="detail-title">请求方法</div>
-            <div class="detail-content">${request.method}</div>
-        </div>
-        
-        <div class="detail-section">
-            <div class="detail-title">请求类型</div>
-            <div class="detail-content">${request.type || 'Unknown'}</div>
-        </div>
-        
-        <div class="detail-section">
-            <div class="detail-title">时间戳</div>
-            <div class="detail-content">${request.timeString} (${request.timestamp})</div>
-        </div>
-    `;
-    
-    if (request.statusCode) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">状态码</div>
-                <div class="detail-content">${request.statusCode}</div>
-            </div>
-        `;
-    }
-    
-    if (request.requestHeaders && request.requestHeaders.length > 0) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">请求头</div>
-                <div class="detail-content">${formatHeaders(request.requestHeaders)}</div>
-            </div>
-        `;
-    }
-    
-    if (request.responseHeaders && request.responseHeaders.length > 0) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">响应头</div>
-                <div class="detail-content">${formatHeaders(request.responseHeaders)}</div>
-            </div>
-        `;
-    }
-    
-    if (request.requestBody) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">请求体</div>
-                <div class="detail-content">${formatRequestBody(request.requestBody)}</div>
-            </div>
-        `;
-    }
-    
-    if (request.responseTime) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">响应时间</div>
-                <div class="detail-content">${request.responseTime}ms</div>
-            </div>
-        `;
-    }
-    
-    if (request.response) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">响应状态</div>
-                <div class="detail-content">${request.response.status} ${request.response.statusText || ''}</div>
-            </div>
-        `;
-        
-        if (request.response.contentType) {
-            html += `
-                <div class="detail-section">
-                    <div class="detail-title">内容类型</div>
-                    <div class="detail-content">${request.response.contentType}</div>
-                </div>
-            `;
-        }
-        
-        if (request.response.body) {
-            html += `
-                <div class="detail-section">
-                    <div class="detail-title">响应体</div>
-                    <div class="detail-content">${formatResponseBody(request.response.body, request.response.contentType)}</div>
-                </div>
-            `;
-        }
-    }
-    
-    if (request.responseSize || request.contentLength) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">响应大小</div>
-                <div class="detail-content">${formatBytes(request.responseSize || parseInt(request.contentLength) || 0)}</div>
-            </div>
-        `;
-    }
-    
-    if (request.performanceData) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">性能数据</div>
-                <div class="detail-content">
-                    传输大小: ${formatBytes(request.performanceData.transferSize || 0)}<br>
-                    编码大小: ${formatBytes(request.performanceData.encodedBodySize || 0)}<br>
-                    解码大小: ${formatBytes(request.performanceData.decodedBodySize || 0)}<br>
-                    持续时间: ${request.performanceData.duration ? request.performanceData.duration.toFixed(2) + 'ms' : 'N/A'}<br>
-                    发起类型: ${request.performanceData.initiatorType || 'Unknown'}
-                </div>
-            </div>
-        `;
-    }
-    
-    if (request.error) {
-        html += `
-            <div class="detail-section">
-                <div class="detail-title">错误信息</div>
-                <div class="detail-content">${request.error}</div>
-            </div>
-        `;
-    }
-    
-    return html;
-}
-
-// 格式化请求头
-function formatHeaders(headers) {
-    return headers.map(header => `${header.name}: ${header.value}`).join('\n');
-}
-
-// 格式化请求体
-function formatRequestBody(requestBody) {
-    if (!requestBody) return '';
-    
-    if (requestBody.formData) {
-        return Object.entries(requestBody.formData)
-            .map(([key, value]) => `${key}: ${Array.isArray(value) ? value.join(', ') : value}`)
-            .join('\n');
-    }
-    
-    if (requestBody.raw && requestBody.raw.length > 0) {
-        return requestBody.raw.map(item => {
-            if (item.bytes) {
-                try {
-                    const decoder = new TextDecoder('utf-8');
-                    return decoder.decode(new Uint8Array(item.bytes));
-                } catch (e) {
-                    return '[Binary Data]';
-                }
+    // 加载监控配置
+    function loadMonitorConfig() {
+        chrome.storage.sync.get(['xhs_monitor_config'], function(result) {
+            if (result.xhs_monitor_config) {
+                appState.config = result.xhs_monitor_config;
             }
-            return item.file || '[Unknown]';
-        }).join('\n');
+            updateConfigWarning();
+        });
     }
-    
-    return JSON.stringify(requestBody, null, 2);
-}
 
-// 切换请求详情显示
-function toggleRequestDetails(index) {
-    const requestItem = requestListEl.children[index];
-    const detailsEl = requestItem.querySelector('.request-details');
-    
-    if (detailsEl.classList.contains('show')) {
-        detailsEl.classList.remove('show');
-    } else {
-        // 先关闭其他所有展开的详情
-        const allDetails = requestListEl.querySelectorAll('.request-details.show');
-        allDetails.forEach(detail => detail.classList.remove('show'));
-        
-        // 展开当前项
-        detailsEl.classList.add('show');
-    }
-}
-
-// 获取状态码对应的CSS类
-function getStatusClass(statusCode) {
-    if (!statusCode) return '';
-    
-    if (statusCode >= 200 && statusCode < 300) return 'status-2xx';
-    if (statusCode >= 300 && statusCode < 400) return 'status-3xx';
-    if (statusCode >= 400 && statusCode < 500) return 'status-4xx';
-    if (statusCode >= 500) return 'status-5xx';
-    
-    return '';
-}
-
-// 截断URL
-function truncateUrl(url, maxLength) {
-    if (url.length <= maxLength) return url;
-    
-    const start = url.substring(0, Math.floor(maxLength / 2));
-    const end = url.substring(url.length - Math.floor(maxLength / 2));
-    
-    return `${start}...${end}`;
-}
-
-// 更新请求计数
-function updateRequestCount(count) {
-    requestCountEl.textContent = count || 0;
-}
-
-// 显示空状态
-function showEmptyState() {
-    requestListEl.innerHTML = `
-        <div class="empty-state">
-            <h3>暂无请求记录</h3>
-            <p>访问小红书网站以开始监控网络请求</p>
-        </div>
-    `;
-}
-
-// 清空请求日志
-function clearRequestLog() {
-    if (confirm('确定要清空所有请求记录吗？')) {
-        chrome.runtime.sendMessage({action: 'clearLog'}, function(response) {
+    // 加载请求统计
+    function loadRequestStats() {
+        chrome.runtime.sendMessage({ action: 'getRequestStats' }, function(response) {
             if (response && response.success) {
-                currentRequests = [];
-                filteredRequests = [];
-                updateRequestCount(0);
-                showEmptyState();
+                appState.requestStats = response.stats;
+                updateRequestStats();
             }
         });
     }
-}
 
-// 格式化响应体
-function formatResponseBody(body, contentType) {
-    if (!body) return '';
-    
-    // 限制显示长度
-    const maxLength = 1000;
-    let displayBody = body;
-    
-    if (body.length > maxLength) {
-        displayBody = body.substring(0, maxLength) + '\n... (内容过长，已截断)';
+    // 更新UI
+    function updateUI() {
+        updateApiStatus();
+        updateConfigWarning();
+        updateRequestStats();
+        updateEmptyState();
     }
-    
-    // 根据内容类型格式化
-    if (contentType && contentType.includes('application/json')) {
-        try {
-            const jsonObj = JSON.parse(body);
-            return JSON.stringify(jsonObj, null, 2);
-        } catch (e) {
-            return displayBody;
-        }
-    } else if (contentType && contentType.includes('text/html')) {
-        // HTML内容进行转义
-        return displayBody.replace(/</g, '&lt;').replace(/>/g, '&gt;');
-    }
-    
-    return displayBody;
-}
 
-// 格式化字节数
-function formatBytes(bytes) {
-    if (bytes === 0) return '0 Bytes';
-    if (!bytes) return 'Unknown';
-    
-    const k = 1024;
-    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-}
-
-// 导出请求日志
-function exportRequestLog() {
-    if (currentRequests.length === 0) {
-        alert('没有请求记录可以导出');
-        return;
-    }
-    
-    // 显示导出中状态
-    const originalText = exportBtn.textContent;
-    exportBtn.textContent = '导出中...';
-    exportBtn.disabled = true;
-    
-    chrome.runtime.sendMessage({action: 'exportLog'}, function(response) {
-        // 恢复按钮状态
-        exportBtn.disabled = false;
+    // 更新API状态
+    function updateApiStatus() {
+        const hasHost = !!appState.apiConfig.host;
+        const hasToken = !!appState.apiConfig.token;
         
-        if (response && response.success) {
-            // 显示成功消息
-            exportBtn.textContent = '导出成功!';
-            exportBtn.style.background = '#28a745';
-            
-            setTimeout(() => {
-                exportBtn.textContent = originalText;
-                exportBtn.style.background = '';
-            }, 2000);
+        if (hasHost && hasToken) {
+            elements.apiStatusIndicator.classList.add('connected');
+            elements.apiStatusText.textContent = `API已连接: ${appState.apiConfig.host.substring(0, 20)}... (已登录)`;
+            elements.ssoContainer.style.display = 'none';
+        } else if (hasHost) {
+            elements.apiStatusIndicator.classList.remove('connected');
+            elements.apiStatusText.textContent = `API已配置: ${appState.apiConfig.host.substring(0, 20)}... (未登录)`;
+            elements.ssoContainer.style.display = 'block';
         } else {
-            // 显示错误消息
-            exportBtn.textContent = '导出失败';
-            exportBtn.style.background = '#dc3545';
-            
-            console.error('导出失败:', response ? response.error : '未知错误');
-            alert('导出失败: ' + (response ? response.error : '未知错误'));
-            
-            setTimeout(() => {
-                exportBtn.textContent = originalText;
-                exportBtn.style.background = '';
-            }, 3000);
+            elements.apiStatusIndicator.classList.remove('connected');
+            elements.apiStatusText.textContent = '未配置API服务';
+            elements.ssoContainer.style.display = 'none';
         }
-    });
-} 
+    }
+
+    // 更新配置警告
+    function updateConfigWarning() {
+        if (!appState.config) {
+            elements.configWarning.style.display = 'block';
+            return;
+        }
+
+        const hasEnabledPatterns = appState.config.urlPatterns && 
+            appState.config.urlPatterns.some(p => p.enabled);
+        
+        if (!appState.config.enableMonitoring || !hasEnabledPatterns) {
+            elements.configWarning.style.display = 'block';
+        } else {
+            elements.configWarning.style.display = 'none';
+        }
+    }
+
+    // 更新请求统计
+    function updateRequestStats() {
+        elements.totalRequests.textContent = appState.requestStats.total.toLocaleString();
+        elements.todayRequests.textContent = appState.requestStats.today.toLocaleString();
+    }
+
+    // 更新空状态显示
+    function updateEmptyState() {
+        if (appState.requestStats.total === 0) {
+            elements.emptyState.style.display = 'block';
+        } else {
+            elements.emptyState.style.display = 'none';
+        }
+    }
+
+    // 启动SSO登录
+    async function startSsoLogin() {
+        const apiHost = appState.apiConfig.host;
+        
+        if (!apiHost) {
+            showToast('请先在配置页面设置API地址', 'error');
+            openConfigPage();
+            return;
+        }
+
+        if (!apiHost.startsWith('http')) {
+            showToast('API地址格式不正确，必须以http://或https://开头', 'error');
+            return;
+        }
+
+        // 更新UI状态
+        elements.ssoStartLogin.disabled = true;
+        elements.ssoStartLogin.innerHTML = '<div class="spinner"></div>初始化SSO...';
+        
+        try {
+            console.log('[SSO] 开始创建SSO会话...');
+            
+            // 创建SSO会话
+            const response = await fetch(`${apiHost}/api/auth/sso-session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    client_type: 'monitor_plugin'
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`服务器返回错误状态: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[SSO] SSO会话创建成功:', data);
+
+            // 保存会话信息
+            appState.ssoSession.id = data.session_id;
+            appState.ssoSession.status = 'pending';
+
+            // 显示"已完成登录"按钮
+            elements.ssoCheckLogin.classList.remove('hidden');
+            elements.ssoCheckLogin.style.display = 'block';
+
+            // 打开SSO登录页面
+            chrome.tabs.create({ url: data.login_url });
+
+            // 重置开始登录按钮
+            elements.ssoStartLogin.disabled = false;
+            elements.ssoStartLogin.innerHTML = '🔄 重新发起SSO登录';
+
+            showToast('已打开SSO登录页面，请在新标签页完成登录后返回点击"已完成登录"按钮', 'success');
+
+        } catch (error) {
+            console.error('[SSO] 登录初始化失败:', error);
+            elements.ssoStartLogin.disabled = false;
+            elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
+            showToast(`SSO登录失败: ${error.message}`, 'error');
+            appState.ssoSession.status = 'failed';
+        }
+    }
+
+    // 检查SSO登录状态
+    async function checkSsoLoginStatus() {
+        const apiHost = appState.apiConfig.host;
+        
+        if (!appState.ssoSession.id) {
+            showToast('无效的SSO会话，请重新发起登录', 'error');
+            elements.ssoCheckLogin.style.display = 'none';
+            return;
+        }
+
+        // 更新UI状态
+        elements.ssoCheckLogin.disabled = true;
+        elements.ssoCheckLogin.innerHTML = '<div class="spinner"></div>正在检查登录状态...';
+
+        try {
+            console.log('[SSO] 检查登录状态...');
+            
+            const response = await fetch(`${apiHost}/api/auth/sso-session/${appState.ssoSession.id}`);
+
+            if (!response.ok) {
+                throw new Error(`服务器返回错误状态: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('[SSO] 登录状态检查结果:', data);
+
+            if (data.status === 'completed' && data.tokens) {
+                // 登录成功，保存token
+                const newApiConfig = {
+                    host: apiHost,
+                    token: data.tokens.access_token,
+                    refreshToken: data.tokens.refresh_token || ''
+                };
+
+                // 保存到storage
+                chrome.storage.local.set({
+                    'xhs_api_config': newApiConfig
+                }, function() {
+                    if (chrome.runtime.lastError) {
+                        showToast('保存Token失败: ' + chrome.runtime.lastError.message, 'error');
+                    } else {
+                        appState.apiConfig = newApiConfig;
+                        
+                        // 重置SSO会话状态
+                        appState.ssoSession = {
+                            id: null,
+                            status: 'idle',
+                            pollInterval: null
+                        };
+
+                        // 更新UI
+                        updateApiStatus();
+                        elements.ssoCheckLogin.style.display = 'none';
+                        elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
+
+                        showToast('SSO登录成功！', 'success');
+                        console.log('[SSO] 登录完成，Token已保存');
+                    }
+                });
+
+            } else if (data.status === 'pending') {
+                // 仍在等待登录
+                elements.ssoCheckLogin.disabled = false;
+                elements.ssoCheckLogin.innerHTML = '⏳ 等待登录完成...';
+                showToast('您尚未完成SSO登录，请在新标签页完成登录后返回', 'info');
+
+            } else {
+                // 登录失败或其他状态
+                elements.ssoCheckLogin.disabled = false;
+                elements.ssoCheckLogin.innerHTML = '❌ 登录失败，点击重试';
+                showToast('SSO登录失败，请重试', 'error');
+            }
+
+        } catch (error) {
+            console.error('[SSO] 检查登录状态失败:', error);
+            elements.ssoCheckLogin.disabled = false;
+            elements.ssoCheckLogin.innerHTML = '🔄 检查失败，点击重试';
+            showToast(`检查登录状态失败: ${error.message}`, 'error');
+        }
+    }
+
+    // 打开日志页面
+    function openLogsPage() {
+        chrome.tabs.create({
+            url: chrome.runtime.getURL('logs.html')
+        });
+    }
+
+    // 清空日志
+    function clearLogs() {
+        if (confirm('确定要清空所有监控日志吗？此操作不可撤销。')) {
+            chrome.runtime.sendMessage({ action: 'clearLogs' }, function(response) {
+                if (response && response.success) {
+                    appState.requestStats = { total: 0, today: 0 };
+                    updateRequestStats();
+                    updateEmptyState();
+                    showToast('日志已清空', 'success');
+                } else {
+                    showToast('清空日志失败', 'error');
+                }
+            });
+        }
+    }
+
+    // 打开配置页面
+    function openConfigPage(e) {
+        if (e) e.preventDefault();
+        if (chrome.runtime.openOptionsPage) {
+            chrome.runtime.openOptionsPage();
+        } else {
+            chrome.tabs.create({
+                url: chrome.runtime.getURL('options.html')
+            });
+        }
+    }
+
+    // 打开帮助页面
+    function openHelpPage(e) {
+        if (e) e.preventDefault();
+        chrome.tabs.create({
+            url: chrome.runtime.getURL('help.html')
+        });
+    }
+
+    // 打开关于页面
+    function openAboutPage(e) {
+        if (e) e.preventDefault();
+        chrome.tabs.create({
+            url: 'https://github.com/your-repo/xhs-monitor-plugin'
+        });
+    }
+
+    // 处理来自background的消息
+    function handleMessage(request, sender, sendResponse) {
+        console.log('[Popup] 收到消息:', request);
+
+        switch (request.action) {
+            case 'statsUpdated':
+                appState.requestStats = request.stats;
+                updateRequestStats();
+                updateEmptyState();
+                break;
+                
+            case 'configUpdated':
+                loadMonitorConfig();
+                break;
+                
+            case 'apiConfigUpdated':
+                loadApiConfig();
+                break;
+                
+            case 'ping':
+                sendResponse({ pong: true, source: 'popup' });
+                break;
+        }
+
+        return true;
+    }
+
+    // 显示提示消息
+    function showToast(message, type = 'info') {
+        // 创建toast元素
+        const toast = document.createElement('div');
+        toast.className = `toast toast-${type}`;
+        toast.textContent = message;
+        
+        // 添加样式
+        Object.assign(toast.style, {
+            position: 'fixed',
+            top: '20px',
+            right: '20px',
+            padding: '12px 16px',
+            borderRadius: '6px',
+            color: 'white',
+            fontSize: '14px',
+            zIndex: '10000',
+            maxWidth: '280px',
+            wordWrap: 'break-word',
+            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+            transform: 'translateX(100%)',
+            transition: 'transform 0.3s ease'
+        });
+
+        // 设置背景色
+        switch (type) {
+            case 'success':
+                toast.style.background = '#28a745';
+                break;
+            case 'error':
+                toast.style.background = '#dc3545';
+                break;
+            case 'warning':
+                toast.style.background = '#ffc107';
+                toast.style.color = '#212529';
+                break;
+            default:
+                toast.style.background = '#007bff';
+        }
+
+        document.body.appendChild(toast);
+
+        // 显示动画
+        setTimeout(() => {
+            toast.style.transform = 'translateX(0)';
+        }, 100);
+
+        // 自动隐藏
+        setTimeout(() => {
+            toast.style.transform = 'translateX(100%)';
+            setTimeout(() => {
+                if (toast.parentNode) {
+                    toast.parentNode.removeChild(toast);
+                }
+            }, 300);
+        }, 3000);
+    }
+
+    console.log('[XHS Monitor Popup] 脚本加载完成');
+
+})(); 

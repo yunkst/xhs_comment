@@ -3,38 +3,319 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小红书请求监控</title>
-    <link rel="stylesheet" href="popup.css">
+    <title>小红书网络监控插件</title>
+    <style>
+        body {
+            width: 320px;
+            min-height: 400px;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+        }
+
+        .container {
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+            color: white;
+        }
+
+        .header h1 {
+            margin: 0 0 8px 0;
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header .subtitle {
+            font-size: 12px;
+            opacity: 0.9;
+            margin: 0;
+        }
+
+        .status-card {
+            background: white;
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .api-status {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .status-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #dc3545;
+        }
+
+        .status-indicator.connected {
+            background: #28a745;
+        }
+
+        .status-text {
+            font-size: 12px;
+            color: #666;
+            flex: 1;
+        }
+
+        .sso-container {
+            margin-top: 12px;
+        }
+
+        .sso-container.hidden {
+            display: none;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .btn:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .btn-primary {
+            background: #007bff;
+            color: white;
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background: #0056b3;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background: #1e7e34;
+        }
+
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background: #545b62;
+        }
+
+        .btn-outline {
+            background: transparent;
+            color: #007bff;
+            border: 1px solid #007bff;
+        }
+
+        .btn-outline:hover:not(:disabled) {
+            background: #007bff;
+            color: white;
+        }
+
+        .spinner {
+            width: 14px;
+            height: 14px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .stat-item {
+            text-align: center;
+            padding: 12px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .stat-number {
+            font-size: 20px;
+            font-weight: 600;
+            color: #007bff;
+            margin-bottom: 4px;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+
+        .empty-state .icon {
+            font-size: 32px;
+            margin-bottom: 12px;
+            opacity: 0.5;
+        }
+
+        .empty-state .message {
+            font-size: 14px;
+            line-height: 1.4;
+        }
+
+        .empty-state .config-link {
+            color: #007bff;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .empty-state .config-link:hover {
+            text-decoration: underline;
+        }
+
+        .divider {
+            height: 1px;
+            background: #eee;
+            margin: 16px 0;
+        }
+
+        .footer-links {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 16px;
+        }
+
+        .footer-link {
+            color: rgba(255, 255, 255, 0.8);
+            text-decoration: none;
+            font-size: 12px;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .footer-link:hover {
+            color: white;
+            background: rgba(255, 255, 255, 0.1);
+        }
+
+        .warning-message {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+            margin-bottom: 12px;
+        }
+    </style>
 </head>
 <body>
     <div class="container">
-        <header class="header">
-            <h1>小红书请求监控</h1>
-            <div class="stats">
-                <span id="requestCount">0</span> 条请求记录
+        <div class="header">
+            <h1>🔍 小红书网络监控</h1>
+            <p class="subtitle">实时监控和记录网络请求</p>
+        </div>
+
+        <!-- API状态和SSO登录 -->
+        <div class="status-card">
+            <div class="api-status">
+                <div class="status-indicator" id="apiStatusIndicator"></div>
+                <div class="status-text" id="apiStatusText">未配置API服务</div>
             </div>
-        </header>
-
-        <div class="controls">
-            <button id="refreshBtn" class="btn btn-primary">刷新</button>
-            <button id="clearBtn" class="btn btn-warning">清空日志</button>
-            <button id="exportBtn" class="btn btn-success">导出JSON</button>
+            
+            <!-- SSO登录容器 -->
+            <div class="sso-container" id="ssoContainer">
+                <button class="btn btn-primary" id="ssoStartLogin">
+                    🔐 单点登录 (SSO)
+                </button>
+                <button class="btn btn-success hidden" id="ssoCheckLogin">
+                    ✅ 已完成登录，点击继续
+                </button>
+            </div>
         </div>
 
-        <div class="filters">
-            <input type="text" id="filterInput" placeholder="过滤URL..." class="filter-input">
-            <select id="methodFilter" class="filter-select">
-                <option value="">所有方法</option>
-                <option value="GET">GET</option>
-                <option value="POST">POST</option>
-                <option value="PUT">PUT</option>
-                <option value="DELETE">DELETE</option>
-                <option value="PATCH">PATCH</option>
-            </select>
+        <!-- 监控统计 -->
+        <div class="status-card">
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="totalRequests">0</div>
+                    <div class="stat-label">总请求数</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="todayRequests">0</div>
+                    <div class="stat-label">今日请求</div>
+                </div>
+            </div>
+            
+            <button class="btn btn-outline" id="viewLogsBtn">
+                📊 查看详细日志
+            </button>
+            
+            <button class="btn btn-secondary" id="clearLogsBtn">
+                🗑️ 清空日志
+            </button>
         </div>
 
-        <div class="request-list" id="requestList">
-            <div class="loading">正在加载请求数据...</div>
+        <!-- 空状态提示 -->
+        <div class="status-card" id="emptyState">
+            <div class="empty-state">
+                <div class="icon">📡</div>
+                <div class="message">
+                    暂无监控数据<br>
+                    请访问小红书页面开始监控，或在<a href="#" class="config-link" id="configLink">配置页面</a>设置监控规则
+                </div>
+            </div>
+        </div>
+
+        <!-- 配置警告 -->
+        <div class="warning-message" id="configWarning" style="display: none;">
+            ⚠️ 监控功能已禁用或未配置URL规则，请检查配置设置
+        </div>
+
+        <div class="footer-links">
+            <a href="#" class="footer-link" id="configPageLink">⚙️ 配置</a>
+            <a href="#" class="footer-link" id="helpLink">❓ 帮助</a>
+            <a href="#" class="footer-link" id="aboutLink">ℹ️ 关于</a>
         </div>
     </div>
 

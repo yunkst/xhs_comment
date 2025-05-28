@@ -18,6 +18,35 @@
         </header>
 
         <main class="main-content">
+            <!-- API服务器配置 -->
+            <section class="config-section">
+                <h2>🌐 API服务器配置</h2>
+                <div class="setting-item">
+                    <label class="input-setting">
+                        <span class="setting-label">API服务器地址</span>
+                        <input type="url" id="apiHostInput" placeholder="https://your-api-server.com" class="text-input">
+                    </label>
+                    <p class="setting-description">用于数据同步的后端API服务器地址</p>
+                </div>
+                
+                <div class="api-status-display" id="apiStatusDisplay">
+                    <div class="status-item">
+                        <span class="status-label">连接状态:</span>
+                        <span class="status-value" id="apiConnectionStatus">未配置</span>
+                    </div>
+                    <div class="status-item">
+                        <span class="status-label">登录状态:</span>
+                        <span class="status-value" id="apiLoginStatus">未登录</span>
+                    </div>
+                </div>
+                
+                <div class="button-group">
+                    <button id="saveApiConfigBtn" class="btn btn-primary">💾 保存API配置</button>
+                    <button id="testApiConnectionBtn" class="btn btn-secondary">🔗 测试连接</button>
+                    <button id="logoutBtn" class="btn btn-warning" style="display: none;">🚪 退出登录</button>
+                </div>
+            </section>
+
             <!-- 全局开关 -->
             <section class="config-section">
                 <h2>🔧 全局设置</h2>
