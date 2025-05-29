@@ -114,6 +114,51 @@ async def health_check():
             }
         )
 
+# --- 备份服务健康检查接口 ---
+@app.get("/c_hello")
+async def backup_health_check(asker: str = None):
+    """
+    备份服务健康检查接口（无需认证）
+    用于外部服务检查系统状态
+    
+    Args:
+        asker: 请求方标识
+        
+    Returns:
+        简单的健康状态
+    """
+    try:
+        # 检查数据库连接
+        db = await get_database()
+        await db.list_collection_names()
+        
+        response_data = {
+            "status": "ok",
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "xhs_comment_system",
+            "database": "connected"
+        }
+        
+        # 如果是backuper请求，添加额外信息
+        if asker == "backuper":
+            response_data.update({
+                "backup_ready": True,
+                "last_backup": None,  # 可以后续实现获取最后备份时间
+                "collections": ["comments", "notes", "users", "notifications"]
+            })
+        
+        return response_data
+        
+    except Exception as e:
+        logger.error(f"备份健康检查失败: {str(e)}")
+        return {
+            "status": "error",
+            "timestamp": datetime.utcnow().isoformat(),
+            "service": "xhs_comment_system",
+            "database": "disconnected",
+            "error": str(e)
+        }
+
 # --- 服务前端静态文件 (根端点 /web) ---
 
 # 1. 静态资源 (如 JS, CSS, images from Vite's 'assets' folder)

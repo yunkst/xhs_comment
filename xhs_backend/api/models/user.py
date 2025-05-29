@@ -47,3 +47,4 @@ class UserNote(BaseModel):
     content: Optional[str] = None  # 新增通知内容
     editor: Optional[str] = None # 编辑人
     updatedAt: datetime = Field(default_factory=datetime.utcnow)  # 更新时间 
+    commentId: Optional[str] = None  # 关联的评论ID
