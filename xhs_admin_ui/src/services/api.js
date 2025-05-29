@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { navigateToLogin } from '../utils/auth';
 
 // 创建axios实例
 const api = axios.create({
@@ -108,31 +109,32 @@ api.interceptors.response.use(
         });
       }
       
-      // 清除token并重定向到登录页
-      localStorage.removeItem('token');
-      localStorage.removeItem('refresh_token');
-      localStorage.removeItem('id_token');
-      window.location.href = '/login';
+      // Token刷新失败或没有refresh_token，跳转到登录页
+      navigateToLogin();
     }
     
     return Promise.reject(error);
   }
 );
 
-// 用户相关接口
+// 用户相关接口 (迁移到新的用户管理域架构)
 export const userApi = {
   login: (data) => {
-    return api.post('/api/login', data);
+    return api.post('/api/v1/user/auth/login', data);
   },
   register: (data) => {
-    return api.post('/api/register', data);
+    return api.post('/api/v1/user/auth/register', data);
   },
   getOtpQrcode: (username) => {
-    return api.get(`/api/otp-qrcode?username=${username}`);
+    return api.get(`/api/v1/user/auth/otp-qrcode?username=${username}`);
+  },
+  // 检查注册状态
+  checkRegisterStatus: () => {
+    return api.get('/api/v1/user/auth/register-status');
   }
 };
 
-// SSO相关接口
+// SSO相关接口 (迁移到新的用户认证域)
 export const ssoApi = {
   // 获取SSO登录URL
   getSsoLoginUrl: () => {
@@ -145,6 +147,14 @@ export const ssoApi = {
   // 获取SSO用户信息
   getSsoUserInfo: () => {
     return api.get('/api/v1/user/auth/sso-userinfo');
+  },
+  // 创建SSO会话
+  createSsoSession: (clientType) => {
+    return api.post('/api/v1/user/auth/sso-session', { client_type: clientType });
+  },
+  // 获取SSO会话状态
+  getSsoSessionStatus: (sessionId) => {
+    return api.get(`/api/v1/user/auth/sso-session/${sessionId}`);
   }
 };
 
@@ -170,17 +180,17 @@ export const commentApi = {
   deleteComment: (commentId) => {
     return api.delete(`/api/v1/content/comments/${commentId}`);
   },
-  // 更新评论状态 (向后兼容，如果原有接口支持)
+  // 更新评论状态 (使用新的内容管理域)
   updateCommentStatus: (commentId, status) => {
-    return api.put(`/api/comments/${commentId}/status`, { status });
+    return api.put(`/api/v1/content/comments/${commentId}/status`, { status });
   },
-  // 批量更新评论状态 (向后兼容，如果原有接口支持)
+  // 批量更新评论状态 (使用新的内容管理域)
   batchUpdateStatus: (ids, status) => {
-    return api.put('/api/comments/batch/status', { ids, status });
+    return api.put('/api/v1/content/comments/batch/status', { ids, status });
   },
-  // 批量删除评论 (向后兼容，如果原有接口支持)
+  // 批量删除评论 (使用新的内容管理域)
   batchDelete: (ids) => {
-    return api.post('/api/comments/batch/delete', { ids });
+    return api.post('/api/v1/content/comments/batch/delete', { ids });
   }
 };
 
@@ -222,21 +232,21 @@ export const userManagementApi = {
   getCurrentUser: () => {
     return api.get('/api/v1/user/auth/me');
   },
-  // 禁言用户 (向后兼容，如果原有接口支持)
+  // 禁言用户 (使用新的用户管理域)
   muteUser: (userId, data) => {
-    return api.post(`/api/users/${userId}/mute`, data);
+    return api.post(`/api/v1/user/profile/${userId}/mute`, data);
   },
-  // 解除禁言 (向后兼容，如果原有接口支持)
+  // 解除禁言 (使用新的用户管理域)
   unmuteUser: (userId) => {
-    return api.post(`/api/users/${userId}/unmute`);
+    return api.post(`/api/v1/user/profile/${userId}/unmute`);
   },
-  // 封禁用户 (向后兼容，如果原有接口支持)
+  // 封禁用户 (使用新的用户管理域)
   banUser: (userId, data) => {
-    return api.post(`/api/users/${userId}/ban`, data);
+    return api.post(`/api/v1/user/profile/${userId}/ban`, data);
   },
-  // 解除封禁 (向后兼容，如果原有接口支持)
+  // 解除封禁 (使用新的用户管理域)
   unbanUser: (userId) => {
-    return api.post(`/api/users/${userId}/unban`);
+    return api.post(`/api/v1/user/profile/${userId}/unban`);
   }
 };
 
@@ -266,39 +276,39 @@ export const notificationApi = {
 
 // 系统设置接口
 export const systemApi = {
-  // 获取系统设置 (向后兼容，如果原有接口支持)
+  // 获取系统设置 (使用新的系统管理域)
   getSystemSettings: () => {
-    return api.get('/api/system/settings');
+    return api.get('/api/v1/system/monitoring/settings');
   },
-  // 更新系统设置 (向后兼容，如果原有接口支持)
+  // 更新系统设置 (使用新的系统管理域)
   updateSystemSettings: (data) => {
-    return api.put('/api/system/settings', data);
+    return api.put('/api/v1/system/monitoring/settings', data);
   },
-  // 备份数据 (向后兼容，如果原有接口支持)
+  // 备份数据 (使用新的系统管理域)
   backupData: () => {
-    return api.post('/api/system/backup');
+    return api.post('/api/v1/system/monitoring/backup');
   },
-  // 恢复数据 (向后兼容，如果原有接口支持)
+  // 恢复数据 (使用新的系统管理域)
   restoreData: (formData) => {
-    return api.post('/api/system/restore', formData, {
+    return api.post('/api/v1/system/monitoring/restore', formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
     });
   },
-  // 获取备份历史 (向后兼容，如果原有接口支持)
+  // 获取备份历史 (使用新的系统管理域)
   getBackupHistory: () => {
-    return api.get('/api/system/backup/history');
+    return api.get('/api/v1/system/monitoring/backup/history');
   },
-  // 下载备份文件 (向后兼容，如果原有接口支持)
+  // 下载备份文件 (使用新的系统管理域)
   downloadBackup: (filename) => {
-    return api.get(`/api/system/backup/download/${filename}`, {
+    return api.get(`/api/v1/system/monitoring/backup/download/${filename}`, {
       responseType: 'blob'
     });
   },
-  // 删除备份文件 (向后兼容，如果原有接口支持)
+  // 删除备份文件 (使用新的系统管理域)
   deleteBackup: (filename) => {
-    return api.delete(`/api/system/backup/${filename}`);
+    return api.delete(`/api/v1/system/monitoring/backup/${filename}`);
   },
   // 获取系统状态
   getSystemStatus: () => {
@@ -366,25 +376,25 @@ export const networkDataApi = {
   }
 };
 
-// 用户备注接口 (向后兼容)
+// 用户备注接口 (迁移到用户管理域)
 export const userNoteApi = {
   // 添加用户备注
   addUserNote: (data) => {
-    return api.post('/api/user-notes', data);
+    return api.post('/api/v1/user/profile/notes', data);
   },
   // 获取用户备注
   getUserNotes: (userId) => {
-    return api.get(`/api/user-notes?user_id=${userId}`);
+    return api.get(`/api/v1/user/profile/${userId}/notes`);
   },
   // 批量获取用户备注
   getUserNotesBatch: (userIds) => {
-    return api.get(`/api/user-notes/batch?user_ids=${userIds.join(',')}`);
+    return api.get(`/api/v1/user/profile/notes/batch?user_ids=${userIds.join(',')}`);
   }
 };
 
-// 获取用户列表（小红书用户）- 向后兼容
+// 获取用户列表（小红书用户）- 使用新的用户管理域
 export const getUserList = async (page = 1, pageSize = 10) => {
-  const response = await api.get('/api/users/info/list', {
+  const response = await api.get('/api/v1/user/profile/list', {
     params: {
       page: page,
       page_size: pageSize
@@ -401,6 +411,46 @@ export const migrationApi = {
   }
 };
 
+// ========================
+// 向后兼容API别名 (Backward Compatibility)
+// ========================
+
+// 为向后兼容提供旧API路径的别名
+// 这些将在未来版本中移除，建议使用上面的新API
+
+export const legacyApi = {
+  // 旧的评论接口别名
+  getComments: commentApi.getCommentList,
+  updateCommentStatus: commentApi.updateCommentStatus,
+  batchUpdateCommentStatus: commentApi.batchUpdateStatus,
+  batchDeleteComments: commentApi.batchDelete,
+  
+  // 旧的用户接口别名
+  getUsers: userManagementApi.getUserList,
+  getUserInfo: userManagementApi.getUserDetail,
+  
+  // 旧的系统接口别名
+  getSystemHealth: systemApi.healthCheck,
+  getSystemInfo: systemApi.getSystemStatus,
+  
+  // 旧的抓取规则别名
+  getCaptureRules: captureRuleApi.getCaptureRules,
+  getAllCaptureRules: captureRuleApi.getAllCaptureRules,
+  
+  // 旧的网络数据别名
+  getNetworkData: networkDataApi.getNetworkData,
+  postNetworkData: networkDataApi.receiveNetworkData,
+  
+  // 旧的用户备注别名
+  addUserNote: userNoteApi.addUserNote,
+  getUserNotes: userNoteApi.getUserNotes,
+  
+  // 旧的SSO接口别名
+  ssoRefresh: ssoApi.refreshSsoToken,
+  ssoLogin: ssoApi.getSsoLoginUrl,
+  ssoUserInfo: ssoApi.getSsoUserInfo
+};
+
 export default {
   userApi,
   commentApi,
@@ -412,5 +462,6 @@ export default {
   ssoApi,
   captureRuleApi,
   networkDataApi,
-  migrationApi
+  migrationApi,
+  legacyApi  // 向后兼容层
 }; 

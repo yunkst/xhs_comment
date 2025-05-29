@@ -1,29 +1,10 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { setRouter } from '../utils/auth'
 import LoginView from '../views/LoginView.vue'
 import LayoutView from '../views/LayoutView.vue'
 import DashboardView from '../views/DashboardView.vue'
-
-// 从URL查询参数中提取并存储token
-const processTokenFromUrl = () => {
-  const urlParams = new URLSearchParams(window.location.search)
-  const accessToken = urlParams.get('access_token')
-  const refreshToken = urlParams.get('refresh_token')
-  const idToken = urlParams.get('id_token')
-  
-  if (accessToken) {
-    // 保存token到localStorage
-    console.log('保存token')
-    localStorage.setItem('token', accessToken)
-    if (refreshToken) localStorage.setItem('refresh_token', refreshToken)
-    if (idToken) localStorage.setItem('id_token', idToken)
-    
-    // 清除URL参数，避免token暴露在地址栏
-    window.history.replaceState({}, document.title, window.location.pathname)
-    return true
-  }
-  return false
-}
+import SsoInitiateView from '../views/SsoInitiateView.vue'
 
 const router = createRouter({
   history: createWebHashHistory(import.meta.env.BASE_URL),
@@ -33,6 +14,12 @@ const router = createRouter({
       name: 'login',
       component: LoginView,
       meta: { title: '登录', noAuth: true }
+    },
+    {
+      path: '/sso-initiate',
+      name: 'ssoInitiate',
+      component: SsoInitiateView,
+      meta: { title: 'SSO授权处理', noAuth: true }
     },
     {
       path: '/',
@@ -90,31 +77,40 @@ const router = createRouter({
   ]
 })
 
+// 设置路由实例引用，供认证工具使用
+setRouter(router);
+
 // 路由守卫
 router.beforeEach((to, from, next) => {
   // 设置页面标题
   document.title = to.meta.title ? `${to.meta.title} - 小红书评论维护系统` : '小红书评论维护系统'
+  
+  console.log('[SSO重构] 路由守卫触发:', {
+    从: from.fullPath,
+    到: to.fullPath,
+    完整目标URL: to.fullPath,
+  })
 
-  // 处理URL中的token参数（SSO登录后的重定向）
-  const hasProcessedToken = processTokenFromUrl()
-  if (hasProcessedToken) {
-    // 如果处理了token，重定向到主页
-    next({ path: '/', replace: true })
-    return
-  }
+  // 获取token
+  const token = localStorage.getItem('token')
 
-  // 验证是否需要登录权限
-  if (to.meta.noAuth) {
-    next()
-  } else {
-    const token = localStorage.getItem('token')
-    console.log('有token')
-    if (!token) {
-      ElMessage.warning('请先登录')
-      next('/login')
-    } else {
+  // 如果目标路由需要认证
+  if (!to.meta.noAuth) {
+    if (token) {
+      // 用户已登录，允许访问
+      console.log('[SSO重构] 用户已登录，允许访问受保护路由:', to.path)
       next()
+    } else {
+      // 用户未登录，重定向到登录页
+      console.log('[SSO重构] 用户未登录，目标受保护路由:', to.path, '. 重定向到登录页.')
+      ElMessage.warning('请先登录以访问此页面')
+      // 将完整的原始目标路径作为回调参数，以便登录后能正确跳转
+      next({ path: '/login', query: { redirect_after_login: to.fullPath } })
     }
+  } else {
+    // 目标路由不需要认证 (例如 /login, /sso-initiate, /404)
+    console.log('[SSO重构] 访问无需认证的路由:', to.path)
+    next()
   }
 })
 

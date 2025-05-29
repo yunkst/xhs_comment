@@ -35,12 +35,6 @@
       <div class="table-header">
         <h3>评论列表</h3>
         <div class="table-operations">
-          <!-- <el-button type="primary" @click="handleBatchApprove" :disabled="selectedComments.length === 0">
-            批量通过
-          </el-button>
-          <el-button type="danger" @click="handleBatchDelete" :disabled="selectedComments.length === 0">
-            批量删除
-          </el-button> -->
           <el-button @click="refreshTable">刷新</el-button>
         </div>
       </div>
@@ -52,50 +46,54 @@
         @selection-change="handleSelectionChange"
       >
         <el-table-column type="selection" width="55" />
-        <!-- <el-table-column prop="commentId" label="评论ID" width="220" /> -->
-        <el-table-column prop="authorId" label="作者ID" width="220" />
-        <el-table-column label="作者头像" width="100">
+        <el-table-column prop="commentId" label="评论ID" width="200" />
+        <el-table-column prop="content" label="评论内容" width="300">
           <template #default="scope">
-            <el-avatar :size="40" :src="scope.row.authorAvatar">
-              <img src="https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png"/>
-            </el-avatar>
+            <div class="comment-content">
+              {{ scope.row.content }}
+            </div>
           </template>
         </el-table-column>
-        <el-table-column prop="authorName" label="作者名称" width="150" />
-        <el-table-column prop="content" label="评论内容" min-width="250" show-overflow-tooltip />
-        <el-table-column prop="noteId" label="笔记ID" width="220" />
-        <!-- <el-table-column prop="status" label="状态" width="100">
+        <el-table-column prop="userId" label="用户ID" width="150" />
+        <el-table-column prop="createdAt" label="创建时间" width="180">
           <template #default="scope">
-            <el-tag :type="scope.row.status === '通过' ? 'success' : scope.row.status === '待审核' ? 'warning' : 'danger'">
-              {{ scope.row.status }}
+            {{ formatDateTime(scope.row.createdAt) }}
+            </template>
+        </el-table-column>
+        <el-table-column prop="status" label="状态" width="100">
+            <template #default="scope">
+            <el-tag :type="getStatusType(scope.row.status)">
+              {{ scope.row.status || '待审核' }}
             </el-tag>
-          </template>
-        </el-table-column> -->
-        <el-table-column prop="timestamp" label="评论时间" width="180">
-            <template #default="scope">
-                {{ formatDateTime(scope.row.timestamp) }}
             </template>
         </el-table-column>
-        <el-table-column prop="fetchTimestamp" label="获取时间" width="180">
-            <template #default="scope">
-                {{ formatDateTime(scope.row.fetchTimestamp) }}
-            </template>
-        </el-table-column>
-        <el-table-column label="操作" width="100" fixed="right">
+        <el-table-column label="操作" width="200" fixed="right">
           <template #default="scope">
             <el-button size="small" @click="handleViewComment(scope.row)">查看</el-button>
-            <!-- <el-button
-              size="small"
-              type="success"
-              v-if="scope.row.status !== '通过'"
-              @click="handleApprove(scope.row)"
-            >
-              通过
-            </el-button>
-            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button> -->
+            <el-button size="small" type="success" @click="handleApprove(scope.row)" v-if="scope.row.status !== '通过'">通过</el-button>
+            <el-button size="small" type="danger" @click="handleDelete(scope.row)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
+
+      <div class="table-footer">
+        <div class="batch-actions">
+          <el-button 
+            type="success" 
+            @click="handleBatchApprove" 
+            :disabled="selectedComments.length === 0"
+          >
+            批量通过 ({{ selectedComments.length }})
+          </el-button>
+          <el-button 
+            type="danger" 
+            @click="handleBatchDelete" 
+            :disabled="selectedComments.length === 0"
+          >
+            批量删除 ({{ selectedComments.length }})
+          </el-button>
+        </div>
+      </div>
 
       <div class="pagination-container">
         <el-pagination
@@ -113,31 +111,46 @@
 
     <!-- 评论详情对话框 -->
     <el-dialog v-model="dialogVisible" title="评论详情" width="600px">
-      <el-descriptions :column="1" border v-if="currentComment && Object.keys(currentComment).length > 0">
-        <el-descriptions-item label="评论ID">{{ currentComment.commentId }}</el-descriptions-item>
-        <el-descriptions-item label="作者ID">{{ currentComment.authorId }}</el-descriptions-item>
-        <el-descriptions-item label="作者名称">{{ currentComment.authorName }}</el-descriptions-item>
-        <el-descriptions-item label="作者头像">
-          <el-avatar :size="60" :src="currentComment.authorAvatar">
-            <img src="https://cube.elemecdn.com/e/fd/0fc7d20532fdaf769a25683617711png.png"/>
-          </el-avatar>
+      <div v-if="currentComment" class="comment-detail">
+        <el-descriptions :column="1" border>
+          <el-descriptions-item label="评论ID">
+            {{ currentComment.commentId || currentComment.id }}
+          </el-descriptions-item>
+          <el-descriptions-item label="用户ID">
+            {{ currentComment.userId || currentComment.authorId }}
+          </el-descriptions-item>
+          <el-descriptions-item label="用户名称">
+            {{ currentComment.userName || currentComment.authorName || '-' }}
         </el-descriptions-item>
-        <el-descriptions-item label="笔记ID">{{ currentComment.noteId }}</el-descriptions-item>
         <el-descriptions-item label="评论内容">
-          <div style="white-space: pre-wrap;">{{ currentComment.content }}</div>
+            <div class="comment-content-detail">
+              {{ currentComment.content }}
+            </div>
+          </el-descriptions-item>
+          <el-descriptions-item label="笔记ID">
+            {{ currentComment.noteId || '-' }}
+          </el-descriptions-item>
+          <el-descriptions-item label="创建时间">
+            {{ formatDateTime(currentComment.createdAt || currentComment.timestamp) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="获取时间">
+            {{ formatDateTime(currentComment.fetchTimestamp || currentComment.updatedAt) }}
+          </el-descriptions-item>
+          <el-descriptions-item label="当前状态">
+            <el-select v-model="currentComment.status" placeholder="选择状态">
+              <el-option label="待审核" value="待审核" />
+              <el-option label="通过" value="通过" />
+              <el-option label="拦截" value="拦截" />
+            </el-select>
         </el-descriptions-item>
-        <el-descriptions-item label="评论时间">{{ formatDateTime(currentComment.timestamp) }}</el-descriptions-item>
-        <el-descriptions-item label="获取时间">{{ formatDateTime(currentComment.fetchTimestamp) }}</el-descriptions-item>
-        <el-descriptions-item label="回复评论ID" v-if="currentComment.repliedId">{{ currentComment.repliedId }}</el-descriptions-item>
       </el-descriptions>
-      <div v-else>
-        <p>暂无评论详情</p>
       </div>
+      
       <template #footer>
-        <div class="dialog-footer">
-          <el-button @click="dialogVisible = false">关闭</el-button>
-          <!-- <el-button type="primary" @click="handleSaveComment">保存状态</el-button> -->
-        </div>
+        <span class="dialog-footer">
+          <el-button @click="dialogVisible = false">取消</el-button>
+          <el-button type="primary" @click="handleSaveComment">保存状态</el-button>
+        </span>
       </template>
     </el-dialog>
   </div>
@@ -247,6 +260,16 @@ const formatDateTime = (dateTimeStr) => {
   }
 }
 
+// 获取状态类型
+const getStatusType = (status) => {
+  switch (status) {
+    case '通过': return 'success'
+    case '拦截': return 'danger'
+    case '待审核': return 'warning'
+    default: return 'info'
+  }
+}
+
 // 搜索
 const handleSearch = () => {
   pagination.currentPage = 1
@@ -277,50 +300,118 @@ const handleViewComment = (row) => {
   dialogVisible.value = true
 }
 
-/* // 暂时注释掉状态管理和删除逻辑，因为后端数据结构不包含status，且删除/更新状态API需确认
 // 处理批量通过
-const handleBatchApprove = () => {
-  const commentIds = selectedComments.value.map(item => item.commentId) // 使用 commentId
-  ElMessageBox.confirm(`确定要批量通过这 ${selectedComments.value.length} 条评论吗?`, '提示', {
-    // ... 省略 ...
-  }).then(async () => {
-    // await commentApi.batchUpdateStatus(commentIds, '通过') // 假设后端有此接口
-    // ... 省略 ...
-  }).catch(() => {})
+const handleBatchApprove = async () => {
+  if (selectedComments.value.length === 0) {
+    ElMessage.warning('请先选择要操作的评论')
+    return
+  }
+  
+  const commentIds = selectedComments.value.map(item => item.commentId || item.id)
+  
+  try {
+    await ElMessageBox.confirm(`确定要批量通过这 ${selectedComments.value.length} 条评论吗?`, '提示', {
+      confirmButtonText: '确定',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await commentApi.batchUpdateStatus(commentIds, '通过')
+    ElMessage.success('批量通过成功')
+    getCommentList()
+    
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量通过失败:', error)
+      ElMessage.error(error.response?.data?.detail || '批量通过失败')
+    }
+  }
 }
 
 // 处理批量删除
-const handleBatchDelete = () => {
-  const commentIds = selectedComments.value.map(item => item.commentId) // 使用 commentId
-  ElMessageBox.confirm(`确定要批量删除这 ${selectedComments.value.length} 条评论吗?`, '提示', {
-    // ... 省略 ...
-  }).then(async () => {
-    // await commentApi.batchDelete(commentIds)
-    // ... 省略 ...
-  }).catch(() => {})
+const handleBatchDelete = async () => {
+  if (selectedComments.value.length === 0) {
+    ElMessage.warning('请先选择要删除的评论')
+    return
+  }
+  
+  const commentIds = selectedComments.value.map(item => item.commentId || item.id)
+  
+  try {
+    await ElMessageBox.confirm(`确定要批量删除这 ${selectedComments.value.length} 条评论吗？此操作不可恢复。`, '警告', {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await commentApi.batchDelete(commentIds)
+    ElMessage.success('批量删除成功')
+    getCommentList()
+    
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('批量删除失败:', error)
+      ElMessage.error(error.response?.data?.detail || '批量删除失败')
+    }
+  }
 }
 
 // 单条通过
 const handleApprove = async (row) => {
-    // await commentApi.updateCommentStatus(row.commentId, '通过') // 假设后端有此接口
-    // ... 省略 ...
+  const commentId = row.commentId || row.id
+  
+  try {
+    await commentApi.updateCommentStatus(commentId, '通过')
+    ElMessage.success('评论通过成功')
+    getCommentList()
+  } catch (error) {
+    console.error('评论通过失败:', error)
+    ElMessage.error(error.response?.data?.detail || '评论通过失败')
+  }
 }
 
 // 单条删除
 const handleDelete = async (row) => {
-    // await commentApi.deleteComment(row.commentId)
-    // ... 省略 ...
+  const commentId = row.commentId || row.id
+  
+  try {
+    await ElMessageBox.confirm('确定要删除这条评论吗？此操作不可恢复。', '警告', {
+      confirmButtonText: '确定删除',
+      cancelButtonText: '取消',
+      type: 'warning'
+    })
+    
+    await commentApi.deleteComment(commentId)
+    ElMessage.success('评论删除成功')
+    getCommentList()
+    
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('评论删除失败:', error)
+      ElMessage.error(error.response?.data?.detail || '评论删除失败')
+    }
+  }
 }
 
 // 保存评论状态 (对话框中)
 const handleSaveComment = async () => {
-  if (!currentComment.value || !currentComment.value.commentId) return;
-  // await commentApi.updateCommentStatus(currentComment.value.commentId, currentComment.value.status)
-  // ... 省略 ...
+  if (!currentComment.value || !(currentComment.value.commentId || currentComment.value.id)) {
+    ElMessage.error('评论信息无效')
+    return
+  }
+  
+  const commentId = currentComment.value.commentId || currentComment.value.id
+  
+  try {
+    await commentApi.updateCommentStatus(commentId, currentComment.value.status)
+    ElMessage.success('评论状态更新成功')
   dialogVisible.value = false
   getCommentList()
+  } catch (error) {
+    console.error('评论状态更新失败:', error)
+    ElMessage.error(error.response?.data?.detail || '评论状态更新失败')
+  }
 }
-*/
 
 // 分页处理
 const handleSizeChange = (val) => {
@@ -369,5 +460,45 @@ onMounted(() => {
   display: flex;
   justify-content: flex-end;
   margin-top: 20px;
+}
+
+.table-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.comment-content {
+  max-width: 300px;
+  word-break: break-word;
+  line-height: 1.4;
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+}
+
+.comment-content-detail {
+  white-space: pre-wrap;
+  word-break: break-word;
+  line-height: 1.6;
+  max-height: 200px;
+  overflow-y: auto;
+  padding: 10px;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+}
+
+.comment-detail {
+  max-height: 60vh;
+  overflow-y: auto;
 }
 </style> 

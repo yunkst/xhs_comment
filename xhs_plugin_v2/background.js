@@ -59,15 +59,15 @@
     // 加载API配置
     function loadApiConfig() {
         return new Promise((resolve) => {
-            chrome.storage.local.get(['xhs_api_config'], function(result) {
-                if (result.xhs_api_config) {
-                    globalState.apiConfig = result.xhs_api_config;
-                } else {
-                    globalState.apiConfig = { host: '', token: '', refreshToken: '' };
-                }
-                console.log('[Background] API配置已加载:', {
-                    hasHost: !!globalState.apiConfig.host,
-                    hasToken: !!globalState.apiConfig.token
+        chrome.storage.local.get(['xhs_api_config'], function(result) {
+            if (result.xhs_api_config) {
+                globalState.apiConfig = result.xhs_api_config;
+            } else {
+                globalState.apiConfig = { host: '', token: '', refreshToken: '' };
+            }
+            console.log('[Background] API配置已加载:', {
+                hasHost: !!globalState.apiConfig.host,
+                hasToken: !!globalState.apiConfig.token
                 });
                 resolve();
             });
@@ -84,7 +84,7 @@
 
             console.log('[Background] 开始从后端加载抓取规则...');
             
-            const response = await fetch(`${globalState.apiConfig.host}/api/system/capture-rules`, {
+            const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/capture-rules`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -114,7 +114,7 @@
             // 对于手动刷新，重新抛出错误以便上层处理
             if (error.message === '未配置API地址') {
                 // 对于未配置API地址的情况，使用空规则
-                globalState.captureRules = [];
+            globalState.captureRules = [];
                 console.log('[Background] 未配置API地址，使用空抓取规则');
                 return;
             }
@@ -357,7 +357,7 @@
             };
 
             // 发送到后端
-            const response = await fetch(`${globalState.apiConfig.host}/api/system/network-data`, {
+            const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/network-data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -404,7 +404,7 @@
         }
 
         try {
-            const response = await fetch(`${globalState.apiConfig.host}/api/auth/sso-refresh`, {
+            const response = await fetch(`${globalState.apiConfig.host}/api/v1/user/auth/sso-refresh`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -488,7 +488,7 @@
                         // API配置更新后，重新加载抓取规则
                         if (globalState.apiConfig.host) {
                             try {
-                                await loadCaptureRules();
+                            await loadCaptureRules();
                                 console.log('[Background] 抓取规则已自动刷新');
                             } catch (error) {
                                 console.error('[Background] 自动刷新抓取规则失败:', error);
@@ -508,7 +508,7 @@
 
                 case 'refreshCaptureRules':
                     (async () => {
-                        try {
+                    try {
                             // 检查是否有API配置
                             if (!globalState.apiConfig?.host) {
                                 sendResponse({
@@ -518,18 +518,18 @@
                                 return;
                             }
 
-                            await loadCaptureRules();
-                            sendResponse({
-                                success: true,
-                                message: '抓取规则已刷新',
-                                data: globalState.captureRules
-                            });
-                        } catch (error) {
-                            sendResponse({
-                                success: false,
-                                error: error.message
-                            });
-                        }
+                        await loadCaptureRules();
+                        sendResponse({
+                            success: true,
+                            message: '抓取规则已刷新',
+                            data: globalState.captureRules
+                        });
+                    } catch (error) {
+                        sendResponse({
+                            success: false,
+                            error: error.message
+                        });
+                    }
                     })();
                     break;
 
