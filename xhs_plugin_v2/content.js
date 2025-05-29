@@ -39,24 +39,8 @@
             return true;
         }
         
-        // 对于其他网站，检查配置
-        if (!contentConfig.urlPatterns) return false;
-        
-        return contentConfig.urlPatterns.some(pattern => {
-            if (!pattern.enabled) return false;
-            return matchUrlPattern(url, pattern.pattern);
-        });
-    }
-    
-    // URL模式匹配函数
-    function matchUrlPattern(url, pattern) {
-        const regexPattern = pattern
-            .replace(/\./g, '\\.')
-            .replace(/\*/g, '.*')
-            .replace(/\?/g, '\\?');
-        
-        const regex = new RegExp('^' + regexPattern + '$', 'i');
-        return regex.test(url);
+        // 对于其他网站，不再支持用户自定义 URL 模式
+        return false;
     }
     
     // 注入监控脚本
@@ -101,6 +85,8 @@
     window.addEventListener('XHS_REQUEST_INTERCEPTED', function(event) {
         const requestData = event.detail;
         
+        console.log('[Content] 收到拦截事件:', requestData.url, requestData.method);
+        
         // 发送给后台脚本记录
         chrome.runtime.sendMessage({
             action: 'logCustomRequest',
@@ -119,8 +105,12 @@
                 error: requestData.error
             }
         }, function(response) {
-            if (response && !response.success && response.reason === 'URL not matched') {
-                console.log('[XHS Monitor] 请求被过滤 - URL不匹配配置:', requestData.url);
+            if (response && response.success) {
+                console.log('[Content] 成功记录请求:', requestData.url);
+            } else if (response && !response.success && response.reason === 'URL not matched') {
+                console.log('[Content] 请求被过滤 - URL不匹配配置:', requestData.url);
+            } else {
+                console.log('[Content] 记录请求失败:', requestData.url, response);
             }
         });
     });

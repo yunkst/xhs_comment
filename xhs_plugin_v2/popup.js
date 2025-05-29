@@ -232,10 +232,7 @@
             return;
         }
 
-        const hasEnabledPatterns = appState.config.urlPatterns && 
-            appState.config.urlPatterns.some(p => p.enabled);
-        
-        if (!appState.config.enableMonitoring || !hasEnabledPatterns) {
+        if (!appState.config.enableMonitoring) {
             elements.configWarning.style.display = 'block';
         } else {
             elements.configWarning.style.display = 'none';
