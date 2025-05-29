@@ -17,8 +17,8 @@ from api.deps import get_current_user, get_current_user_combined
 # 配置日志
 logger = logging.getLogger(__name__)
 
-# 创建路由器 (移除prefix，由上级路由统一管理)
-router = APIRouter()
+# 创建路由器 (添加前缀)
+router = APIRouter(prefix="/monitoring")
 
 @router.get("/status", response_model=Dict[str, Any], summary="系统状态")
 async def system_status(
@@ -200,54 +200,36 @@ async def version_info():
 @router.get("/health", response_model=Dict[str, Any], summary="健康检查")
 async def health_check():
     """
-    健康检查接口
+    健康检查接口（无需认证）
     
-    无需认证的健康检查接口，用于负载均衡器和监控系统
+    Returns:
+        服务健康状态
     """
     try:
-        # 简单的健康检查
-        health_status = {
+        # 检查数据库连接
+        db = await get_database()
+        # 简单的数据库连接测试
+        await db.list_collection_names()
+        
+        return {
             "status": "healthy",
             "timestamp": datetime.utcnow().isoformat(),
             "service": "小红书评论维护系统",
-            "version": "2.1.0"
+            "version": "1.0.0",
+            "database": "connected"
         }
-        
-        # 检查数据库连接
-        try:
-            db = await get_database()
-            await db.command("ping")
-            health_status["database"] = "connected"
-        except Exception as db_error:
-            health_status["database"] = "disconnected"
-            health_status["database_error"] = str(db_error)
-            health_status["status"] = "degraded"
-        
-        # 检查系统资源
-        try:
-            memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
-            
-            health_status["resources"] = {
-                "memory_percent": memory.percent,
-                "disk_percent": disk.percent
-            }
-            
-            # 如果资源使用率过高，标记为警告
-            if memory.percent > 90 or disk.percent > 90:
-                health_status["status"] = "warning"
-                health_status["warning"] = "High resource usage"
-                
-        except Exception as resource_error:
-            health_status["resources"] = "unavailable"
-            health_status["resource_error"] = str(resource_error)
-        
-        return health_status
-        
     except Exception as e:
+        logger.error(f"健康检查失败: {str(e)}")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail=f"服务不可用: {str(e)}"
+            detail={
+                "status": "unhealthy",
+                "timestamp": datetime.utcnow().isoformat(),
+                "service": "小红书评论维护系统",
+                "version": "1.0.0",
+                "database": "disconnected",
+                "error": str(e)
+            }
         )
 
 @router.get("/metrics", summary="系统度量指标")

@@ -28,8 +28,21 @@ REDIRECT_MAPPING = {
     "/api/comments": "/api/v1/content/comments",
     "/api/notes": "/api/v1/content/notes",
     
-    # 用户管理域重定向
+    # 用户认证域重定向 (新增)
+    "/api/login": "/api/v1/user/auth/login",
+    "/api/register": "/api/v1/user/auth/register", 
+    "/api/otp-qrcode": "/api/v1/user/auth/otp-qrcode",
+    "/api/me": "/api/v1/user/auth/me",
+    
+    # SSO认证相关重定向
+    "/api/auth/sso-session": "/api/v1/user/auth/sso-session",
+    "/api/auth/sso-session/{session_id}": "/api/v1/user/auth/sso-session/{session_id}",
     "/api/auth/sso-refresh": "/api/v1/user/auth/sso-refresh",
+    "/api/auth/sso-login-url": "/api/v1/user/auth/sso-login-url",
+    "/api/auth/sso-callback": "/api/v1/user/auth/sso-callback",
+    "/api/auth/sso-userinfo": "/api/v1/user/auth/sso-userinfo",
+    
+    # 用户管理域重定向
     "/api/auth/me": "/api/v1/user/auth/me",
     "/api/users": "/api/v1/user/profile",
     

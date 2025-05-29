@@ -11,7 +11,10 @@ from .content import CommentItem, StructuredComment, Note
 from .user import (
     User, UserInRegister, UserInLogin, UserInDB, TokenResponse, UserNote
 )
-from .auth import SSOLoginResponse
+from .auth import (
+    SSOLoginResponse, SSOSessionRequest, SSOSessionResponse, 
+    SSOSessionStatusResponse, SSOCallbackResponse
+)
 
 # 新增网络数据模型
 try:
@@ -37,7 +40,8 @@ __all__ = [
     'User', 'UserInRegister', 'UserInLogin', 'UserInDB', 'TokenResponse', 'UserNote',
     
     # 认证模型
-    'SSOLoginResponse',
+    'SSOLoginResponse', 'SSOSessionRequest', 'SSOSessionResponse', 
+    'SSOSessionStatusResponse', 'SSOCallbackResponse',
     
     # 网络数据模型
     'RawNetworkData', 'ParsedNetworkData', 'DataProcessingResult', 

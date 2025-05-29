@@ -69,12 +69,15 @@ async def get_comments(
         cursor = collection.find(query).sort("fetch_time", -1).skip(skip).limit(page_size)
         comments_list = []
         
-        for doc in cursor:
+        # 使用异步方式获取文档列表
+        comments_list = await cursor.to_list(length=page_size)
+        
+        # 转换ObjectId为字符串
+        for doc in comments_list:
             doc['_id'] = str(doc['_id'])
-            comments_list.append(doc)
         
         # 获取总数
-        total = collection.count_documents(query)
+        total = await collection.count_documents(query)
         
         return {
             "success": True,
@@ -108,8 +111,8 @@ async def get_comments_stats(
         structured_collection = db[STRUCTURED_COMMENTS_COLLECTION]
         
         # 基础统计
-        total_comments = collection.count_documents({})
-        structured_comments = structured_collection.count_documents({})
+        total_comments = await collection.count_documents({})
+        structured_comments = await structured_collection.count_documents({})
         
         # 时间范围统计
         now = datetime.utcnow()
@@ -118,12 +121,12 @@ async def get_comments_stats(
         week_start = now - timedelta(days=7)
         month_start = now - timedelta(days=30)
         
-        today_comments = collection.count_documents({"fetch_time": {"$gte": today_start}})
-        yesterday_comments = collection.count_documents({
+        today_comments = await collection.count_documents({"fetch_time": {"$gte": today_start}})
+        yesterday_comments = await collection.count_documents({
             "fetch_time": {"$gte": yesterday_start, "$lt": today_start}
         })
-        week_comments = collection.count_documents({"fetch_time": {"$gte": week_start}})
-        month_comments = collection.count_documents({"fetch_time": {"$gte": month_start}})
+        week_comments = await collection.count_documents({"fetch_time": {"$gte": week_start}})
+        month_comments = await collection.count_documents({"fetch_time": {"$gte": month_start}})
         
         # 按笔记统计 (Top 10)
         notes_pipeline = [
@@ -131,7 +134,9 @@ async def get_comments_stats(
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        top_notes = list(collection.aggregate(notes_pipeline))
+        # 使用异步方式获取聚合结果
+        notes_cursor = collection.aggregate(notes_pipeline)
+        top_notes = await notes_cursor.to_list(length=10)
         
         # 按用户统计 (Top 10)
         users_pipeline = [
@@ -139,7 +144,9 @@ async def get_comments_stats(
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        top_users = list(collection.aggregate(users_pipeline))
+        # 使用异步方式获取聚合结果
+        users_cursor = collection.aggregate(users_pipeline)
+        top_users = await users_cursor.to_list(length=10)
         
         return {
             "success": True,
@@ -181,7 +188,7 @@ async def get_comment(
         
         collection = db[COMMENTS_COLLECTION]
         
-        comment = collection.find_one({"_id": ObjectId(comment_id)})
+        comment = await collection.find_one({"_id": ObjectId(comment_id)})
         
         if not comment:
             raise HTTPException(
@@ -220,7 +227,7 @@ async def delete_comment(
         
         collection = db[COMMENTS_COLLECTION]
         
-        result = collection.delete_one({"_id": ObjectId(comment_id)})
+        result = await collection.delete_one({"_id": ObjectId(comment_id)})
         
         if result.deleted_count == 0:
             raise HTTPException(

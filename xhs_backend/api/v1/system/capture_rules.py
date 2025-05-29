@@ -3,8 +3,8 @@
 
 系统管理域 - 抓取规则的CRUD操作和配置管理
 """
-from fastapi import APIRouter, HTTPException, Depends
-from typing import Dict, Any
+from fastapi import APIRouter, HTTPException, Depends, status
+from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
 
@@ -15,8 +15,8 @@ from api.models.common import CaptureRule, CaptureRulesResponse
 # 配置日志
 logger = logging.getLogger(__name__)
 
-# 创建路由器 (移除prefix，由上级路由统一管理)
-router = APIRouter()
+# 创建路由器 (添加前缀)
+router = APIRouter(prefix="/capture-rules")
 
 # 默认抓取规则配置
 DEFAULT_CAPTURE_RULES = [
@@ -71,49 +71,35 @@ DEFAULT_CAPTURE_RULES = [
 ]
 
 @router.get("", response_model=CaptureRulesResponse, summary="获取抓取规则")
-async def get_capture_rules(db=Depends(get_database)):
+async def get_capture_rules(current_user: str = Depends(get_current_user)):
     """
-    获取URL抓取规则配置
+    获取抓取规则列表
     
-    此接口供插件调用，获取需要监控的URL规则
-    无需认证，以便插件快速获取配置
+    返回插件用于匹配网络请求的规则列表
     """
     try:
-        # 从数据库获取抓取规则
-        collection = db.capture_rules
+        # 从数据库获取规则列表
+        db = await get_database()
+        rules_collection = db["capture_rules"]
         
-        # 如果数据库中没有规则，初始化默认规则
-        if collection.count_documents({}) == 0:
-            # 插入默认规则
-            rules_to_insert = []
-            for rule_data in DEFAULT_CAPTURE_RULES:
-                rule_data['created_at'] = datetime.utcnow()
-                rule_data['updated_at'] = datetime.utcnow()
-                rules_to_insert.append(rule_data)
-            
-            collection.insert_many(rules_to_insert)
+        # 查询所有规则并排序
+        cursor = rules_collection.find({})
+        rules = await cursor.to_list(length=100)
         
-        # 查询启用的规则，按优先级排序
-        rules_cursor = collection.find(
-            {"enabled": True}
-        ).sort("priority", -1)
+        # 处理ObjectId
+        for rule in rules:
+            rule["_id"] = str(rule["_id"])
         
-        rules = []
-        for rule_doc in rules_cursor:
-            # 移除MongoDB的_id字段
-            rule_doc.pop('_id', None)
-            rules.append(CaptureRule(**rule_doc))
-        
-        return CaptureRulesResponse(
-            success=True,
-            rules=rules,
-            total_count=len(rules),
-            message=f"成功获取 {len(rules)} 条抓取规则"
-        )
+        return {
+            "success": True,
+            "rules": rules,
+            "message": f"成功获取 {len(rules)} 条抓取规则"
+        }
         
     except Exception as e:
+        logger.exception("获取抓取规则失败")
         raise HTTPException(
-            status_code=500,
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"获取抓取规则失败: {str(e)}"
         )
 
