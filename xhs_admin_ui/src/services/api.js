@@ -34,7 +34,7 @@ const refreshToken = async () => {
     }
     
     const response = await axios.post(
-      `${import.meta.env.VITE_API_BASE_URL || ''}/api/auth/sso-refresh`,
+      `${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/user/auth/sso-refresh`,
       { refresh_token: refreshToken },
       { headers: { 'Content-Type': 'application/json' }}
     );
@@ -136,15 +136,15 @@ export const userApi = {
 export const ssoApi = {
   // 获取SSO登录URL
   getSsoLoginUrl: () => {
-    return api.get('/api/auth/sso-login-url');
+    return api.get('/api/v1/user/auth/sso-login-url');
   },
   // 刷新SSO Token
   refreshSsoToken: (refreshToken) => {
-    return api.post('/api/auth/sso-refresh', { refresh_token: refreshToken });
+    return api.post('/api/v1/user/auth/sso-refresh', { refresh_token: refreshToken });
   },
   // 获取SSO用户信息
   getSsoUserInfo: () => {
-    return api.get('/api/auth/sso-userinfo');
+    return api.get('/api/v1/user/auth/sso-userinfo');
   }
 };
 
@@ -152,27 +152,55 @@ export const ssoApi = {
 export const commentApi = {
   // 获取评论列表
   getCommentList: (params) => {
-    return api.get('/api/comments', { params });
+    return api.get('/api/v1/content/comments', { params });
+  },
+  // 获取评论统计
+  getCommentsStats: () => {
+    return api.get('/api/v1/content/comments/stats');
   },
   // 获取特定用户的评论
   getUserComments: (userId) => {
-    return api.get(`/api/comments/user/${userId}`);
+    return api.get(`/api/v1/content/comments/user/${userId}`);
   },
-  // 更新评论状态
-  updateCommentStatus: (commentId, status) => {
-    return api.put(`/api/comments/${commentId}/status`, { status });
+  // 获取单条评论详情
+  getComment: (commentId) => {
+    return api.get(`/api/v1/content/comments/${commentId}`);
   },
   // 删除评论
   deleteComment: (commentId) => {
-    return api.delete(`/api/comments/${commentId}`);
+    return api.delete(`/api/v1/content/comments/${commentId}`);
   },
-  // 批量更新评论状态
+  // 更新评论状态 (向后兼容，如果原有接口支持)
+  updateCommentStatus: (commentId, status) => {
+    return api.put(`/api/comments/${commentId}/status`, { status });
+  },
+  // 批量更新评论状态 (向后兼容，如果原有接口支持)
   batchUpdateStatus: (ids, status) => {
     return api.put('/api/comments/batch/status', { ids, status });
   },
-  // 批量删除评论
+  // 批量删除评论 (向后兼容，如果原有接口支持)
   batchDelete: (ids) => {
     return api.post('/api/comments/batch/delete', { ids });
+  }
+};
+
+// 笔记相关接口
+export const noteApi = {
+  // 获取笔记列表
+  getNoteList: (params) => {
+    return api.get('/api/v1/content/notes', { params });
+  },
+  // 获取笔记统计
+  getNotesStats: () => {
+    return api.get('/api/v1/content/notes/stats');
+  },
+  // 获取单条笔记详情
+  getNote: (noteId) => {
+    return api.get(`/api/v1/content/notes/${noteId}`);
+  },
+  // 删除笔记
+  deleteNote: (noteId) => {
+    return api.delete(`/api/v1/content/notes/${noteId}`);
   }
 };
 
@@ -180,45 +208,77 @@ export const commentApi = {
 export const userManagementApi = {
   // 获取用户列表
   getUserList: (params) => {
-    return api.get('/api/users', { params });
+    return api.get('/api/v1/user/profile', { params });
+  },
+  // 获取用户统计
+  getUsersStats: () => {
+    return api.get('/api/v1/user/profile/stats');
   },
   // 获取用户详情
   getUserDetail: (userId) => {
-    return api.get(`/api/users/${userId}`);
+    return api.get(`/api/v1/user/profile/${userId}`);
   },
-  // 禁言用户
+  // 获取当前用户信息
+  getCurrentUser: () => {
+    return api.get('/api/v1/user/auth/me');
+  },
+  // 禁言用户 (向后兼容，如果原有接口支持)
   muteUser: (userId, data) => {
     return api.post(`/api/users/${userId}/mute`, data);
   },
-  // 解除禁言
+  // 解除禁言 (向后兼容，如果原有接口支持)
   unmuteUser: (userId) => {
     return api.post(`/api/users/${userId}/unmute`);
   },
-  // 封禁用户
+  // 封禁用户 (向后兼容，如果原有接口支持)
   banUser: (userId, data) => {
     return api.post(`/api/users/${userId}/ban`, data);
   },
-  // 解除封禁
+  // 解除封禁 (向后兼容，如果原有接口支持)
   unbanUser: (userId) => {
     return api.post(`/api/users/${userId}/unban`);
   }
 };
 
+// 通知相关接口
+export const notificationApi = {
+  // 获取通知列表
+  getNotificationList: (params) => {
+    return api.get('/api/v1/notification/notifications', { params });
+  },
+  // 获取通知统计
+  getNotificationsStats: () => {
+    return api.get('/api/v1/notification/notifications/stats');
+  },
+  // 获取通知类型
+  getNotificationTypes: () => {
+    return api.get('/api/v1/notification/notifications/types');
+  },
+  // 获取单条通知详情
+  getNotification: (notificationId) => {
+    return api.get(`/api/v1/notification/notifications/${notificationId}`);
+  },
+  // 删除通知
+  deleteNotification: (notificationId) => {
+    return api.delete(`/api/v1/notification/notifications/${notificationId}`);
+  }
+};
+
 // 系统设置接口
 export const systemApi = {
-  // 获取系统设置
+  // 获取系统设置 (向后兼容，如果原有接口支持)
   getSystemSettings: () => {
     return api.get('/api/system/settings');
   },
-  // 更新系统设置
+  // 更新系统设置 (向后兼容，如果原有接口支持)
   updateSystemSettings: (data) => {
     return api.put('/api/system/settings', data);
   },
-  // 备份数据
+  // 备份数据 (向后兼容，如果原有接口支持)
   backupData: () => {
     return api.post('/api/system/backup');
   },
-  // 恢复数据
+  // 恢复数据 (向后兼容，如果原有接口支持)
   restoreData: (formData) => {
     return api.post('/api/system/restore', formData, {
       headers: {
@@ -226,35 +286,39 @@ export const systemApi = {
       }
     });
   },
-  // 获取备份历史
+  // 获取备份历史 (向后兼容，如果原有接口支持)
   getBackupHistory: () => {
     return api.get('/api/system/backup/history');
   },
-  // 下载备份文件
+  // 下载备份文件 (向后兼容，如果原有接口支持)
   downloadBackup: (filename) => {
     return api.get(`/api/system/backup/download/${filename}`, {
       responseType: 'blob'
     });
   },
-  // 删除备份文件
+  // 删除备份文件 (向后兼容，如果原有接口支持)
   deleteBackup: (filename) => {
     return api.delete(`/api/system/backup/${filename}`);
   },
   // 获取系统状态
   getSystemStatus: () => {
-    return api.get('/api/system/status');
+    return api.get('/api/v1/system/monitoring/status');
   },
   // 获取数据库统计
   getDatabaseStats: () => {
-    return api.get('/api/system/database-stats');
+    return api.get('/api/v1/system/monitoring/database-stats');
   },
   // 获取版本信息
   getVersionInfo: () => {
-    return api.get('/api/system/version');
+    return api.get('/api/v1/system/monitoring/version');
   },
   // 健康检查
   healthCheck: () => {
-    return api.get('/api/system/health');
+    return api.get('/api/v1/system/monitoring/health');
+  },
+  // 获取系统度量指标
+  getMetrics: () => {
+    return api.get('/api/v1/system/monitoring/metrics');
   }
 };
 
@@ -262,27 +326,47 @@ export const systemApi = {
 export const captureRuleApi = {
   // 获取所有抓取规则（管理员）
   getAllCaptureRules: () => {
-    return api.get('/api/system/capture-rules/all');
+    return api.get('/api/v1/system/capture-rules/all');
   },
   // 获取启用的抓取规则（插件用）
   getCaptureRules: () => {
-    return api.get('/api/system/capture-rules');
+    return api.get('/api/v1/system/capture-rules');
   },
   // 创建抓取规则
   createCaptureRule: (data) => {
-    return api.post('/api/system/capture-rules', data);
+    return api.post('/api/v1/system/capture-rules', data);
   },
   // 更新抓取规则
   updateCaptureRule: (ruleName, data) => {
-    return api.put(`/api/system/capture-rules/${ruleName}`, data);
+    return api.put(`/api/v1/system/capture-rules/${ruleName}`, data);
   },
   // 删除抓取规则
   deleteCaptureRule: (ruleName) => {
-    return api.delete(`/api/system/capture-rules/${ruleName}`);
+    return api.delete(`/api/v1/system/capture-rules/${ruleName}`);
   }
 };
 
-// 用户备注接口
+// 网络数据监控接口
+export const networkDataApi = {
+  // 获取网络请求数据
+  getNetworkData: (params) => {
+    return api.get('/api/v1/system/network-data', { params });
+  },
+  // 获取网络数据统计
+  getNetworkDataStats: () => {
+    return api.get('/api/v1/system/network-data/stats');
+  },
+  // 批量处理网络数据
+  batchProcessNetworkData: (data) => {
+    return api.post('/api/v1/system/network-data/batch-process', data);
+  },
+  // 接收网络数据（供插件使用）
+  receiveNetworkData: (data) => {
+    return api.post('/api/v1/system/network-data', data);
+  }
+};
+
+// 用户备注接口 (向后兼容)
 export const userNoteApi = {
   // 添加用户备注
   addUserNote: (data) => {
@@ -298,7 +382,7 @@ export const userNoteApi = {
   }
 };
 
-// 获取用户列表（小红书用户）
+// 获取用户列表（小红书用户）- 向后兼容
 export const getUserList = async (page = 1, pageSize = 10) => {
   const response = await api.get('/api/users/info/list', {
     params: {
@@ -309,25 +393,24 @@ export const getUserList = async (page = 1, pageSize = 10) => {
   return response; // 直接返回拦截器处理后的完整响应
 };
 
-// 网络数据监控接口
-export const networkDataApi = {
-  // 获取网络请求数据
-  getNetworkData: (params) => {
-    return api.get('/api/network-data', { params });
-  },
-  // 接收网络数据
-  receiveNetworkData: (data) => {
-    return api.post('/api/system/network-data', data);
+// API迁移信息
+export const migrationApi = {
+  // 获取API迁移信息
+  getMigrationInfo: () => {
+    return api.get('/api/migrate-info');
   }
 };
 
 export default {
   userApi,
   commentApi,
+  noteApi,
   userManagementApi,
+  notificationApi,
   systemApi,
   userNoteApi,
   ssoApi,
   captureRuleApi,
-  networkDataApi
+  networkDataApi,
+  migrationApi
 }; 

@@ -2,6 +2,36 @@
 
 本项目是 "小红书评论维护系统" 的前端管理界面，基于 Vue 3 和 Element Plus 构建。
 
+## 🆕 API架构更新 (v2.1.0)
+
+本项目已更新为使用**领域驱动设计 (DDD)** 的新API架构，提供更清晰的接口组织和更好的功能支持。
+
+### 新架构特点
+
+- **🎯 按业务领域分组**：系统管理、内容管理、用户管理、通知管理
+- **📈 增强的统计功能**：每个领域都提供专门的统计接口
+- **🔄 完全向后兼容**：原有API路径自动重定向到新路径
+- **📚 更好的文档**：统一的响应格式和错误处理
+
+### 主要API模块
+
+| 模块 | 路径前缀 | 功能 |
+|------|----------|------|
+| 系统管理 | `/api/v1/system` | 抓取规则、网络数据、系统监控 |
+| 内容管理 | `/api/v1/content` | 评论、笔记管理和统计 |
+| 用户管理 | `/api/v1/user` | 认证、用户资料管理 |
+| 通知管理 | `/api/v1/notification` | 通知消息管理 |
+
+### 迁移指南
+
+查看详细的API迁移指南：**[API_MIGRATION_GUIDE.md](./API_MIGRATION_GUIDE.md)**
+
+### 获取迁移信息
+
+```bash
+GET /api/migrate-info
+```
+
 ## 环境准备
 
 在开始之前，请确保您的开发环境中安装了以下软件：
@@ -52,6 +82,44 @@
     ```
     该命令会启动 Vite 开发服务器，通常默认地址是 `http://localhost:5173`。您可以在浏览器中打开此地址查看应用。项目支持热模块替换 (HMR)，代码更改后浏览器会自动刷新。
 
+## API使用示例
+
+### 基础用法
+
+```javascript
+import { commentApi, systemApi, noteApi, notificationApi } from './src/services/api'
+
+// 获取评论列表和统计
+const comments = await commentApi.getCommentList({ page: 1, page_size: 20 })
+const commentStats = await commentApi.getCommentsStats()
+
+// 系统监控
+const healthStatus = await systemApi.healthCheck()
+const systemStatus = await systemApi.getSystemStatus()
+
+// 笔记管理
+const notes = await noteApi.getNoteList({ page: 1, page_size: 20 })
+const noteStats = await noteApi.getNotesStats()
+
+// 通知管理
+const notifications = await notificationApi.getNotificationList({ page: 1, page_size: 20 })
+```
+
+### Dashboard统计数据
+
+```javascript
+// 获取全面的统计数据
+const fetchStatistics = async () => {
+  const [commentsStats, usersStats, networkStats] = await Promise.all([
+    commentApi.getCommentsStats(),
+    systemApi.getDatabaseStats(),
+    networkDataApi.getNetworkDataStats()
+  ])
+  
+  // 处理统计数据...
+}
+```
+
 ## 构建打包 (生产环境)
 
 1.  **配置生产环境 API 地址 (如果需要)**：
@@ -93,18 +161,53 @@ xhs_admin_ui/
 │   ├── views/          # 页面级组件
 │   ├── App.vue         # 应用根组件
 │   └── main.js         # 应用入口文件
-├── .env.development  # (可选) 开发环境变量
-├── .env.production   # (可选) 生产环境变量
-├── vite.config.js    # Vite 配置文件
-├── package.json      # 项目依赖和脚本
-└── README.md         # 项目说明
+├── .env.development    # (可选) 开发环境变量
+├── .env.production     # (可选) 生产环境变量
+├── vite.config.js      # Vite 配置文件
+├── package.json        # 项目依赖和脚本
+├── README.md           # 项目说明
+└── API_MIGRATION_GUIDE.md  # API迁移指南
 ```
+
+## 特性说明
+
+### 🔐 SSO认证
+支持 Keycloak 单点登录，自动token刷新和错误处理。
+
+### 📊 实时监控
+- 系统健康状态监控
+- 数据库统计信息
+- 网络数据处理状态
+- 性能度量指标
+
+### 🎯 内容管理
+- 评论审核和管理
+- 笔记内容分析
+- 通知消息处理
+- 批量操作支持
+
+### ⚙️ 系统配置
+- 抓取规则配置
+- 网络数据监控
+- 系统设置管理
+- 备份恢复功能
 
 ## 注意事项
 
 *   如果在 WSL 环境下开发，Vite 的文件监听可能需要配置 `server.watch.usePolling = true` (已在 `vite.config.js` 中配置)。
 *   确保后端服务 (`xhs_backend`) 正在运行，以便前端可以正常请求 API 数据。
+*   新的API架构提供了更好的错误处理和响应格式，建议查看 [API_MIGRATION_GUIDE.md](./API_MIGRATION_GUIDE.md) 了解详细用法。
+
+## 版本历史
+
+### v2.1.0 (2024-12-01)
+- ✨ 重构为领域驱动API架构
+- 🚀 新增笔记和通知管理功能
+- 📈 增强的统计和监控功能
+- 🔄 完全向后兼容
 
 ---
 
 祝您开发愉快！
+
+如有问题，请查看 [API迁移指南](./API_MIGRATION_GUIDE.md) 或检查后端 [架构文档](../xhs_backend/DOMAIN_ARCHITECTURE.md)。
