@@ -16,6 +16,7 @@ class InteractionInfo(BaseModel):
     time: Optional[str] = None
 
 class NotificationItem(BaseModel):
+    
     """通知项模型"""
     id: str
     tabType: Optional[str] = None

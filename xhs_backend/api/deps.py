@@ -82,4 +82,11 @@ async def get_current_user_combined(request: Request) -> str:
         用户名
     """
     from .auth import get_user_from_keycloak_or_jwt
-    return await get_user_from_keycloak_or_jwt(request)
+    result = await get_user_from_keycloak_or_jwt(request)
+    if result is None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="无法验证凭证",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return result

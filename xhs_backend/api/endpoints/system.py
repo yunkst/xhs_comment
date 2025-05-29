@@ -12,7 +12,7 @@ import platform
 from datetime import datetime, timedelta
 
 from database import get_database, COMMENTS_COLLECTION, NOTES_COLLECTION, NOTIFICATIONS_COLLECTION, STRUCTURED_COMMENTS_COLLECTION, USER_INFO_COLLECTION, USERS_COLLECTION
-from api.deps import get_current_user, get_current_user_combined
+from api.deps import get_current_user_combined
 from api.models.common import CaptureRule, CaptureRulesResponse, NetworkDataPayload
 
 # 配置日志
@@ -88,7 +88,7 @@ async def get_capture_rules(db=Depends(get_database)):
         collection = db.capture_rules
         
         # 如果数据库中没有规则，初始化默认规则
-        if collection.count_documents({}) == 0:
+        if await collection.count_documents({}) == 0:
             # 插入默认规则
             rules_to_insert = []
             for rule_data in DEFAULT_CAPTURE_RULES:
@@ -96,7 +96,7 @@ async def get_capture_rules(db=Depends(get_database)):
                 rule_data['updated_at'] = datetime.utcnow()
                 rules_to_insert.append(rule_data)
             
-            collection.insert_many(rules_to_insert)
+            await collection.insert_many(rules_to_insert)
         
         # 查询启用的规则，按优先级排序
         rules_cursor = collection.find(
@@ -104,7 +104,7 @@ async def get_capture_rules(db=Depends(get_database)):
         ).sort("priority", -1)
         
         rules = []
-        for rule_doc in rules_cursor:
+        async for rule_doc in rules_cursor:
             # 移除MongoDB的_id字段
             rule_doc.pop('_id', None)
             rules.append(CaptureRule(**rule_doc))
@@ -124,7 +124,7 @@ async def get_capture_rules(db=Depends(get_database)):
 
 @router.get("/capture-rules/all", response_model=CaptureRulesResponse)
 async def get_all_capture_rules(
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -139,7 +139,7 @@ async def get_all_capture_rules(
         rules_cursor = collection.find().sort("priority", -1)
         
         rules = []
-        for rule_doc in rules_cursor:
+        async for rule_doc in rules_cursor:
             rule_doc.pop('_id', None)
             rules.append(CaptureRule(**rule_doc))
         
@@ -159,7 +159,7 @@ async def get_all_capture_rules(
 @router.post("/capture-rules")
 async def create_capture_rule(
     rule: CaptureRule,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -171,7 +171,7 @@ async def create_capture_rule(
         collection = db.capture_rules
         
         # 检查规则名称是否已存在
-        existing_rule = collection.find_one({"name": rule.name})
+        existing_rule = await collection.find_one({"name": rule.name})
         if existing_rule:
             raise HTTPException(
                 status_code=400,
@@ -183,7 +183,7 @@ async def create_capture_rule(
         rule_dict['created_at'] = datetime.utcnow()
         rule_dict['updated_at'] = datetime.utcnow()
         
-        result = collection.insert_one(rule_dict)
+        result = await collection.insert_one(rule_dict)
         
         return {
             "success": True,
@@ -203,7 +203,7 @@ async def create_capture_rule(
 async def update_capture_rule(
     rule_name: str,
     rule_update: CaptureRule,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -218,7 +218,7 @@ async def update_capture_rule(
         rule_dict = rule_update.dict()
         rule_dict['updated_at'] = datetime.utcnow()
         
-        result = collection.update_one(
+        result = await collection.update_one(
             {"name": rule_name},
             {"$set": rule_dict}
         )
@@ -246,7 +246,7 @@ async def update_capture_rule(
 @router.delete("/capture-rules/{rule_name}")
 async def delete_capture_rule(
     rule_name: str,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -257,7 +257,7 @@ async def delete_capture_rule(
     try:
         collection = db.capture_rules
         
-        result = collection.delete_one({"name": rule_name})
+        result = await collection.delete_one({"name": rule_name})
         
         if result.deleted_count == 0:
             raise HTTPException(
@@ -470,7 +470,7 @@ async def receive_network_data(
         network_data_dict['received_at'] = datetime.utcnow()
         
         # 保存到网络数据集合
-        result = db.network_requests.insert_one(network_data_dict)
+        result = await db.network_requests.insert_one(network_data_dict)
         
         return {
             "success": True,
@@ -495,7 +495,7 @@ async def get_network_data(
     data_type: str = None,
     start_time: str = None,
     end_time: str = None,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -536,28 +536,30 @@ async def get_network_data(
         cursor = collection.find(query).sort("received_at", -1).skip(skip).limit(page_size)
         data_list = []
         
-        for doc in cursor:
+        async for doc in cursor:
             doc['_id'] = str(doc['_id'])
             data_list.append(doc)
         
         # 获取总数
-        total = collection.count_documents(query)
+        total = await collection.count_documents(query)
         
         # 统计数据
         now = datetime.utcnow()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         hour_ago = now - timedelta(hours=1)
         
-        total_requests = collection.count_documents({})
-        today_requests = collection.count_documents({"received_at": {"$gte": today_start}})
-        recent_hour_requests = collection.count_documents({"received_at": {"$gte": hour_ago}})
+        total_requests = await collection.count_documents({})
+        today_requests = await collection.count_documents({"received_at": {"$gte": today_start}})
+        recent_hour_requests = await collection.count_documents({"received_at": {"$gte": hour_ago}})
         
         # 获取活跃规则数
         active_rules_pipeline = [
             {"$group": {"_id": "$rule_name"}},
             {"$count": "count"}
         ]
-        active_rules_result = list(collection.aggregate(active_rules_pipeline))
+        active_rules_result = []
+        async for result in collection.aggregate(active_rules_pipeline):
+            active_rules_result.append(result)
         active_rules_count = active_rules_result[0]["count"] if active_rules_result else 0
         
         # 获取所有可用规则
@@ -565,7 +567,9 @@ async def get_network_data(
             {"$group": {"_id": "$rule_name"}},
             {"$project": {"rule_name": "$_id", "_id": 0}}
         ]
-        available_rules_result = list(collection.aggregate(available_rules_pipeline))
+        available_rules_result = []
+        async for result in collection.aggregate(available_rules_pipeline):
+            available_rules_result.append(result)
         available_rules = [item["rule_name"] for item in available_rules_result]
         
         return {
@@ -591,4 +595,196 @@ async def get_network_data(
         raise HTTPException(
             status_code=500,
             detail=f"查询网络数据失败: {str(e)}"
+        )
+
+# === 系统设置管理接口 ===
+
+@router.get("/settings")
+async def get_system_settings(
+    current_user: str = Depends(get_current_user_combined),
+    db=Depends(get_database)
+):
+    """
+    获取系统设置
+    """
+    try:
+        collection = db.system_settings
+        settings = await collection.find_one({"type": "system"}) or {}
+        
+        # 移除MongoDB的_id字段
+        settings.pop('_id', None)
+        
+        # 提供默认设置
+        default_settings = {
+            "passwordExpiration": 90,
+            "loginLockEnabled": True,
+            "loginLockThreshold": 5,
+            "loginLockTime": 30,
+            "sessionTimeout": 120,
+            "enableNotifications": True,
+            "notificationEmail": "",
+            "maxFileSize": 100,  # MB
+            "allowedFileTypes": [".jpg", ".png", ".pdf", ".txt"],
+            "backupRetentionDays": 30
+        }
+        
+        # 合并默认设置和数据库设置
+        result_settings = {**default_settings, **settings}
+        result_settings.pop('type', None)  # 移除内部字段
+        
+        return {
+            "success": True,
+            "data": result_settings,
+            "message": "成功获取系统设置"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取系统设置失败: {str(e)}"
+        )
+
+@router.put("/settings")
+async def update_system_settings(
+    settings: Dict[str, Any],
+    current_user: str = Depends(get_current_user_combined),
+    db=Depends(get_database)
+):
+    """
+    更新系统设置
+    """
+    try:
+        collection = db.system_settings
+        
+        # 添加更新时间和类型标识
+        settings_data = {
+            **settings,
+            "type": "system",
+            "updated_at": datetime.utcnow(),
+            "updated_by": current_user
+        }
+        
+        # 更新或插入设置
+        result = await collection.update_one(
+            {"type": "system"},
+            {"$set": settings_data},
+            upsert=True
+        )
+        
+        return {
+            "success": True,
+            "message": "系统设置更新成功",
+            "modified_count": result.modified_count
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"更新系统设置失败: {str(e)}"
+        )
+
+@router.post("/backup")
+async def backup_data(
+    current_user: str = Depends(get_current_user_combined),
+    db=Depends(get_database)
+):
+    """
+    备份系统数据
+    """
+    try:
+        import json
+        from datetime import datetime
+        
+        # 生成备份文件名
+        timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+        backup_filename = f"backup_{timestamp}.json"
+        
+        # 收集要备份的数据
+        backup_data = {
+            "created_at": datetime.utcnow().isoformat(),
+            "created_by": current_user,
+            "version": "1.0.0",
+            "collections": {}
+        }
+        
+        # 备份主要集合
+        collections_to_backup = [
+            COMMENTS_COLLECTION,
+            NOTES_COLLECTION,
+            NOTIFICATIONS_COLLECTION,
+            STRUCTURED_COMMENTS_COLLECTION,
+            USER_INFO_COLLECTION,
+            "system_settings",
+            "capture_rules"
+        ]
+        
+        for collection_name in collections_to_backup:
+            collection = db[collection_name]
+            documents = []
+            
+            async for doc in collection.find():
+                # 转换ObjectId为字符串
+                if '_id' in doc:
+                    doc['_id'] = str(doc['_id'])
+                documents.append(doc)
+            
+            backup_data["collections"][collection_name] = documents
+        
+        # 保存备份记录到数据库
+        backup_record = {
+            "filename": backup_filename,
+            "created_at": datetime.utcnow(),
+            "created_by": current_user,
+            "size": len(json.dumps(backup_data)),
+            "collections_count": len(collections_to_backup),
+            "total_documents": sum(len(docs) for docs in backup_data["collections"].values())
+        }
+        
+        await db.backup_history.insert_one(backup_record)
+        
+        return {
+            "success": True,
+            "message": "数据备份成功",
+            "filename": backup_filename,
+            "backup_info": {
+                "collections_count": backup_record["collections_count"],
+                "total_documents": backup_record["total_documents"],
+                "size": backup_record["size"]
+            }
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"数据备份失败: {str(e)}"
+        )
+
+@router.get("/backup/history")
+async def get_backup_history(
+    current_user: str = Depends(get_current_user_combined),
+    db=Depends(get_database)
+):
+    """
+    获取备份历史
+    """
+    try:
+        collection = db.backup_history
+        
+        # 查询备份历史，按创建时间倒序
+        backup_history = []
+        async for backup in collection.find().sort("created_at", -1):
+            backup['_id'] = str(backup['_id'])
+            backup_history.append(backup)
+        
+        return {
+            "success": True,
+            "data": backup_history,
+            "total": len(backup_history),
+            "message": f"成功获取 {len(backup_history)} 条备份记录"
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取备份历史失败: {str(e)}"
         )

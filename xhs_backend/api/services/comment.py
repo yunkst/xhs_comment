@@ -7,9 +7,57 @@ import logging
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import pymongo
-
+import re
+from typing import Tuple
+from api.models.user import UserNote
+from api.models.content import StructuredComment
 # 配置日志
 logger = logging.getLogger(__name__)
+
+
+def clean_content(text: str) -> str:
+    """
+    只保留中文、英文、数字，去掉其他字符
+    """
+    if not text:
+        return ''
+    # 匹配中文、英文、数字
+    return ''.join(re.findall(r'[\u4e00-\u9fa5a-zA-Z0-9]', text))
+
+
+def match_usernote_and_comments(usernotes: List[UserNote], comments: List[StructuredComment]) -> List[Tuple[UserNote, StructuredComment]]:
+    """
+    建立UserNote和StructuredComment的关联：
+    1. userId与authorId完全匹配
+    2. content清洗后匹配
+    返回所有能建立关联的(UserNote, StructuredComment)对
+    """
+    matches = []
+    # 先构建authorId->comment的索引
+    authorid_to_comments = {}
+    for comment in comments:
+        if comment.authorId:
+            authorid_to_comments.setdefault(comment.authorId, []).append(comment)
+    # 先用userId和authorId匹配
+    for usernote in usernotes:
+        if usernote.userId in authorid_to_comments:
+            for comment in authorid_to_comments[usernote.userId]:
+                matches.append((usernote, comment))
+    # 再用content清洗后匹配
+    # 构建清洗后content->comment的索引
+    cleaned_comment_content_map = {}
+    for comment in comments:
+        cleaned = clean_content(comment.content or '')
+        if cleaned:
+            cleaned_comment_content_map.setdefault(cleaned, []).append(comment)
+    for usernote in usernotes:
+        cleaned_usernote_content = clean_content(usernote.content or '')
+        if cleaned_usernote_content in cleaned_comment_content_map:
+            for comment in cleaned_comment_content_map[cleaned_usernote_content]:
+                # 避免重复（如果已经通过userId匹配过就不再重复）
+                if not (usernote, comment) in matches:
+                    matches.append((usernote, comment))
+    return matches
 
 # --- 递归合并评论数据的辅助函数 ---
 def merge_comment_data(existing_comment: Dict[str, Any], new_comment_data: Dict[str, Any]) -> Dict[str, Any]:
