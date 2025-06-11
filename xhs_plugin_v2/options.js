@@ -192,7 +192,7 @@
 
         try {
             // 测试连接到API服务器
-            const response = await fetch(`${apiHost}/api/health`, {
+            const response = await fetch(`${apiHost}/api/v1/system/health`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'

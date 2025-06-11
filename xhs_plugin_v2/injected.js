@@ -43,7 +43,8 @@
                 headers: headers,
                 body: body,
                 type: 'fetch',
-                requestId: requestId
+                requestId: requestId,
+                timestamp: Date.now()
             });
             
             console.log(`[XHS Monitor] Fetch请求拦截: ${method} ${url}`);
@@ -64,6 +65,7 @@
                             method: method.toUpperCase(),
                             type: 'fetch_response',
                             requestId: requestId,
+                            timestamp: Date.now(),
                             response: {
                                 status: response.status,
                                 statusText: response.statusText,
@@ -130,7 +132,8 @@
                 headers: this._xhsHeaders || {},
                 body: data || null,
                 type: 'xhr',
-                requestId: this._xhsRequestId
+                requestId: this._xhsRequestId,
+                timestamp: Date.now()
             });
             
             console.log(`[XHS Monitor] XHR请求拦截: ${this._xhsMethod} ${this._xhsUrl}`);
@@ -160,6 +163,7 @@
                         method: (xhr._xhsMethod || 'GET').toUpperCase(),
                         type: 'xhr_response',
                         requestId: xhr._xhsRequestId,
+                        timestamp: Date.now(),
                         response: {
                             status: xhr.status,
                             statusText: xhr.statusText,

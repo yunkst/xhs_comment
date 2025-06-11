@@ -36,11 +36,11 @@
     });
 
     // 初始化插件
-    function initializePlugin() {
+    async function initializePlugin() {
         loadConfig();
-        loadApiConfig();
+        await loadApiConfig(); // 等待API配置加载完成
         loadRequestStats();
-        loadCaptureRules(); // 从后端加载抓取规则
+        await loadCaptureRules(); // 等待抓取规则加载完成
         setupWebRequestListeners();
     }
 
@@ -58,6 +58,7 @@
 
     // 加载API配置
     function loadApiConfig() {
+        return new Promise((resolve) => {
         chrome.storage.local.get(['xhs_api_config'], function(result) {
             if (result.xhs_api_config) {
                 globalState.apiConfig = result.xhs_api_config;
@@ -67,6 +68,8 @@
             console.log('[Background] API配置已加载:', {
                 hasHost: !!globalState.apiConfig.host,
                 hasToken: !!globalState.apiConfig.token
+                });
+                resolve();
             });
         });
     }
@@ -74,15 +77,14 @@
     // 从后端加载抓取规则
     async function loadCaptureRules() {
         try {
-            // 如果没有配置API地址，跳过
+            // 如果没有配置API地址，抛出错误
             if (!globalState.apiConfig?.host) {
-                console.log('[Background] 未配置API地址，跳过加载抓取规则');
-                return;
+                throw new Error('未配置API地址');
             }
 
             console.log('[Background] 开始从后端加载抓取规则...');
             
-            const response = await fetch(`${globalState.apiConfig.host}/api/system/capture-rules`, {
+            const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/capture-rules`, {
                 method: 'GET',
                 headers: {
                     'Content-Type': 'application/json'
@@ -103,13 +105,21 @@
                 // 重新设置WebRequest监听器
                 setupWebRequestListeners();
             } else {
-                console.error('[Background] 获取抓取规则失败:', data);
+                throw new Error(`获取抓取规则失败: ${data.error || '未知错误'}`);
             }
 
         } catch (error) {
             console.error('[Background] 加载抓取规则时出错:', error);
-            // 使用默认规则作为后备
+            // 对于初始化过程中的调用，使用默认规则作为后备
+            // 对于手动刷新，重新抛出错误以便上层处理
+            if (error.message === '未配置API地址') {
+                // 对于未配置API地址的情况，使用空规则
             globalState.captureRules = [];
+                console.log('[Background] 未配置API地址，使用空抓取规则');
+                return;
+            }
+            // 重新抛出其他错误，让调用者处理
+            throw error;
         }
     }
 
@@ -176,13 +186,25 @@
 
     // 处理请求开始
     function handleBeforeRequest(details) {
+        // 添加调试日志 - 显示所有请求
+        if (details.url.includes('xiaohongshu.com') || details.url.includes('xhscdn.com') || details.url.includes('fegine.com')) {
+            console.log('[Background] 检测到小红书相关请求:', details.url);
+        }
+
         if (!globalState.config || !globalState.config.enableMonitoring) {
+            console.log('[Background] 监控未启用，跳过请求:', details.url);
             return;
         }
 
         // 检查URL是否匹配抓取规则
         const matchedRule = findMatchingRule(details.url);
         if (!matchedRule) {
+            // 添加调试日志 - 显示未匹配的小红书请求
+            if (details.url.includes('xiaohongshu.com') || details.url.includes('xhscdn.com') || details.url.includes('fegine.com')) {
+                console.log('[Background] 小红书请求未匹配任何规则:', details.url);
+                console.log('[Background] 当前抓取规则数量:', globalState.captureRules.length);
+                console.log('[Background] 当前抓取规则:', globalState.captureRules.map(r => `${r.name}: ${r.pattern}`));
+            }
             return;
         }
 
@@ -233,6 +255,7 @@
     // 查找匹配的抓取规则
     function findMatchingRule(url) {
         if (!globalState.captureRules || globalState.captureRules.length === 0) {
+            console.log('[Background] 没有抓取规则');
             return null;
         }
 
@@ -241,12 +264,20 @@
             .filter(rule => rule.enabled)
             .sort((a, b) => b.priority - a.priority);
 
+        console.log(`[Background] 尝试匹配URL: ${url}`);
+        console.log(`[Background] 启用的规则数量: ${sortedRules.length}`);
+
         for (const rule of sortedRules) {
+            console.log(`[Background] 测试规则: ${rule.name} (${rule.pattern})`);
             if (matchUrlPattern(url, rule.pattern)) {
+                console.log(`[Background] ✅ 匹配成功: ${rule.name}`);
                 return rule;
+            } else {
+                console.log(`[Background] ❌ 匹配失败: ${rule.name}`);
             }
         }
 
+        console.log('[Background] 没有规则匹配此URL');
         return null;
     }
 
@@ -326,7 +357,7 @@
             };
 
             // 发送到后端
-            const response = await fetch(`${globalState.apiConfig.host}/api/system/network-data`, {
+            const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/network-data`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -373,7 +404,7 @@
         }
 
         try {
-            const response = await fetch(`${globalState.apiConfig.host}/api/auth/sso-refresh`, {
+            const response = await fetch(`${globalState.apiConfig.host}/api/v1/user/auth/sso-refresh`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -456,7 +487,12 @@
                         
                         // API配置更新后，重新加载抓取规则
                         if (globalState.apiConfig.host) {
+                            try {
                             await loadCaptureRules();
+                                console.log('[Background] 抓取规则已自动刷新');
+                            } catch (error) {
+                                console.error('[Background] 自动刷新抓取规则失败:', error);
+                            }
                         }
                         
                         sendResponse({ success: true });
@@ -471,7 +507,17 @@
                     break;
 
                 case 'refreshCaptureRules':
+                    (async () => {
                     try {
+                            // 检查是否有API配置
+                            if (!globalState.apiConfig?.host) {
+                                sendResponse({
+                                    success: false,
+                                    error: '请先配置API服务器地址'
+                                });
+                                return;
+                            }
+
                         await loadCaptureRules();
                         sendResponse({
                             success: true,
@@ -484,6 +530,7 @@
                             error: error.message
                         });
                     }
+                    })();
                     break;
 
                 case 'getRequestStats':
@@ -495,6 +542,69 @@
 
                 case 'clearRequestLog':
                     globalState.requestLog = [];
+                    sendResponse({ success: true });
+                    break;
+
+                case 'logCustomRequest':
+                    // 处理来自注入脚本的请求记录
+                    const requestData = request.data;
+                    
+                    // 检查是否是响应数据
+                    if (requestData.type === 'xhr_response' || requestData.type === 'fetch_response') {
+                        // 这是响应数据，更新现有请求记录
+                        const existingLogIndex = globalState.requestLog.findIndex(
+                            log => log.requestId === requestData.requestId
+                        );
+                        
+                        if (existingLogIndex !== -1) {
+                            // 更新现有记录的响应信息
+                            globalState.requestLog[existingLogIndex] = {
+                                ...globalState.requestLog[existingLogIndex],
+                                statusCode: requestData.response?.status,
+                                responseHeaders: requestData.response?.headers?.map(([name, value]) => ({name, value})) || [],
+                                response: {
+                                    body: requestData.response?.body,
+                                    contentType: requestData.response?.contentType,
+                                    status: requestData.response?.status,
+                                    statusText: requestData.response?.statusText,
+                                    responseTime: requestData.response?.responseTime
+                                },
+                                timeStamp: requestData.timestamp || Date.now()
+                            };
+                            
+                            console.log('[Background] 更新响应数据:', requestData.url, requestData.response?.status);
+                        } else {
+                            console.warn('[Background] 未找到对应的请求记录:', requestData.requestId);
+                        }
+                        
+                        sendResponse({ success: true });
+                        return;
+                    }
+                    
+                    // 检查URL是否匹配抓取规则
+                    const matchedRule = findMatchingRule(requestData.url);
+                    if (!matchedRule) {
+                        sendResponse({
+                            success: false,
+                            reason: 'URL not matched'
+                        });
+                        return;
+                    }
+
+                    // 构造请求详情对象
+                    const details = {
+                        requestId: requestData.requestId,
+                        url: requestData.url,
+                        method: requestData.method,
+                        type: requestData.type,
+                        timeStamp: requestData.timestamp,
+                        requestHeaders: Object.entries(requestData.headers || {}).map(([name, value]) => ({name, value})),
+                        requestBody: requestData.body
+                    };
+
+                    // 记录请求
+                    logRequest(details, requestData.source, matchedRule);
+                    
                     sendResponse({ success: true });
                     break;
 

@@ -26,7 +26,7 @@ async def get_user_by_username(username: str) -> Optional[dict]:
     user = await db[USERS_COLLECTION].find_one({"username": username})
     return user
 
-async def create_user(user_in: UserInRegister, allow_register: bool = True) -> Optional[dict]:
+async def create_user(user_data: dict, allow_register: bool = True) -> Optional[dict]:
     """创建新用户账户"""
     # 在函数内部导入模块
     from database import get_database, USERS_COLLECTION
@@ -37,18 +37,18 @@ async def create_user(user_in: UserInRegister, allow_register: bool = True) -> O
     db = await get_database()
     
     # 检查用户名是否已存在
-    existing = await db[USERS_COLLECTION].find_one({"username": user_in.username})
+    existing = await db[USERS_COLLECTION].find_one({"username": user_data["username"]})
     if existing:
         raise Exception("用户名已存在")
     
     # 生成密码哈希
-    password_hash = bcrypt.hashpw(user_in.password.encode(), bcrypt.gensalt()).decode()
+    password_hash = bcrypt.hashpw(user_data["password"].encode(), bcrypt.gensalt()).decode()
     
     # 生成OTP密钥
     otp_secret = pyotp.random_base32()
     
     user = User(
-        username=user_in.username,
+        username=user_data["username"],
         password_hash=password_hash,
         otp_secret=otp_secret,
         is_active=True

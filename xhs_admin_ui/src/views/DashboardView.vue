@@ -155,14 +155,22 @@ const statistics = reactive({
 
 const fetchStatistics = async () => {
   try {
-    const response = await systemApi.getSystemSettings()
-    if (response) {
-      statistics.totalComments = response.totalComments || 0
-      statistics.commentsChange = response.commentsChange || 0
-      statistics.totalUsers = response.totalUsers || 0
-      statistics.usersChange = response.usersChange || 0
-      statistics.pendingReplyComments = response.pendingReplyComments || 0
-      statistics.pendingReplyChange = response.pendingReplyChange || 0
+    // 使用新的统计接口
+    const [commentsStats, usersStats] = await Promise.all([
+      commentApi.getCommentsStats(),
+      systemApi.getDatabaseStats()
+    ])
+    
+    if (commentsStats) {
+      statistics.totalComments = commentsStats.stats?.total?.comments || 0
+      statistics.commentsChange = commentsStats.stats?.period?.today || 0
+      statistics.pendingReplyComments = commentsStats.stats?.period?.week || 0
+      statistics.pendingReplyChange = commentsStats.stats?.period?.yesterday || 0
+    }
+    
+    if (usersStats) {
+      statistics.totalUsers = usersStats.total_stats?.users || 0
+      statistics.usersChange = usersStats.daily_stats?.users || 0
     }
   } catch (error) {
     console.error('获取统计数据失败:', error)

@@ -69,35 +69,6 @@
                 </div>
             </section>
 
-            <!-- URL模式配置 -->
-            <section class="config-section">
-                <h2>🌐 URL监控规则</h2>
-                <div class="url-patterns-container">
-                    <div class="add-pattern-form">
-                        <input type="text" id="newPatternInput" placeholder="输入URL模式，如：*.xiaohongshu.com/*" class="pattern-input">
-                        <button id="addPatternBtn" class="add-btn">+ 添加</button>
-                    </div>
-                    
-                    <div class="patterns-list" id="patternsList">
-                        <!-- 动态生成的URL模式列表 -->
-                    </div>
-                </div>
-                
-                <div class="pattern-help">
-                    <h4>📚 URL模式示例：</h4>
-                    <ul>
-                        <li><code>*.xiaohongshu.com/*</code> - 匹配小红书所有子域名</li>
-                        <li><code>*://edith.xiaohongshu.com/api/*</code> - 匹配API接口</li>
-                        <li><code>*.xhscdn.com/*</code> - 匹配CDN资源</li>
-                        <li><code>*://www.xiaohongshu.com/explore*</code> - 匹配探索页面</li>
-                    </ul>
-                    <div style="margin-top: 12px; padding: 12px; background: #e8f5e8; border-left: 4px solid #28a745; border-radius: 4px;">
-                        <strong>✅ 自动注入：</strong>插件会自动在所有小红书页面（*.xiaohongshu.com、*.xhscdn.com、*.fegine.com）注入监控脚本，
-                        无需额外配置。URL模式主要用于控制哪些请求会被记录和显示。
-                    </div>
-                </div>
-            </section>
-
             <!-- 监控类型配置 -->
             <section class="config-section">
                 <h2>📊 监控类型</h2>

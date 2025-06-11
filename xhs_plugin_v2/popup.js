@@ -210,12 +210,25 @@
             elements.ssoContainer.style.display = 'none';
             // 显示退出登录按钮
             elements.logoutContainer.classList.add('show');
+            
+            // 清除所有SSO会话状态
+            clearSsoSession();
         } else if (hasHost) {
             elements.apiStatusIndicator.classList.remove('connected');
             elements.apiStatusText.textContent = `API已配置: ${appState.apiConfig.host.substring(0, 20)}... (未登录)`;
             elements.ssoContainer.style.display = 'block';
             // 隐藏退出登录按钮
             elements.logoutContainer.classList.remove('show');
+            
+            // 如果有正在进行的SSO会话，显示检查按钮
+            if (appState.ssoSession.id && appState.ssoSession.status === 'pending') {
+                elements.ssoCheckLogin.style.display = 'block';
+                elements.ssoCheckLogin.classList.remove('hidden');
+                elements.ssoStartLogin.innerHTML = '🔄 重新发起SSO登录';
+            } else {
+                elements.ssoCheckLogin.style.display = 'none';
+                elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
+            }
         } else {
             elements.apiStatusIndicator.classList.remove('connected');
             elements.apiStatusText.textContent = '未配置API服务';
@@ -232,10 +245,7 @@
             return;
         }
 
-        const hasEnabledPatterns = appState.config.urlPatterns && 
-            appState.config.urlPatterns.some(p => p.enabled);
-        
-        if (!appState.config.enableMonitoring || !hasEnabledPatterns) {
+        if (!appState.config.enableMonitoring) {
             elements.configWarning.style.display = 'block';
         } else {
             elements.configWarning.style.display = 'none';
@@ -272,64 +282,62 @@
             return;
         }
 
-        // 停止之前的轮询
         stopSsoPolling();
-
-        // 更新UI状态
         elements.ssoStartLogin.disabled = true;
         elements.ssoStartLogin.innerHTML = '<div class="spinner"></div>初始化SSO...';
         
         try {
-            console.log('[SSO] 开始创建SSO会话...');
-            
-            // 创建SSO会话
-            const response = await fetch(`${apiHost}/api/auth/sso-session`, {
+            console.log('[SSO重构 Plugin] 开始创建SSO会话...');
+            const response = await fetch(`${apiHost}/api/v1/user/auth/sso-session`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
                 },
                 body: JSON.stringify({
-                    client_type: 'monitor_plugin'
+                    client_type: 'monitor_plugin' // 与后端 SSOSessionRequest 模型一致
                 })
             });
 
             if (!response.ok) {
-                throw new Error(`服务器返回错误状态: ${response.status}`);
+                const errorText = await response.text();
+                console.error('[SSO重构 Plugin] 创建SSO会话失败:', response.status, errorText);
+                throw new Error(`创建SSO会话失败: ${response.status} ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('[SSO] SSO会话创建成功:', data);
+            console.log('[SSO重构 Plugin] SSO会话创建成功:', data);
 
-            // 保存会话信息
+            if (!data.session_id || !data.initiate_url) {
+                console.error('[SSO重构 Plugin] 服务器返回数据不完整:', data);
+                throw new Error('服务器返回的会话数据无效 (缺少session_id或initiate_url)');
+            }
+
             appState.ssoSession.id = data.session_id;
             appState.ssoSession.status = 'pending';
             appState.ssoSession.pollCount = 0;
-            saveSsoSession(); // 保存到存储
+            saveSsoSession(); // 保存会话ID和状态
 
-            // 显示状态按钮
             elements.ssoCheckLogin.classList.remove('hidden');
             elements.ssoCheckLogin.style.display = 'block';
-            elements.ssoCheckLogin.innerHTML = '⏳ 等待登录完成...';
-            elements.ssoCheckLogin.disabled = true;
+            elements.ssoCheckLogin.innerHTML = '⏳ 等待授权完成...';
+            elements.ssoCheckLogin.disabled = true; // 初始时禁用，直到轮询或手动触发
 
-            // 打开SSO登录页面
-            chrome.tabs.create({ url: data.login_url });
+            console.log('[SSO重构 Plugin] 准备打开Admin UI SSO初始化页面:', data.initiate_url);
+            chrome.tabs.create({ url: data.initiate_url });
 
-            // 重置开始登录按钮
             elements.ssoStartLogin.disabled = false;
             elements.ssoStartLogin.innerHTML = '🔄 重新发起SSO登录';
 
-            // 开始自动轮询检查登录状态
             startSsoPolling();
-
-            showToast('已打开SSO登录页面，正在自动检查登录状态...', 'success');
+            showToast('已打开授权页面，请在打开的页面中完成操作。', 'success');
 
         } catch (error) {
-            console.error('[SSO] 登录初始化失败:', error);
+            console.error('[SSO重构 Plugin] SSO登录初始化失败:', error);
             elements.ssoStartLogin.disabled = false;
             elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
-            showToast(`SSO登录失败: ${error.message}`, 'error');
+            showToast(`SSO初始化失败: ${error.message}`, 'error');
             appState.ssoSession.status = 'failed';
+            saveSsoSession();
         }
     }
 
@@ -358,142 +366,116 @@
         }
     }
 
-    // 检查SSO登录状态
+    // 检查SSO登录状态 (轮询后端 /sso-session/{session_id})
     async function checkSsoLoginStatus(isAutoCheck = false) {
         const apiHost = appState.apiConfig.host;
         
-        if (!appState.ssoSession.id) {
-            if (!isAutoCheck) {
-                showToast('无效的SSO会话，请重新发起登录', 'error');
+        if (!appState.ssoSession.id || appState.ssoSession.status !== 'pending') {
+            if (!isAutoCheck && appState.ssoSession.id) { // 仅在手动点击且有session_id时提示
+                showToast('当前没有待处理的SSO会话，或会话已完成/失败。', 'info');
             }
-            elements.ssoCheckLogin.style.display = 'none';
-            // 清除可能存在的无效会话状态
-            appState.ssoSession = { id: null, status: 'idle', pollInterval: null, pollCount: 0, maxPollCount: 60 };
-            saveSsoSession();
-            stopSsoPolling();
+            // 如果没有待处理的会话，则不执行检查，并确保UI正确
+            if (appState.ssoSession.status !== 'completed') {
+                 elements.ssoCheckLogin.style.display = 'none';
+            }
+            stopSsoPolling(); // 确保停止无效轮询
             return;
         }
 
-        // 检查轮询次数限制
         if (isAutoCheck) {
             appState.ssoSession.pollCount++;
             if (appState.ssoSession.pollCount > appState.ssoSession.maxPollCount) {
-                console.log('[SSO] 轮询次数超限，停止自动检查');
+                console.log('[SSO重构 Plugin] 轮询次数超限，停止自动检查');
                 stopSsoPolling();
                 elements.ssoCheckLogin.innerHTML = '⏰ 检查超时，点击手动重试';
                 elements.ssoCheckLogin.disabled = false;
-                showToast('SSO登录检查超时，请手动点击重试或重新发起登录', 'warning');
+                showToast('SSO授权检查超时，请确认已在Admin UI页面完成操作，然后手动重试', 'warning');
+                appState.ssoSession.status = 'failed'; // 标记为失败
+                saveSsoSession();
                 return;
             }
         }
 
-        // 更新UI状态（仅在手动检查时）
         if (!isAutoCheck) {
             elements.ssoCheckLogin.disabled = true;
-            elements.ssoCheckLogin.innerHTML = '<div class="spinner"></div>正在检查登录状态...';
+            elements.ssoCheckLogin.innerHTML = '<div class="spinner"></div>正在检查授权状态...';
         } else {
-            // 自动检查时显示轮询进度
-            const progress = Math.round((appState.ssoSession.pollCount / appState.ssoSession.maxPollCount) * 100);
-            elements.ssoCheckLogin.innerHTML = `⏳ 自动检查中... (${appState.ssoSession.pollCount}/${appState.ssoSession.maxPollCount})`;
+            elements.ssoCheckLogin.innerHTML = `⏳ 自动检查授权中... (${appState.ssoSession.pollCount}/${appState.ssoSession.maxPollCount})`;
         }
 
         try {
-            console.log(`[SSO] 检查登录状态... (第${appState.ssoSession.pollCount}次)`);
-            
-            const response = await fetch(`${apiHost}/api/auth/sso-session/${appState.ssoSession.id}`);
+            console.log(`[SSO重构 Plugin] 检查授权状态 (第${appState.ssoSession.pollCount}次), 会话ID: ${appState.ssoSession.id}`);
+            const response = await fetch(`${apiHost}/api/v1/user/auth/sso-session/${appState.ssoSession.id}`);
 
             if (!response.ok) {
                 if (response.status === 404) {
                     throw new Error('SSO会话已过期或不存在，请重新发起登录');
                 }
-                throw new Error(`服务器返回错误状态: ${response.status}`);
+                const errorText = await response.text();
+                console.error('[SSO重构 Plugin] 检查状态失败:', response.status, errorText);
+                throw new Error(`服务器错误: ${response.status} ${errorText}`);
             }
 
             const data = await response.json();
-            console.log('[SSO] 登录状态检查结果:', data);
+            console.log('[SSO重构 Plugin] 授权状态检查结果:', data);
 
-            if (data.status === 'completed' && data.tokens) {
-                // 登录成功，停止轮询
+            if (data.status === 'completed' && data.tokens && data.tokens.access_token) {
                 stopSsoPolling();
-                
-                // 保存token
+                console.log('[SSO重构 Plugin] 授权成功，收到tokens:', data.tokens);
+
                 const newApiConfig = {
                     host: apiHost,
                     token: data.tokens.access_token,
                     refreshToken: data.tokens.refresh_token || ''
                 };
 
-                // 保存到storage
-                chrome.storage.local.set({
-                    'xhs_api_config': newApiConfig
-                }, function() {
+                chrome.storage.local.set({ 'xhs_api_config': newApiConfig }, function() {
                     if (chrome.runtime.lastError) {
+                        console.error('[SSO重构 Plugin] 保存Token失败:', chrome.runtime.lastError);
                         showToast('保存Token失败: ' + chrome.runtime.lastError.message, 'error');
+                        appState.ssoSession.status = 'failed'; // 标记为失败
                     } else {
                         appState.apiConfig = newApiConfig;
-                        
-                        // 重置并清除SSO会话状态
-                        appState.ssoSession = {
-                            id: null,
-                            status: 'idle',
-                            pollInterval: null,
-                            pollCount: 0,
-                            maxPollCount: 60
-                        };
-                        saveSsoSession(); // 清除存储中的会话状态
-
-                        // 更新UI
-                        updateApiStatus();
-                        elements.ssoCheckLogin.style.display = 'none';
-                        elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
-
-                        showToast('🎉 SSO登录成功！Token已自动保存', 'success');
-                        console.log('[SSO] 登录完成，Token已保存');
+                        appState.ssoSession.status = 'completed'; // 标记为完成
+                        showToast('🎉 插件授权成功！', 'success');
+                        console.log('[SSO重构 Plugin] Token已保存，授权完成。');
+                        updateApiStatus(); // 更新整体UI状态，会隐藏SSO按钮等
+                         // ssoCheckLogin 按钮应由 updateApiStatus 处理隐藏
                     }
+                    saveSsoSession(); // 保存更新后的会话状态 (completed 或 failed)
                 });
-
             } else if (data.status === 'pending') {
-                // 仍在等待登录
                 if (!isAutoCheck) {
                     elements.ssoCheckLogin.disabled = false;
-                    elements.ssoCheckLogin.innerHTML = '⏳ 等待登录完成...';
-                    showToast('您尚未完成SSO登录，请在新标签页完成登录', 'info');
+                    elements.ssoCheckLogin.innerHTML = '⏳ 等待授权完成...';
+                    showToast('授权仍在进行中，请在Admin UI页面完成操作。', 'info');
                 }
-                // 自动检查时继续轮询，不显示提示
-
             } else {
-                // 登录失败或其他状态
+                // 其他状态 (如 failed, unknown, 或者 completed 但缺少 token)
                 stopSsoPolling();
                 elements.ssoCheckLogin.disabled = false;
-                elements.ssoCheckLogin.innerHTML = '❌ 登录失败，点击重试';
-                if (!isAutoCheck) {
-                    showToast('SSO登录失败，请重试', 'error');
+                elements.ssoCheckLogin.innerHTML = '❌ 授权失败，点击重试';
+                let errorMsg = '授权失败或返回状态异常。';
+                if(data.status === 'completed' && (!data.tokens || !data.tokens.access_token)) {
+                    errorMsg = '授权已完成，但未能获取有效令牌。';
                 }
-            }
-
-        } catch (error) {
-            console.error('[SSO] 检查登录状态失败:', error);
-            
-            // 如果是会话过期错误，停止轮询并清除状态
-            if (error.message.includes('过期') || error.message.includes('不存在')) {
-                stopSsoPolling();
-                elements.ssoCheckLogin.style.display = 'none';
-                elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
-                appState.ssoSession = { id: null, status: 'idle', pollInterval: null, pollCount: 0, maxPollCount: 60 };
+                console.error('[SSO重构 Plugin] 授权状态异常或数据不完整:', data);
+                if (!isAutoCheck) {
+                    showToast(errorMsg, 'error');
+                }
+                appState.ssoSession.status = 'failed';
                 saveSsoSession();
-                
-                if (!isAutoCheck) {
-                    showToast(`检查登录状态失败: ${error.message}`, 'error');
-                }
-            } else {
-                // 其他错误，允许重试
-                elements.ssoCheckLogin.disabled = false;
-                elements.ssoCheckLogin.innerHTML = '🔄 检查失败，点击重试';
-                
-                if (!isAutoCheck) {
-                    showToast(`检查登录状态失败: ${error.message}`, 'error');
-                }
             }
+        } catch (error) {
+            console.error('[SSO重构 Plugin] 检查授权状态时出错:', error);
+            stopSsoPolling(); // 发生错误时也应停止轮询以防无限循环
+            elements.ssoCheckLogin.disabled = false;
+            elements.ssoCheckLogin.innerHTML = '🔄 检查失败，点击重试';
+            if (!isAutoCheck) {
+                showToast(`检查授权状态出错: ${error.message}`, 'error');
+            }
+            appState.ssoSession.status = 'failed'; // 标记为失败
+            saveSsoSession();
         }
     }
 
@@ -554,6 +536,9 @@
             // 停止SSO轮询
             stopSsoPolling();
             
+            // 清除SSO会话状态
+            clearSsoSession();
+            
             // 清除API配置中的token
             const clearedApiConfig = {
                 host: appState.apiConfig.host, // 保留host配置
@@ -561,28 +546,14 @@
                 refreshToken: ''
             };
             
-            // 保存清除后的配置
+            // 保存到storage
             chrome.storage.local.set({
                 'xhs_api_config': clearedApiConfig
             }, function() {
                 if (chrome.runtime.lastError) {
                     showToast('退出登录失败: ' + chrome.runtime.lastError.message, 'error');
                 } else {
-                    // 更新本地状态
                     appState.apiConfig = clearedApiConfig;
-                    
-                    // 清除SSO会话状态
-                    appState.ssoSession = {
-                        id: null,
-                        status: 'idle',
-                        pollInterval: null,
-                        pollCount: 0,
-                        maxPollCount: 60
-                    };
-                    saveSsoSession();
-                    
-                    // 重置SSO按钮状态
-                    elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
                     elements.ssoStartLogin.disabled = false;
                     elements.ssoCheckLogin.style.display = 'none';
                     elements.ssoCheckLogin.classList.add('hidden');
@@ -778,6 +749,30 @@
             "'": '&#039;'
         };
         return text.replace(/[&<>"']/g, function(m) { return map[m]; });
+    }
+
+    // 清除SSO会话状态
+    function clearSsoSession() {
+        // 停止任何正在进行的轮询
+        stopSsoPolling();
+        
+        // 重置会话状态
+        appState.ssoSession = {
+            id: null,
+            status: 'idle',
+            pollInterval: null,
+            pollCount: 0,
+            maxPollCount: 60
+        };
+        
+        // 保存到存储
+        saveSsoSession();
+        
+        // 更新UI
+        elements.ssoCheckLogin.style.display = 'none';
+        elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
+        
+        console.log('[SSO] 已清除SSO会话状态');
     }
 
     console.log('[XHS Monitor Popup] 脚本加载完成');

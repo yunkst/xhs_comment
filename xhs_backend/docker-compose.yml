@@ -13,6 +13,21 @@ services:
     networks:
       - app-network
 
+  redis: # 新增 Redis 服务
+    image: redis:alpine # 使用官方的 Redis Alpine 镜像，比较小巧
+    container_name: redis_service
+    ports:
+      - "6379:6379" # 仅在需要从宿主机直接访问Redis时取消注释，通常容器间通信不需要
+    volumes:
+      - redis_data:/data # 持久化 Redis 数据
+    networks:
+      - app-network
+    healthcheck: # 添加健康检查，确保redis服务正常启动
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: 
       context: . # Build the image from the Dockerfile in the current directory
@@ -31,11 +46,18 @@ services:
     #   # Pass the API secret token from your host environment or a .env file
 
     depends_on:
-      - mongo # Ensure mongo starts before the app
+      mongo: # 确保 mongo 启动
+        condition: service_started # 可以等待mongo服务完全启动，如果mongo启动较慢
+      redis:  # 确保 redis 启动并健康
+        condition: service_healthy 
     networks:
       - app-network
     env_file:
       - .env # Load all variables from .env file
+    # 可以在 .env 文件中或此处直接定义 REDIS_HOST 和 REDIS_PORT
+    # environment:
+    #   REDIS_HOST: redis
+    #   REDIS_PORT: 6379
 
 networks:
   app-network:
@@ -44,3 +66,4 @@ networks:
 
 volumes:
   mongo_data: # Define the named volume for MongoDB data 
+  redis_data: # 定义 Redis 的数据卷

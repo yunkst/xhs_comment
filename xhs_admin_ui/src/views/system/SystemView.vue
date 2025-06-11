@@ -9,7 +9,7 @@
 
       <el-tabs type="border-card">
         <el-tab-pane label="安全设置">
-          <el-form :model="securityForm" label-width="180px">
+          <el-form :model="securityForm" label-width="180px" v-loading="settingsLoading">
             <el-form-item label="登录密码有效期">
               <el-select v-model="securityForm.passwordExpiration">
                 <el-option label="永不过期" :value="0" />
@@ -31,7 +31,7 @@
               <el-input-number v-model="securityForm.sessionTimeout" :min="1" :max="1440" />
             </el-form-item>
             <el-form-item>
-              <el-button type="primary" @click="saveSecuritySettings">保存设置</el-button>
+              <el-button type="primary" @click="saveSecuritySettings" :loading="saveLoading">保存设置</el-button>
               <el-button @click="resetSecuritySettings">重置</el-button>
             </el-form-item>
           </el-form>
@@ -59,6 +59,7 @@
               :auto-upload="false"
               :on-change="handleRestoreFileChange"
               :file-list="restoreFiles"
+              accept=".zip,.sql,.bak"
             >
               <el-button type="warning">
                 <el-icon><Upload /></el-icon>
@@ -77,19 +78,80 @@
             </el-button>
           </div>
           
-          <div class="backup-history" v-if="backupHistory.length > 0">
+          <div class="backup-history" v-loading="historyLoading">
             <h4>备份历史</h4>
-            <el-table :data="backupHistory" style="width: 100%">
+            <el-table :data="backupHistory" style="width: 100%" v-if="backupHistory.length > 0">
               <el-table-column prop="filename" label="文件名" />
               <el-table-column prop="size" label="大小" width="120" />
               <el-table-column prop="createTime" label="创建时间" width="180" />
               <el-table-column label="操作" width="180">
                 <template #default="scope">
-                  <el-button size="small" @click="downloadBackup(scope.row)">下载</el-button>
+                  <el-button size="small" @click="downloadBackup(scope.row)" :loading="scope.row.downloading">下载</el-button>
                   <el-button size="small" type="danger" @click="deleteBackup(scope.row)">删除</el-button>
                 </template>
               </el-table-column>
             </el-table>
+            <el-empty v-else description="暂无备份历史" />
+          </div>
+        </el-tab-pane>
+
+        <el-tab-pane label="系统监控">
+          <div class="system-monitoring" v-loading="monitoringLoading">
+            <el-row :gutter="20">
+              <el-col :span="8">
+                <el-card>
+                  <h4>系统状态</h4>
+                  <div class="status-item">
+                    <span>运行时间:</span>
+                    <span>{{ systemStatus.uptime || '-' }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span>CPU使用率:</span>
+                    <span>{{ systemStatus.cpu_usage || '-' }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span>内存使用率:</span>
+                    <span>{{ systemStatus.memory_usage || '-' }}</span>
+                  </div>
+                </el-card>
+              </el-col>
+              <el-col :span="8">
+                <el-card>
+                  <h4>数据库统计</h4>
+                  <div class="status-item">
+                    <span>评论总数:</span>
+                    <span>{{ databaseStats.comments_count || '-' }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span>用户总数:</span>
+                    <span>{{ databaseStats.users_count || '-' }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span>数据库大小:</span>
+                    <span>{{ databaseStats.database_size || '-' }}</span>
+                  </div>
+                </el-card>
+              </el-col>
+              <el-col :span="8">
+                <el-card>
+                  <h4>版本信息</h4>
+                  <div class="status-item">
+                    <span>系统版本:</span>
+                    <span>{{ versionInfo.version || '-' }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span>构建时间:</span>
+                    <span>{{ versionInfo.build_time || '-' }}</span>
+                  </div>
+                  <div class="status-item">
+                    <span>Git提交:</span>
+                    <span>{{ versionInfo.git_commit || '-' }}</span>
+                  </div>
+                </el-card>
+              </el-col>
+            </el-row>
+            
+            <el-button type="primary" @click="loadSystemInfo" style="margin-top: 20px">刷新系统信息</el-button>
           </div>
         </el-tab-pane>
       </el-tabs>
@@ -101,6 +163,15 @@
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { Download, Upload, RefreshRight } from '@element-plus/icons-vue'
+import { systemApi } from '../../services/api'
+
+// 加载状态
+const settingsLoading = ref(false)
+const saveLoading = ref(false)
+const backupLoading = ref(false)
+const restoreLoading = ref(false)
+const historyLoading = ref(false)
+const monitoringLoading = ref(false)
 
 // 安全设置表单
 const securityForm = reactive({
@@ -111,112 +182,216 @@ const securityForm = reactive({
   sessionTimeout: 120
 })
 
+// 原始设置数据，用于重置
+const originalSecurityForm = ref({})
+
 // 备份相关数据
-const backupLoading = ref(false)
-const restoreLoading = ref(false)
 const restoreFiles = ref([])
 const selectedRestoreFile = ref(null)
-const backupHistory = ref([
-  {
-    filename: 'backup_20230615120000.zip',
-    size: '5.2MB',
-    createTime: '2023-06-15 12:00:00'
-  },
-  {
-    filename: 'backup_20230610090000.zip',
-    size: '5.1MB',
-    createTime: '2023-06-10 09:00:00'
-  },
-  {
-    filename: 'backup_20230601180000.zip',
-    size: '4.9MB',
-    createTime: '2023-06-01 18:00:00'
-  }
-])
+const backupHistory = ref([])
 
-// 安全设置相关方法
-const saveSecuritySettings = () => {
-  ElMessage.success('安全设置保存成功')
+// 系统监控数据
+const systemStatus = ref({})
+const databaseStats = ref({})
+const versionInfo = ref({})
+
+// 加载系统设置
+const loadSystemSettings = async () => {
+  settingsLoading.value = true
+  try {
+    const response = await systemApi.getSystemSettings()
+    if (response && response.data) {
+      Object.assign(securityForm, response.data)
+      originalSecurityForm.value = { ...response.data }
+    }
+  } catch (error) {
+    console.error('加载系统设置失败:', error)
+    ElMessage.error(error.response?.data?.detail || '加载系统设置失败')
+  } finally {
+    settingsLoading.value = false
+  }
 }
 
+// 保存安全设置
+const saveSecuritySettings = async () => {
+  saveLoading.value = true
+  try {
+    await systemApi.updateSystemSettings(securityForm)
+    originalSecurityForm.value = { ...securityForm }
+  ElMessage.success('安全设置保存成功')
+  } catch (error) {
+    console.error('保存安全设置失败:', error)
+    ElMessage.error(error.response?.data?.detail || '保存安全设置失败')
+  } finally {
+    saveLoading.value = false
+  }
+}
+
+// 重置安全设置
 const resetSecuritySettings = () => {
-  securityForm.passwordExpiration = 90
-  securityForm.loginLockEnabled = true
-  securityForm.loginLockThreshold = 5
-  securityForm.loginLockTime = 30
-  securityForm.sessionTimeout = 120
+  Object.assign(securityForm, originalSecurityForm.value)
   ElMessage.info('安全设置已重置')
 }
 
-// 备份相关方法
-const handleBackup = () => {
-  backupLoading.value = true
-  
-  // 模拟备份过程
-  setTimeout(() => {
-    const now = new Date()
-    const year = now.getFullYear()
-    const month = String(now.getMonth() + 1).padStart(2, '0')
-    const day = String(now.getDate()).padStart(2, '0')
-    const hour = String(now.getHours()).padStart(2, '0')
-    const minute = String(now.getMinutes()).padStart(2, '0')
-    const second = String(now.getSeconds()).padStart(2, '0')
-    
-    const filename = `backup_${year}${month}${day}${hour}${minute}${second}.zip`
-    
-    backupHistory.value.unshift({
-      filename,
-      size: '5.3MB',
-      createTime: `${year}-${month}-${day} ${hour}:${minute}:${second}`
-    })
-    
-    backupLoading.value = false
-    ElMessage.success('数据备份成功')
-  }, 2000)
+// 加载备份历史
+const loadBackupHistory = async () => {
+  historyLoading.value = true
+  try {
+    const response = await systemApi.getBackupHistory()
+    if (response && response.data) {
+      backupHistory.value = response.data.map(item => ({
+        ...item,
+        downloading: false
+      }))
+    }
+  } catch (error) {
+    console.error('加载备份历史失败:', error)
+    ElMessage.error(error.response?.data?.detail || '加载备份历史失败')
+    backupHistory.value = []
+  } finally {
+    historyLoading.value = false
+  }
 }
 
+// 备份数据
+const handleBackup = async () => {
+  backupLoading.value = true
+  try {
+    const response = await systemApi.backupData()
+    ElMessage.success('数据备份成功')
+    // 重新加载备份历史
+    await loadBackupHistory()
+  } catch (error) {
+    console.error('数据备份失败:', error)
+    ElMessage.error(error.response?.data?.detail || '数据备份失败')
+  } finally {
+    backupLoading.value = false
+  }
+}
+
+// 处理恢复文件选择
 const handleRestoreFileChange = (file) => {
   restoreFiles.value = [file]
   selectedRestoreFile.value = file
 }
 
-const handleRestore = () => {
+// 恢复数据
+const handleRestore = async () => {
   if (!selectedRestoreFile.value) {
     ElMessage.warning('请先选择备份文件')
     return
   }
   
-  ElMessageBox.confirm('恢复操作将覆盖当前数据，是否继续?', '警告', {
+  try {
+    await ElMessageBox.confirm('恢复操作将覆盖当前数据，是否继续?', '警告', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
+    })
+    
     restoreLoading.value = true
     
-    // 模拟恢复过程
-    setTimeout(() => {
-      restoreLoading.value = false
+    // 创建FormData对象
+    const formData = new FormData()
+    formData.append('file', selectedRestoreFile.value.raw)
+    
+    await systemApi.restoreData(formData)
+    
       restoreFiles.value = []
       selectedRestoreFile.value = null
       ElMessage.success('数据恢复成功')
-    }, 2000)
-  }).catch(() => {})
+    
+    // 重新加载系统信息
+    await loadSystemInfo()
+    
+  } catch (error) {
+    if (error !== 'cancel') {  // 用户取消操作
+      console.error('数据恢复失败:', error)
+      ElMessage.error(error.response?.data?.detail || '数据恢复失败')
+}
+  } finally {
+    restoreLoading.value = false
+  }
 }
 
-const downloadBackup = (backup) => {
-  ElMessage.success(`正在下载备份文件: ${backup.filename}`)
+// 下载备份
+const downloadBackup = async (backup) => {
+  backup.downloading = true
+  try {
+    const response = await systemApi.downloadBackup(backup.filename)
+    
+    // 创建下载链接
+    const blob = new Blob([response], { type: 'application/octet-stream' })
+    const url = window.URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = backup.filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    window.URL.revokeObjectURL(url)
+    
+    ElMessage.success(`备份文件 ${backup.filename} 下载成功`)
+  } catch (error) {
+    console.error('下载备份文件失败:', error)
+    ElMessage.error(error.response?.data?.detail || '下载备份文件失败')
+  } finally {
+    backup.downloading = false
+  }
 }
 
-const deleteBackup = (backup) => {
-  ElMessageBox.confirm(`确定要删除备份文件 ${backup.filename} 吗?`, '警告', {
+// 删除备份
+const deleteBackup = async (backup) => {
+  try {
+    await ElMessageBox.confirm(`确定要删除备份文件 ${backup.filename} 吗?`, '警告', {
     confirmButtonText: '确定',
     cancelButtonText: '取消',
     type: 'warning'
-  }).then(() => {
+    })
+    
+    await systemApi.deleteBackup(backup.filename)
+    
+    // 从列表中移除
     backupHistory.value = backupHistory.value.filter(item => item.filename !== backup.filename)
     ElMessage.success('备份文件删除成功')
-  }).catch(() => {})
+  } catch (error) {
+    if (error !== 'cancel') {
+      console.error('删除备份文件失败:', error)
+      ElMessage.error(error.response?.data?.detail || '删除备份文件失败')
+    }
+  }
 }
+
+// 加载系统信息
+const loadSystemInfo = async () => {
+  monitoringLoading.value = true
+  try {
+    const [statusResponse, dbStatsResponse, versionResponse] = await Promise.all([
+      systemApi.getSystemStatus(),
+      systemApi.getDatabaseStats(),
+      systemApi.getVersionInfo()
+    ])
+    
+    systemStatus.value = statusResponse?.data || {}
+    databaseStats.value = dbStatsResponse?.data || {}
+    versionInfo.value = versionResponse?.data || {}
+    
+  } catch (error) {
+    console.error('加载系统信息失败:', error)
+    ElMessage.error(error.response?.data?.detail || '加载系统信息失败')
+  } finally {
+    monitoringLoading.value = false
+  }
+}
+
+// 组件挂载时加载所有数据
+onMounted(async () => {
+  await Promise.all([
+    loadSystemSettings(),
+    loadBackupHistory(),
+    loadSystemInfo()
+  ])
+})
 </script>
 
 <style scoped>
@@ -255,7 +430,29 @@ const deleteBackup = (backup) => {
   color: #606266;
 }
 
+.system-monitoring .status-item {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  padding: 5px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.system-monitoring .status-item:last-child {
+  border-bottom: none;
+}
+
 :deep(.el-upload-list) {
   margin-top: 10px;
+}
+
+:deep(.el-card) {
+  margin-bottom: 20px;
+}
+
+:deep(.el-card .el-card__body h4) {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #409eff;
 }
 </style> 
