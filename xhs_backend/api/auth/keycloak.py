@@ -1,7 +1,8 @@
 from fastapi import Depends, HTTPException, status, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from keycloak import KeycloakOpenID
-from jose import JWTError, jwt
+from jose import JWTError
+from jose import jwt as jose_jwt
 import os
 from typing import Optional, Dict, Any
 import logging
@@ -140,7 +141,7 @@ async def get_keycloak_user(request: Request) -> Optional[str]:
 def _decode_jwt_token_for_auth_fallback(token: str) -> Optional[TokenData]:
     """Decodes JWT token, returns TokenData if valid, else None."""
     try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jose_jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         username: Optional[str] = payload.get("sub") # 'sub' 通常用于存储用户标识
         if username is None:
             logger.warning("_decode_jwt_token_for_auth_fallback: JWT token payload missing 'sub' (username).")

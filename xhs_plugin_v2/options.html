@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>小红书监控插件 - 配置</title>
+    <link rel="stylesheet" href="shared/common.css">
     <link rel="stylesheet" href="options.css">
 </head>
 <body>
@@ -43,6 +44,39 @@
                 <div class="button-group">
                     <button id="saveApiConfigBtn" class="btn btn-primary">💾 保存API配置</button>
                     <button id="testApiConnectionBtn" class="btn btn-secondary">🔗 测试连接</button>
+                </div>
+            </section>
+            
+            <!-- 账号密码登录 -->
+            <section class="config-section" id="loginForm">
+                <h2>🔑 账号密码登录</h2>
+                <div class="setting-item">
+                    <label class="input-setting">
+                        <span class="setting-label">用户名</span>
+                        <input type="text" id="usernameInput" placeholder="请输入用户名" class="text-input">
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label class="input-setting">
+                        <span class="setting-label">密码</span>
+                        <input type="password" id="passwordInput" placeholder="请输入密码" class="text-input">
+                    </label>
+                </div>
+                <div class="setting-item">
+                    <label class="checkbox-item">
+                        <input type="checkbox" id="useOtpCheckbox" checked>
+                        <span class="checkmark"></span>
+                        <span class="checkbox-label">需要动态验证码 (OTP)</span>
+                    </label>
+                </div>
+                <div class="setting-item" id="otpGroup">
+                    <label class="input-setting">
+                        <span class="setting-label">动态验证码</span>
+                        <input type="text" id="otpInput" placeholder="请输入6位OTP代码" class="text-input" maxlength="6">
+                    </label>
+                </div>
+                <div class="button-group">
+                    <button id="loginBtn" class="btn btn-success">🔓 登录</button>
                     <button id="logoutBtn" class="btn btn-warning" style="display: none;">🚪 退出登录</button>
                 </div>
             </section>
@@ -155,6 +189,6 @@
         </footer>
     </div>
 
-    <script src="options.js"></script>
+    <script src="options/index.js" type="module"></script>
 </body>
 </html> 

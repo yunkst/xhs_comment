@@ -27,7 +27,7 @@ class UserInLogin(BaseModel):
     """用户登录请求模型"""
     username: str
     password: str
-    otp_code: str
+    otp_code: Optional[str] = None
 
 class UserInDB(User):
     """数据库中的用户模型"""

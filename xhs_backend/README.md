@@ -183,6 +183,8 @@ MONGO_URI=mongodb://localhost:27017
 MONGO_DB=xhs_data
 JWT_SECRET_KEY=your_secret_key_here
 ALLOW_REGISTER=true
+# (可选) 设置为 false 来禁用OTP二次验证，默认为 true
+AUTH_OTP_ENABLED=true
 ```
 
 3. 运行开发服务器：

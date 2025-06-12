@@ -1,0 +1,429 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统性能优化指南
+
+本指南提供了系统各组件的性能优化策略和最佳实践。
+
+## 后端性能优化
+
+### 1. FastAPI 应用优化
+
+**异步编程最佳实践**:
+- 所有数据库操作使用 `async/await`
+- 避免在异步函数中使用同步调用
+- 合理使用连接池和会话管理
+
+```python
+# 推荐做法 - 异步数据库操作
+async def get_comments(db, note_id: str):
+    return await db[COMMENTS_COLLECTION].find({"note_id": note_id}).to_list(100)
+
+# 避免 - 同步操作阻塞事件循环
+def sync_heavy_operation():
+    time.sleep(5)  # 不要在异步函数中使用
+```
+
+**API端点优化**:
+- 实现请求数据验证和过滤
+- 使用适当的HTTP状态码和响应格式
+- 启用API响应缓存机制
+- 限制返回数据的大小
+
+**相关文件**:
+- API端点: [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints)
+- 服务层: [xhs_backend/api/services/](mdc:xhs_backend/api/services)
+
+### 2. 数据库性能优化
+
+**MongoDB索引策略**:
+```javascript
+// 为常用查询字段创建索引
+db.comments.createIndex({ "note_id": 1, "timestamp": -1 })
+db.comments.createIndex({ "user_id": 1 })
+db.comments.createIndex({ "collected_at": 1 })
+db.notifications.createIndex({ "timestamp": -1 })
+db.user_info.createIndex({ "user_id": 1 }, { unique: true })
+
+// 复合索引用于复杂查询
+db.comments.createIndex({ 
+  "note_id": 1, 
+  "timestamp": -1, 
+  "is_author": 1 
+})
+```
+
+**查询优化**:
+- 使用聚合管道进行复杂统计
+- 实现分页查询避免一次加载大量数据
+- 使用投影限制返回字段
+- 合理使用 `$lookup` 进行关联查询
+
+```python
+# 分页查询示例
+async def get_comments_paginated(
+    db, 
+    note_id: str, 
+    page: int = 1, 
+    page_size: int = 20
+):
+    skip = (page - 1) * page_size
+    cursor = db[COMMENTS_COLLECTION].find(
+        {"note_id": note_id}
+    ).sort("timestamp", -1).skip(skip).limit(page_size)
+    return await cursor.to_list(page_size)
+```
+
+**数据库连接优化**:
+- 配置适当的连接池大小
+- 设置合理的连接超时时间
+- 监控数据库连接使用情况
+
+**相关文件**:
+- 数据库配置: [xhs_backend/database.py](mdc:xhs_backend/database.py)
+- 数据模式: [.cursor/rules/database-schema.mdc](mdc:.cursor/rules/database-schema.mdc)
+
+### 3. 内存和缓存优化
+
+**Redis缓存策略**:
+```python
+# 缓存常用数据
+async def get_user_info_cached(user_id: str):
+    cache_key = f"user_info:{user_id}"
+    cached_data = await redis.get(cache_key)
+    if cached_data:
+        return json.loads(cached_data)
+    
+    user_info = await db[USER_INFO_COLLECTION].find_one({"user_id": user_id})
+    await redis.setex(cache_key, 3600, json.dumps(user_info))
+    return user_info
+```
+
+**内存使用优化**:
+- 及时释放大对象的引用
+- 使用生成器处理大量数据
+- 避免在内存中缓存过多数据
+
+### 4. 并发处理优化
+
+**请求并发控制**:
+- 实现请求速率限制
+- 使用信号量控制并发数量
+- 优化线程池和进程池配置
+
+```python
+# 限制并发数量
+import asyncio
+semaphore = asyncio.Semaphore(10)
+
+async def process_comment_with_limit(comment_data):
+    async with semaphore:
+        return await process_comment(comment_data)
+```
+
+## 前端性能优化
+
+### 1. Vue.js 应用优化
+
+**组件优化**:
+- 使用 `v-memo` 和 `computed` 进行缓存
+- 实现组件懒加载和代码分割
+- 优化组件渲染和更新逻辑
+
+```javascript
+// 组件懒加载
+const CommentList = defineAsyncComponent(() => 
+  import('./components/CommentList.vue')
+)
+
+// 使用computed缓存计算结果
+const filteredComments = computed(() => {
+  return comments.value.filter(comment => 
+    comment.content.includes(searchKeyword.value)
+  )
+})
+```
+
+**状态管理优化**:
+- 合理设计Pinia store结构
+- 避免不必要的响应式数据
+- 实现状态持久化和恢复
+
+**相关文件**:
+- 组件目录: [xhs_admin_ui/src/components/](mdc:xhs_admin_ui/src/components)
+- 视图组件: [xhs_admin_ui/src/views/](mdc:xhs_admin_ui/src/views)
+- 状态管理: [xhs_admin_ui/src/stores/](mdc:xhs_admin_ui/src/stores)
+
+### 2. 网络请求优化
+
+**API调用优化**:
+```javascript
+// 请求缓存
+const apiCache = new Map()
+
+async function fetchWithCache(url, options = {}) {
+  const cacheKey = `${url}_${JSON.stringify(options)}`
+  
+  if (apiCache.has(cacheKey)) {
+    return apiCache.get(cacheKey)
+  }
+  
+  const response = await fetch(url, options)
+  const data = await response.json()
+  
+  apiCache.set(cacheKey, data)
+  setTimeout(() => apiCache.delete(cacheKey), 300000) // 5分钟缓存
+  
+  return data
+}
+
+// 请求防抖
+import { debounce } from 'lodash-es'
+
+const debouncedSearch = debounce(async (keyword) => {
+  await searchComments(keyword)
+}, 300)
+```
+
+**数据加载优化**:
+- 实现虚拟滚动处理大量数据
+- 使用分页和无限滚动
+- 预加载关键数据
+
+**相关文件**:
+- API服务: [xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js)
+
+### 3. 构建和资源优化
+
+**Vite配置优化**:
+```javascript
+// vite.config.js
+export default defineConfig({
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor': ['vue', 'vue-router', 'pinia'],
+          'ui': ['element-plus'],
+          'utils': ['lodash-es', 'date-fns']
+        }
+      }
+    },
+    chunkSizeWarningLimit: 1000
+  },
+  optimizeDeps: {
+    include: ['vue', 'vue-router', 'pinia', 'element-plus']
+  }
+})
+```
+
+**资源压缩和缓存**:
+- 启用Gzip压缩
+- 配置静态资源缓存策略
+- 优化图片和字体资源
+
+**相关文件**:
+- Vite配置: [xhs_admin_ui/vite.config.js](mdc:xhs_admin_ui/vite.config.js)
+
+## Chrome插件性能优化
+
+### 1. 内容脚本优化
+
+**DOM操作优化**:
+```javascript
+// 批量DOM操作
+function updateCommentElements(comments) {
+  const fragment = document.createDocumentFragment()
+  
+  comments.forEach(comment => {
+    const element = createCommentElement(comment)
+    fragment.appendChild(element)
+  })
+  
+  commentContainer.appendChild(fragment)
+}
+
+// 使用事件委托
+document.addEventListener('click', (event) => {
+  if (event.target.matches('.comment-item')) {
+    handleCommentClick(event.target)
+  }
+})
+```
+
+**数据处理优化**:
+```javascript
+// 使用Web Worker处理大量数据
+const worker = new Worker('dataProcessor.js')
+
+worker.postMessage({ 
+  action: 'processComments', 
+  data: rawComments 
+})
+
+worker.onmessage = (event) => {
+  const processedComments = event.data
+  sendToAPI(processedComments)
+}
+```
+
+**相关文件**:
+- 内容脚本: [xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js)
+- 后台脚本: [xhs_chrome_plugin/js/background.js](mdc:xhs_chrome_plugin/js/background.js)
+
+### 2. 内存和存储优化
+
+**内存管理**:
+- 及时清理事件监听器
+- 避免内存泄漏
+- 限制数据缓存大小
+
+```javascript
+// 清理事件监听器
+function cleanup() {
+  document.removeEventListener('click', handleClick)
+  observer.disconnect()
+}
+
+// 限制缓存大小
+const cache = new Map()
+const MAX_CACHE_SIZE = 1000
+
+function addToCache(key, value) {
+  if (cache.size >= MAX_CACHE_SIZE) {
+    const firstKey = cache.keys().next().value
+    cache.delete(firstKey)
+  }
+  cache.set(key, value)
+}
+```
+
+**存储优化**:
+- 使用Chrome存储API进行数据持久化
+- 压缩存储数据
+- 定期清理过期数据
+
+### 3. 网络请求优化
+
+**批量请求**:
+```javascript
+// 批量发送数据
+const pendingData = []
+const BATCH_SIZE = 50
+
+function addDataToBatch(data) {
+  pendingData.push(data)
+  
+  if (pendingData.length >= BATCH_SIZE) {
+    sendBatch()
+  }
+}
+
+async function sendBatch() {
+  if (pendingData.length === 0) return
+  
+  const batch = pendingData.splice(0, BATCH_SIZE)
+  
+  try {
+    await fetch('/api/comments/batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batch)
+    })
+  } catch (error) {
+    console.error('Batch send failed:', error)
+    // 重新加入队列
+    pendingData.unshift(...batch)
+  }
+}
+```
+
+## 系统整体性能监控
+
+### 1. 性能指标监控
+
+**后端指标**:
+- API响应时间
+- 数据库查询性能
+- 内存和CPU使用率
+- 并发请求数量
+
+**前端指标**:
+- 页面加载时间
+- 首屏渲染时间
+- 组件渲染性能
+- 网络请求延迟
+
+**数据库指标**:
+- 查询执行时间
+- 索引使用效率
+- 连接池状态
+- 存储空间使用
+
+### 2. 性能测试
+
+**负载测试**:
+```bash
+# 使用 wrk 进行API负载测试
+wrk -t12 -c400 -d30s http://localhost:8000/api/comments
+
+# 使用 ab 进行简单压力测试
+ab -n 1000 -c 10 http://localhost:8000/api/health
+```
+
+**数据库性能测试**:
+```javascript
+// MongoDB性能分析
+db.comments.explain("executionStats").find({
+  "note_id": "example_note_id",
+  "timestamp": { $gte: ISODate("2024-01-01") }
+})
+```
+
+### 3. 性能优化建议
+
+**定期任务**:
+- 分析慢查询日志
+- 清理无用数据和索引
+- 更新依赖包版本
+- 监控系统资源使用
+
+**架构优化**:
+- 考虑使用CDN加速静态资源
+- 实现读写分离
+- 使用消息队列处理异步任务
+- 部署负载均衡器
+
+**相关文件**:
+- Docker配置: [.cursor/rules/docker-configuration.mdc](mdc:.cursor/rules/docker-configuration.mdc)
+- 故障排除: [.cursor/rules/troubleshooting.mdc](mdc:.cursor/rules/troubleshooting.mdc)
+
+## 性能优化检查清单
+
+### 后端优化
+- [ ] 数据库索引是否合理
+- [ ] API端点是否实现分页
+- [ ] 异步操作是否正确使用
+- [ ] 缓存机制是否有效
+- [ ] 并发控制是否适当
+
+### 前端优化
+- [ ] 组件懒加载是否实现
+- [ ] 静态资源是否压缩
+- [ ] API请求是否缓存
+- [ ] 大列表是否使用虚拟滚动
+- [ ] 图片是否优化
+
+### 插件优化
+- [ ] DOM操作是否批量处理
+- [ ] 事件监听器是否及时清理
+- [ ] 数据是否批量发送
+- [ ] 内存使用是否合理
+
+### 系统整体
+- [ ] 监控指标是否完善
+- [ ] 日志记录是否适当
+- [ ] 错误处理是否健全
+- [ ] 文档是否及时更新

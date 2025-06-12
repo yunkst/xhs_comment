@@ -68,14 +68,15 @@ async def get_notes(
         
         # 查询数据
         cursor = collection.find(query).sort("fetch_time", -1).skip(skip).limit(page_size)
+        notes_docs = await cursor.to_list(length=page_size)
         notes_list = []
         
-        for doc in cursor:
+        for doc in notes_docs:
             doc['_id'] = str(doc['_id'])
             notes_list.append(doc)
         
         # 获取总数
-        total = collection.count_documents(query)
+        total = await collection.count_documents(query)
         
         return {
             "success": True,
@@ -108,7 +109,7 @@ async def get_notes_stats(
         collection = db[NOTES_COLLECTION]
         
         # 基础统计
-        total_notes = collection.count_documents({})
+        total_notes = await collection.count_documents({})
         
         # 时间范围统计
         now = datetime.utcnow()
@@ -117,12 +118,12 @@ async def get_notes_stats(
         week_start = now - timedelta(days=7)
         month_start = now - timedelta(days=30)
         
-        today_notes = collection.count_documents({"fetch_time": {"$gte": today_start}})
-        yesterday_notes = collection.count_documents({
+        today_notes = await collection.count_documents({"fetch_time": {"$gte": today_start}})
+        yesterday_notes = await collection.count_documents({
             "fetch_time": {"$gte": yesterday_start, "$lt": today_start}
         })
-        week_notes = collection.count_documents({"fetch_time": {"$gte": week_start}})
-        month_notes = collection.count_documents({"fetch_time": {"$gte": month_start}})
+        week_notes = await collection.count_documents({"fetch_time": {"$gte": week_start}})
+        month_notes = await collection.count_documents({"fetch_time": {"$gte": month_start}})
         
         # 按作者统计 (Top 10)
         authors_pipeline = [
@@ -130,7 +131,7 @@ async def get_notes_stats(
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        top_authors = list(collection.aggregate(authors_pipeline))
+        top_authors = await collection.aggregate(authors_pipeline).to_list(length=10)
         
         # 获取平均点赞数和收藏数
         engagement_pipeline = [
@@ -144,7 +145,7 @@ async def get_notes_stats(
                 }
             }
         ]
-        engagement_result = list(collection.aggregate(engagement_pipeline))
+        engagement_result = await collection.aggregate(engagement_pipeline).to_list(length=1)
         engagement_stats = engagement_result[0] if engagement_result else {
             "avg_liked_count": 0,
             "avg_collected_count": 0,
@@ -197,10 +198,10 @@ async def get_note(
         # 尝试通过MongoDB ObjectId查询
         try:
             from bson import ObjectId
-            note = collection.find_one({"_id": ObjectId(note_id)})
+            note = await collection.find_one({"_id": ObjectId(note_id)})
         except:
             # 如果不是有效的ObjectId，尝试按note_id字段查询
-            note = collection.find_one({"note_id": note_id})
+            note = await collection.find_one({"note_id": note_id})
         
         if not note:
             raise HTTPException(
@@ -240,10 +241,10 @@ async def delete_note(
         # 尝试通过MongoDB ObjectId删除
         try:
             from bson import ObjectId
-            result = collection.delete_one({"_id": ObjectId(note_id)})
+            result = await collection.delete_one({"_id": ObjectId(note_id)})
         except:
             # 如果不是有效的ObjectId，尝试按note_id字段删除
-            result = collection.delete_one({"note_id": note_id})
+            result = await collection.delete_one({"note_id": note_id})
         
         if result.deleted_count == 0:
             raise HTTPException(

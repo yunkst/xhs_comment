@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 # 创建路由器
 router = APIRouter()
 
-@router.get("", summary="查询用户")
+@router.get("/list", summary="查询用户")
 async def get_users(
     page: int = Query(1, ge=1, description="页码"),
     page_size: int = Query(20, ge=1, le=100, description="每页数量"),
@@ -49,14 +49,15 @@ async def get_users(
         # 查询数据，排除敏感字段
         projection = {"password": 0, "token": 0}
         cursor = collection.find(query, projection).sort("created_at", -1).skip(skip).limit(page_size)
+        users_docs = await cursor.to_list(length=page_size)
         users_list = []
         
-        for doc in cursor:
+        for doc in users_docs:
             doc['_id'] = str(doc['_id'])
             users_list.append(doc)
         
         # 获取总数
-        total = collection.count_documents(query)
+        total = await collection.count_documents(query)
         
         return {
             "success": True,
@@ -90,8 +91,8 @@ async def get_users_stats(
         user_info_collection = db[USER_INFO_COLLECTION]
         
         # 基础统计
-        total_users = users_collection.count_documents({})
-        total_user_info = user_info_collection.count_documents({})
+        total_users = await users_collection.count_documents({})
+        total_user_info = await user_info_collection.count_documents({})
         
         # 时间范围统计
         now = datetime.utcnow()
@@ -100,17 +101,18 @@ async def get_users_stats(
         week_start = now - timedelta(days=7)
         month_start = now - timedelta(days=30)
         
-        today_users = users_collection.count_documents({"created_at": {"$gte": today_start}})
-        yesterday_users = users_collection.count_documents({
+        today_users = await users_collection.count_documents({"created_at": {"$gte": today_start}})
+        yesterday_users = await users_collection.count_documents({
             "created_at": {"$gte": yesterday_start, "$lt": today_start}
         })
-        week_users = users_collection.count_documents({"created_at": {"$gte": week_start}})
-        month_users = users_collection.count_documents({"created_at": {"$gte": month_start}})
+        week_users = await users_collection.count_documents({"created_at": {"$gte": week_start}})
+        month_users = await users_collection.count_documents({"created_at": {"$gte": month_start}})
         
         # 活跃用户统计 (最近登录)
-        recent_active = users_collection.count_documents({
+        has_login_field = await users_collection.find_one({"last_login": {"$exists": True}})
+        recent_active = await users_collection.count_documents({
             "last_login": {"$gte": week_start}
-        }) if users_collection.find_one({"last_login": {"$exists": True}}) else 0
+        }) if has_login_field else 0
         
         return {
             "success": True,
@@ -155,10 +157,10 @@ async def get_user(
         # 尝试通过MongoDB ObjectId查询
         try:
             from bson import ObjectId
-            user = collection.find_one({"_id": ObjectId(user_id)}, {"password": 0, "token": 0})
+            user = await collection.find_one({"_id": ObjectId(user_id)}, {"password": 0, "token": 0})
         except:
             # 如果不是有效的ObjectId，尝试按username查询
-            user = collection.find_one({"username": user_id}, {"password": 0, "token": 0})
+            user = await collection.find_one({"username": user_id}, {"password": 0, "token": 0})
         
         if not user:
             raise HTTPException(

@@ -13,6 +13,19 @@ services:
     networks:
       - app-network
 
+  redis: # 添加 Redis 服务（开发环境）
+    image: redis:alpine # 使用官方的 Redis Alpine 镜像
+    container_name: redis_service_dev
+    volumes:
+      - redis_data:/data # 持久化 Redis 数据
+    networks:
+      - app-network
+    healthcheck: # 添加健康检查
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: 
       context: . # Build the image from the Dockerfile in the current directory
@@ -40,3 +53,4 @@ networks:
 
 volumes:
   mongo_data: # Define the named volume for MongoDB data 
+  redis_data: # 添加 Redis 数据卷 

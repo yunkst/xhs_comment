@@ -131,6 +131,10 @@ export const userApi = {
   // 检查注册状态
   checkRegisterStatus: () => {
     return api.get('/api/v1/user/auth/register-status');
+  },
+  // 检查OTP状态
+  checkOtpStatus: () => {
+    return api.get('/api/v1/user/auth/otp-status');
   }
 };
 

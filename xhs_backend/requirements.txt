@@ -22,3 +22,5 @@ Pillow>=9.5.0  # 用于QR码生成
 # 工具
 python-dotenv>=1.0.0
 pydantic-settings>=2.0.0
+
+redis==6.2.0

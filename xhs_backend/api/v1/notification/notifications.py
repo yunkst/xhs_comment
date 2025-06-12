@@ -68,14 +68,15 @@ async def get_notifications(
         
         # 查询数据
         cursor = collection.find(query).sort("timestamp", -1).skip(skip).limit(page_size)
+        notifications_docs = await cursor.to_list(length=page_size)
         notifications_list = []
         
-        for doc in cursor:
+        for doc in notifications_docs:
             doc['_id'] = str(doc['_id'])
             notifications_list.append(doc)
         
         # 获取总数
-        total = collection.count_documents(query)
+        total = await collection.count_documents(query)
         
         return {
             "success": True,
@@ -108,7 +109,7 @@ async def get_notifications_stats(
         collection = db[NOTIFICATIONS_COLLECTION]
         
         # 基础统计
-        total_notifications = collection.count_documents({})
+        total_notifications = await collection.count_documents({})
         
         # 时间范围统计
         now = datetime.utcnow()
@@ -117,19 +118,19 @@ async def get_notifications_stats(
         week_start = now - timedelta(days=7)
         month_start = now - timedelta(days=30)
         
-        today_notifications = collection.count_documents({"timestamp": {"$gte": today_start}})
-        yesterday_notifications = collection.count_documents({
+        today_notifications = await collection.count_documents({"timestamp": {"$gte": today_start}})
+        yesterday_notifications = await collection.count_documents({
             "timestamp": {"$gte": yesterday_start, "$lt": today_start}
         })
-        week_notifications = collection.count_documents({"timestamp": {"$gte": week_start}})
-        month_notifications = collection.count_documents({"timestamp": {"$gte": month_start}})
+        week_notifications = await collection.count_documents({"timestamp": {"$gte": week_start}})
+        month_notifications = await collection.count_documents({"timestamp": {"$gte": month_start}})
         
         # 按类型统计
         types_pipeline = [
             {"$group": {"_id": "$type", "count": {"$sum": 1}}},
             {"$sort": {"count": -1}}
         ]
-        types_result = list(collection.aggregate(types_pipeline))
+        types_result = await collection.aggregate(types_pipeline).to_list(length=None)
         types_stats = {item["_id"]: item["count"] for item in types_result}
         
         # 按用户统计 (Top 10)
@@ -138,7 +139,7 @@ async def get_notifications_stats(
             {"$sort": {"count": -1}},
             {"$limit": 10}
         ]
-        top_users = list(collection.aggregate(users_pipeline))
+        top_users = await collection.aggregate(users_pipeline).to_list(length=10)
         
         return {
             "success": True,
@@ -182,7 +183,7 @@ async def get_notification_types(
             {"$sort": {"count": -1}}
         ]
         
-        types_result = list(collection.aggregate(pipeline))
+        types_result = await collection.aggregate(pipeline).to_list(length=None)
         
         return {
             "success": True,
@@ -218,7 +219,7 @@ async def get_notification(
         
         collection = db[NOTIFICATIONS_COLLECTION]
         
-        notification = collection.find_one({"_id": ObjectId(notification_id)})
+        notification = await collection.find_one({"_id": ObjectId(notification_id)})
         
         if not notification:
             raise HTTPException(
@@ -257,7 +258,7 @@ async def delete_notification(
         
         collection = db[NOTIFICATIONS_COLLECTION]
         
-        result = collection.delete_one({"_id": ObjectId(notification_id)})
+        result = await collection.delete_one({"_id": ObjectId(notification_id)})
         
         if result.deleted_count == 0:
             raise HTTPException(

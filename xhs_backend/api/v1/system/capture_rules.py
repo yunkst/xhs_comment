@@ -18,57 +18,7 @@ logger = logging.getLogger(__name__)
 # 创建路由器 (添加前缀)
 router = APIRouter(prefix="/capture-rules")
 
-# 默认抓取规则配置
-DEFAULT_CAPTURE_RULES = [
-    {
-        "name": "通知接口",
-        "pattern": "*/api/sns/web/v1/notify/*",
-        "enabled": True,
-        "description": "小红书通知相关API",
-        "data_type": "notification",
-        "priority": 10
-    },
-    {
-        "name": "评论接口",
-        "pattern": "*/api/sns/web/v1/comment/*",
-        "enabled": True,
-        "description": "小红书评论相关API",
-        "data_type": "comment",
-        "priority": 10
-    },
-    {
-        "name": "用户信息接口",
-        "pattern": "*/api/sns/web/v1/user/*",
-        "enabled": True,
-        "description": "小红书用户信息API",
-        "data_type": "user",
-        "priority": 8
-    },
-    {
-        "name": "笔记内容接口",
-        "pattern": "*/api/sns/web/v1/feed/*",
-        "enabled": True,
-        "description": "小红书笔记内容API",
-        "data_type": "note",
-        "priority": 9
-    },
-    {
-        "name": "搜索接口",
-        "pattern": "*/api/sns/web/v1/search/*",
-        "enabled": True,
-        "description": "小红书搜索API",
-        "data_type": "search",
-        "priority": 5
-    },
-    {
-        "name": "热门推荐接口",
-        "pattern": "*/api/sns/web/v1/homefeed/*",
-        "enabled": True,
-        "description": "小红书首页推荐API",
-        "data_type": "recommendation",
-        "priority": 3
-    }
-]
+
 
 @router.get("", response_model=CaptureRulesResponse, summary="获取抓取规则")
 async def get_capture_rules(current_user: str = Depends(get_current_user)):
@@ -82,8 +32,9 @@ async def get_capture_rules(current_user: str = Depends(get_current_user)):
         db = await get_database()
         rules_collection = db["capture_rules"]
         
-        # 查询所有规则并排序
-        cursor = rules_collection.find({})
+
+        # 查询启用的规则并排序
+        cursor = rules_collection.find({"enabled": True}).sort("priority", -1)
         rules = await cursor.to_list(length=100)
         
         # 处理ObjectId
@@ -116,11 +67,12 @@ async def get_all_capture_rules(
     try:
         collection = db.capture_rules
         
-        # 查询所有规则，按优先级排序
-        rules_cursor = collection.find().sort("priority", -1)
+
+        # 查询所有规则，按优先级排序，使用to_list方法
+        rules_docs = await collection.find().sort("priority", -1).to_list(length=100)
         
         rules = []
-        for rule_doc in rules_cursor:
+        for rule_doc in rules_docs:
             rule_doc.pop('_id', None)
             rules.append(CaptureRule(**rule_doc))
         
@@ -152,7 +104,7 @@ async def create_capture_rule(
         collection = db.capture_rules
         
         # 检查规则名称是否已存在
-        existing_rule = collection.find_one({"name": rule.name})
+        existing_rule = await collection.find_one({"name": rule.name})
         if existing_rule:
             raise HTTPException(
                 status_code=400,
@@ -164,7 +116,7 @@ async def create_capture_rule(
         rule_dict['created_at'] = datetime.utcnow()
         rule_dict['updated_at'] = datetime.utcnow()
         
-        result = collection.insert_one(rule_dict)
+        result = await collection.insert_one(rule_dict)
         
         return {
             "success": True,
@@ -199,7 +151,7 @@ async def update_capture_rule(
         rule_dict = rule_update.dict()
         rule_dict['updated_at'] = datetime.utcnow()
         
-        result = collection.update_one(
+        result = await collection.update_one(
             {"name": rule_name},
             {"$set": rule_dict}
         )
@@ -238,7 +190,7 @@ async def delete_capture_rule(
     try:
         collection = db.capture_rules
         
-        result = collection.delete_one({"name": rule_name})
+        result = await collection.delete_one({"name": rule_name})
         
         if result.deleted_count == 0:
             raise HTTPException(

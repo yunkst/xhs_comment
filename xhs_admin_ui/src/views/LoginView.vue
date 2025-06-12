@@ -23,7 +23,7 @@
             </template>
           </el-input>
         </el-form-item>
-        <el-form-item prop="otp_code">
+        <el-form-item prop="otp_code" v-if="otpEnabled">
           <el-input v-model="loginForm.otp_code" prefix-icon="el-icon-key" placeholder="动态验证码" @keyup.enter="handleLogin">
             <template #prefix>
               <el-icon><Key /></el-icon>
@@ -75,7 +75,7 @@
               <el-button type="primary" :loading="registerLoading" class="login-button" @click="handleRegister">注册</el-button>
             </el-form-item>
             
-            <div class="register-notice">
+            <div class="register-notice" v-if="otpEnabled">
               <el-alert
                 title="注册须知"
                 type="info"
@@ -131,6 +131,7 @@ const qrcodeDialogVisible = ref(false)
 const otpQrcode = ref('')
 const activeTab = ref('login')
 const allowRegister = ref(true)
+const otpEnabled = ref(true)
 
 const loginForm = reactive({
   username: '',
@@ -144,11 +145,11 @@ const registerForm = reactive({
   confirmPassword: ''
 })
 
-const loginRules = {
+const loginRules = reactive({
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  otp_code: [{ required: true, message: '请输入动态验证码', trigger: 'blur' }]
-}
+  otp_code: []
+})
 
 const registerRules = {
   username: [
@@ -326,12 +327,23 @@ const handleRegister = async () => {
         password: registerForm.password
       })
       
-      ElMessage.success('注册成功！请设置OTP动态验证码')
+      ElMessage.success(otpEnabled.value ? '注册成功！请设置OTP动态验证码' : '注册成功！')
       
-      // 注册成功后，显示OTP二维码
-      otpQrcode.value = ''
-      await loadOtpQrcodeForUser(registerForm.username)
-      qrcodeDialogVisible.value = true
+      // 注册成功后，如果启用了OTP，显示OTP二维码
+      if (otpEnabled.value) {
+        otpQrcode.value = ''
+        await loadOtpQrcodeForUser(registerForm.username)
+        qrcodeDialogVisible.value = true
+      } else {
+        // 如果未启用OTP，直接切换到登录标签页
+        activeTab.value = 'login'
+        loginForm.username = registerForm.username
+        // 清空注册表单
+        registerForm.username = ''
+        registerForm.password = ''
+        registerForm.confirmPassword = ''
+        ElMessage.info('请使用您的账号和密码登录')
+      }
       
     } catch (error) {
       console.error('注册失败:', error)
@@ -393,6 +405,25 @@ const checkRegisterStatus = async () => {
   }
 }
 
+// 检查OTP状态
+const checkOtpStatus = async () => {
+  try {
+    const response = await userApi.checkOtpStatus()
+    otpEnabled.value = response.otp_enabled !== false // 默认启用
+    
+    // 动态更新OTP验证规则
+    if (otpEnabled.value) {
+      loginRules.otp_code = [{ required: true, message: '请输入动态验证码', trigger: 'blur' }]
+    } else {
+      loginRules.otp_code = []
+    }
+  } catch (error) {
+    console.warn('检查OTP状态失败，默认启用OTP:', error)
+    otpEnabled.value = true
+    loginRules.otp_code = [{ required: true, message: '请输入动态验证码', trigger: 'blur' }]
+  }
+}
+
 // 页面加载时检查SSO回调参数和注册状态
 onMounted(() => {
   console.log('[SSO重构] LoginView - 组件挂载')
@@ -419,6 +450,25 @@ onMounted(() => {
     .catch(error => {
       console.error('[SSO重构] LoginView - 获取注册状态失败:', error)
       allowRegister.value = false
+    })
+    
+  // 检查OTP功能是否开启
+  userApi.checkOtpStatus()
+    .then(response => {
+      otpEnabled.value = response.otp_enabled !== false
+      console.log('[SSO重构] LoginView - OTP功能状态:', otpEnabled.value)
+      
+      // 动态更新OTP验证规则
+      if (otpEnabled.value) {
+        loginRules.otp_code = [{ required: true, message: '请输入动态验证码', trigger: 'blur' }]
+      } else {
+        loginRules.otp_code = []
+      }
+    })
+    .catch(error => {
+      console.error('[SSO重构] LoginView - 获取OTP状态失败:', error)
+      otpEnabled.value = true // 默认启用
+      loginRules.otp_code = [{ required: true, message: '请输入动态验证码', trigger: 'blur' }]
     })
 })
 </script>

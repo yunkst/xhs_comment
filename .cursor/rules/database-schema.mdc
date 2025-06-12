@@ -1,0 +1,203 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统数据库模式指南
+
+本系统使用MongoDB作为主要数据存储，采用文档型数据结构设计。所有集合都在 [xhs_backend/database.py](mdc:xhs_backend/database.py) 中定义常量名称。
+
+## 核心数据集合
+
+### 1. 用户集合 (`USERS_COLLECTION`)
+
+存储系统用户信息，包括认证和授权相关数据。
+
+```json
+{
+  "_id": "ObjectId",
+  "username": "string",
+  "email": "string",
+  "password_hash": "string",
+  "otp_secret": "string",
+  "is_active": "boolean",
+  "is_superuser": "boolean",
+  "created_at": "datetime",
+  "updated_at": "datetime",
+  "last_login": "datetime"
+}
+```
+
+### 2. 评论集合 (`COMMENTS_COLLECTION`)
+
+存储从小红书抓取的结构化评论数据。
+
+```json
+{
+  "_id": "ObjectId",
+  "comment_id": "string",
+  "note_id": "string",
+  "user_id": "string",
+  "username": "string",
+  "content": "string",
+  "timestamp": "datetime",
+  "likes_count": "number",
+  "replies_count": "number",
+  "parent_comment_id": "string",
+  "level": "number",
+  "user_avatar": "string",
+  "is_author": "boolean",
+  "collected_at": "datetime",
+  "source_url": "string"
+}
+```
+
+### 3. 原始评论集合 (`RAW_COMMENTS_COLLECTION`)
+
+存储从浏览器插件直接收集的原始HTML/JSON数据。
+
+```json
+{
+  "_id": "ObjectId",
+  "raw_data": "object",
+  "source_url": "string",
+  "page_type": "string",
+  "collected_at": "datetime",
+  "processed": "boolean",
+  "processing_errors": "array"
+}
+```
+
+### 4. 结构化评论集合 (`STRUCTURED_COMMENTS_COLLECTION`)
+
+存储经过处理和分析的评论数据，包含额外的分析字段。
+
+```json
+{
+  "_id": "ObjectId",
+  "comment_id": "string",
+  "note_id": "string",
+  "processed_content": "string",
+  "sentiment_score": "number",
+  "keywords": "array",
+  "category": "string",
+  "quality_score": "number",
+  "spam_probability": "number",
+  "processed_at": "datetime",
+  "analysis_version": "string"
+}
+```
+
+### 5. 笔记集合 (`NOTES_COLLECTION`)
+
+存储从小红书抓取的笔记/帖子信息。
+
+```json
+{
+  "_id": "ObjectId",
+  "note_id": "string",
+  "title": "string",
+  "content": "string",
+  "author_id": "string",
+  "author_name": "string",
+  "images": "array",
+  "tags": "array",
+  "likes_count": "number",
+  "comments_count": "number",
+  "shares_count": "number",
+  "views_count": "number",
+  "created_at": "datetime",
+  "collected_at": "datetime",
+  "source_url": "string"
+}
+```
+
+### 6. 通知集合 (`NOTIFICATIONS_COLLECTION`)
+
+存储从小红书抓取的通知信息。
+
+```json
+{
+  "_id": "ObjectId",
+  "notification_id": "string",
+  "type": "string",
+  "title": "string",
+  "content": "string",
+  "from_user": "string",
+  "target_note_id": "string",
+  "is_read": "boolean",
+  "timestamp": "datetime",
+  "collected_at": "datetime",
+  "source_url": "string"
+}
+```
+
+### 7. 用户信息集合 (`USER_INFO_COLLECTION`)
+
+存储从小红书抓取的用户公开信息。
+
+```json
+{
+  "_id": "ObjectId",
+  "user_id": "string",
+  "username": "string",
+  "nickname": "string",
+  "avatar": "string",
+  "bio": "string",
+  "followers_count": "number",
+  "following_count": "number",
+  "notes_count": "number",
+  "likes_count": "number",
+  "verified": "boolean",
+  "verification_type": "string",
+  "last_active": "datetime",
+  "collected_at": "datetime",
+  "updated_at": "datetime"
+}
+```
+
+## 数据库操作规范
+
+### 1. 连接管理
+- 使用 [xhs_backend/database.py](mdc:xhs_backend/database.py) 中的 `get_database()` 函数获取数据库实例
+- 所有数据库操作都应该是异步的，使用 `await` 关键字
+- 在服务层通过依赖注入获取数据库连接
+
+### 2. 集合操作
+- 集合名称使用 `database.py` 中定义的常量，避免硬编码
+- 所有文档都应包含 `created_at` 和 `updated_at` 时间戳
+- 使用 MongoDB 的 ObjectId 作为主键
+
+### 3. 查询优化
+- 为经常查询的字段创建索引（如 `note_id`, `user_id`, `timestamp`）
+- 使用聚合管道进行复杂的数据分析和统计
+- 对大量数据查询使用分页机制
+
+### 4. 数据验证
+- 在服务层使用 Pydantic 模型进行数据验证
+- 确保必要字段的存在性和数据类型正确性
+- 对日期时间字段统一使用 UTC 时间
+
+## 数据迁移与维护
+
+### 1. 数据迁移
+- 新增字段时确保向后兼容性
+- 使用 MongoDB 的 `updateMany` 操作批量更新现有文档
+- 重要数据变更前先备份
+
+### 2. 数据清理
+- 定期清理过期的原始数据
+- 删除重复或无效的评论数据
+- 压缩和归档历史数据
+
+### 3. 性能监控
+- 监控查询性能和索引使用情况
+- 定期分析慢查询日志
+- 根据使用模式调整索引策略
+
+## 相关文件引用
+
+- 数据库连接配置: [xhs_backend/database.py](mdc:xhs_backend/database.py)
+- 数据模型定义: [xhs_backend/api/models/](mdc:xhs_backend/api/models)
+- 服务层数据操作: [xhs_backend/api/services/](mdc:xhs_backend/api/services)
+- API端点数据处理: [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints)

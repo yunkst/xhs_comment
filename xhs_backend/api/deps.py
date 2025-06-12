@@ -1,7 +1,8 @@
 from typing import Generator, Optional, Dict, Any, List
 from fastapi import Depends, HTTPException, status, Query, Request
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
+from jose import JWTError
+from jose import jwt as jose_jwt
 import os
 from pydantic import BaseModel
 
@@ -55,7 +56,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
     )
     
     try:
-        payload = jwt.decode(
+        payload = jose_jwt.decode(
             token, 
             SECRET_KEY, 
             algorithms=[ALGORITHM]

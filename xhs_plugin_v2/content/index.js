@@ -49,7 +49,8 @@
         
         // 注入原始监控脚本
         const script1 = document.createElement('script');
-        script1.src = chrome.runtime.getURL('injected.js');
+        script1.src = chrome.runtime.getURL('injected/index.js');
+        script1.type = 'module';
         script1.onload = function() {
             this.remove();
             console.log('[XHS Monitor] 基础监控脚本已注入');

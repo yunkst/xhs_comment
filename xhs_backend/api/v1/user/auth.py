@@ -32,6 +32,7 @@ SECRET_KEY = os.getenv("JWT_SECRET_KEY", "change_this_secret")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7  # 7天
 ALLOW_REGISTER = os.getenv("ALLOW_REGISTER", "true").lower() == "true"
+AUTH_OTP_ENABLED = os.getenv("AUTH_OTP_ENABLED", "true").lower() == "true"
 
 # 创建路由器
 router = APIRouter()
@@ -114,10 +115,12 @@ async def login(user_in: UserInLogin):
     if not user:
         raise HTTPException(status_code=401, detail="用户名或密码错误")
     
-    # 校验OTP
-    totp = pyotp.TOTP(user["otp_secret"])
-    if not totp.verify(user_in.otp_code):
-        raise HTTPException(status_code=401, detail="动态验证码错误")
+    # 根据配置决定是否校验OTP
+    if AUTH_OTP_ENABLED:
+        # 校验OTP
+        totp = pyotp.TOTP(user["otp_secret"])
+        if not totp.verify(user_in.otp_code):
+            raise HTTPException(status_code=401, detail="动态验证码错误")
     
     # 生成访问令牌
     access_token = create_access_token(data={"sub": user["username"]})

@@ -1,0 +1,284 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# 小红书评论维护系统故障排除指南
+
+本指南提供了系统各组件常见问题的诊断和解决方案。
+
+## 后端服务故障排除
+
+### 1. 服务启动失败
+
+**问题症状**: 
+- Docker 容器无法启动
+- FastAPI 应用启动时报错
+- 数据库连接失败
+
+**排查步骤**:
+1. 检查 [xhs_backend/.env](mdc:xhs_backend/.env) 文件是否存在和配置正确
+2. 验证环境变量设置:
+   ```bash
+   # 在 xhs_backend 目录下检查
+   docker-compose config
+   ```
+3. 查看容器日志:
+   ```bash
+   docker-compose logs -f xhs_backend
+   docker-compose logs -f mongodb
+   ```
+4. 检查端口占用情况:
+   ```bash
+   netstat -tlnp | grep :8000
+   netstat -tlnp | grep :27017
+   ```
+
+**常见解决方案**:
+- 确保 `JWT_SECRET_KEY` 和 `API_SECRET_TOKEN` 已设置
+- 检查 MongoDB 服务是否正常运行
+- 重建Docker镜像: `docker-compose up --build`
+- 清理Docker缓存: `docker system prune -a`
+
+### 2. API 请求失败
+
+**问题症状**:
+- HTTP 500 内部服务器错误
+- 认证失败 (401/403)
+- 请求超时
+
+**排查步骤**:
+1. 检查API端点是否正确: `http://localhost:8000/docs`
+2. 验证请求格式和数据结构
+3. 查看后端日志中的详细错误信息
+4. 测试数据库连接状态
+
+**相关文件**:
+- API端点定义: [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints)
+- 认证逻辑: [xhs_backend/api/auth/](mdc:xhs_backend/api/auth)
+- 数据库连接: [xhs_backend/database.py](mdc:xhs_backend/database.py)
+
+### 3. 数据库连接问题
+
+**问题症状**:
+- MongoDB 连接超时
+- 数据查询失败
+- 数据库操作异常
+
+**排查步骤**:
+1. 检查 MongoDB 容器状态: `docker ps | grep mongo`
+2. 验证数据库配置参数
+3. 测试数据库连接:
+   ```bash
+   docker exec -it mongodb mongosh
+   ```
+4. 检查集合是否存在和数据完整性
+
+**相关文件**:
+- 数据库配置: [xhs_backend/database.py](mdc:xhs_backend/database.py)
+- 数据模型: [xhs_backend/api/models/](mdc:xhs_backend/api/models)
+
+## 前端界面故障排除
+
+### 1. 前端无法访问
+
+**问题症状**:
+- 无法访问 `http://localhost:3000`
+- 页面加载错误或空白
+- 静态资源加载失败
+
+**排查步骤**:
+1. 检查前端容器状态: `docker ps | grep admin_ui`
+2. 查看前端构建日志: `docker-compose logs -f admin_ui`
+3. 验证前端配置文件
+4. 检查反向代理配置
+
+**相关文件**:
+- 前端入口: [xhs_admin_ui/index.html](mdc:xhs_admin_ui/index.html)
+- Vite配置: [xhs_admin_ui/vite.config.js](mdc:xhs_admin_ui/vite.config.js)
+- 路由配置: [xhs_admin_ui/src/router/index.js](mdc:xhs_admin_ui/src/router/index.js)
+
+### 2. API调用失败
+
+**问题症状**:
+- 前端无法获取数据
+- CORS 错误
+- 网络请求被拒绝
+
+**排查步骤**:
+1. 检查API服务地址配置
+2. 验证跨域设置
+3. 查看浏览器网络面板的错误信息
+4. 检查认证token是否有效
+
+**相关文件**:
+- API服务配置: [xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js)
+- 环境配置: [xhs_admin_ui/.env](mdc:xhs_admin_ui/.env)
+
+### 3. 用户认证问题
+
+**问题症状**:
+- 登录失败
+- Token过期
+- 权限不足
+
+**排查步骤**:
+1. 验证用户凭据是否正确
+2. 检查OTP配置和二维码生成
+3. 确认JWT设置和密钥
+4. 查看认证相关日志
+
+**相关文件**:
+- 认证组件: [xhs_admin_ui/src/views/](mdc:xhs_admin_ui/src/views)
+- 状态管理: [xhs_admin_ui/src/stores/](mdc:xhs_admin_ui/src/stores)
+
+## Chrome插件故障排除
+
+### 1. 插件无法加载
+
+**问题症状**:
+- 插件安装失败
+- 插件图标不显示
+- 控制台有错误信息
+
+**排查步骤**:
+1. 检查插件清单文件: [xhs_chrome_plugin/manifest.json](mdc:xhs_chrome_plugin/manifest.json)
+2. 验证插件文件完整性
+3. 查看Chrome扩展管理页面的错误信息
+4. 检查浏览器版本兼容性
+
+**相关文件**:
+- 插件清单: [xhs_chrome_plugin/manifest.json](mdc:xhs_chrome_plugin/manifest.json)
+- 内容脚本: [xhs_chrome_plugin/js/](mdc:xhs_chrome_plugin/js)
+
+### 2. 数据抓取失败
+
+**问题症状**:
+- 无法获取评论数据
+- 数据格式错误
+- 网页结构变化导致解析失败
+
+**排查步骤**:
+1. 检查小红书网页结构是否变化
+2. 验证选择器和数据解析逻辑
+3. 查看浏览器控制台错误信息
+4. 测试不同页面类型的兼容性
+
+**相关文件**:
+- 数据解析脚本: [xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js)
+- 数据格式规范: [plugin-data-format.mdc](mdc:plugin-data-format.mdc)
+
+### 3. API通信问题
+
+**问题症状**:
+- 数据发送失败
+- 认证token无效
+- 网络连接被拒绝
+
+**排查步骤**:
+1. 验证API端点地址配置
+2. 检查认证token设置
+3. 确认CORS和安全策略
+4. 测试网络连接
+
+**相关文件**:
+- 插件配置: [xhs_chrome_plugin/js/options.js](mdc:xhs_chrome_plugin/js/options.js)
+- API调用逻辑: [xhs_chrome_plugin/js/background.js](mdc:xhs_chrome_plugin/js/background.js)
+
+## 系统整体诊断
+
+### 1. 完整系统健康检查
+
+执行以下命令进行系统整体检查:
+
+```bash
+# 检查所有容器状态
+docker-compose ps
+
+# 检查网络连接
+docker network ls | grep app-network
+
+# 检查日志
+docker-compose logs --tail=50
+
+# 检查资源使用
+docker stats
+
+# 测试API连接
+curl -X GET "http://localhost:8000/health" -H "accept: application/json"
+```
+
+### 2. 性能问题诊断
+
+**问题症状**:
+- 响应时间过长
+- 系统资源占用过高
+- 数据库查询慢
+
+**排查步骤**:
+1. 监控容器资源使用情况
+2. 分析数据库查询性能
+3. 检查网络延迟和带宽
+4. 优化代码和查询逻辑
+
+### 3. 数据一致性检查
+
+**检查项目**:
+- 数据库中的数据完整性
+- 不同集合之间的关联性
+- 时间戳和版本信息
+- 重复数据的处理
+
+**相关文件**:
+- 数据模式: [.cursor/rules/database-schema.mdc](mdc:.cursor/rules/database-schema.mdc)
+- 数据处理: [xhs_backend/processing.py](mdc:xhs_backend/processing.py)
+
+## 常用调试命令
+
+```bash
+# 重启整个系统
+docker-compose down && docker-compose up -d --build
+
+# 查看特定服务日志
+docker-compose logs -f [service_name]
+
+# 进入容器调试
+docker exec -it [container_name] /bin/bash
+
+# 清理无用的Docker资源
+docker system prune -a --volumes
+
+# 重置数据库
+docker-compose down -v && docker-compose up -d
+
+# 监控系统资源
+docker stats
+htop
+```
+
+## 日志分析
+
+### 1. 后端日志
+- 位置: Docker容器内 `/app/logs/` 或通过 `docker-compose logs`
+- 关键信息: 错误堆栈、SQL查询、认证失败
+
+### 2. 前端日志
+- 位置: 浏览器开发者工具 Console
+- 关键信息: API调用失败、路由错误、组件渲染问题
+
+### 3. 插件日志
+- 位置: Chrome扩展管理页面、浏览器Console
+- 关键信息: 内容脚本错误、API通信失败、权限问题
+
+## 获取帮助
+
+当遇到无法解决的问题时:
+1. 收集完整的错误日志和系统信息
+2. 记录重现问题的具体步骤
+3. 检查相关的规则文件和文档
+4. 参考项目README和设置指南
+
+**相关规则文件**:
+- [development-workflow.mdc](mdc:.cursor/rules/development-workflow.mdc)
+- [docker-configuration.mdc](mdc:.cursor/rules/docker-configuration.mdc)
+- [auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)
