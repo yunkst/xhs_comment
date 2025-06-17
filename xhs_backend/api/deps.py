@@ -36,40 +36,12 @@ def get_pagination(
     """获取分页参数"""
     return PaginationParams(page=page, page_size=page_size)
 
-async def get_current_user(token: str = Depends(oauth2_scheme)) -> str:
+async def get_current_user(request: Request) -> str:
     """
-    从JWT令牌获取当前用户名
-    
-    Args:
-        token: JWT令牌
-        
-    Returns:
-        当前用户名
-        
-    Raises:
-        HTTPException: 如果令牌无效或无法解析
+    从请求中获取当前用户名
     """
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="无法验证凭证",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    
-    try:
-        payload = jose_jwt.decode(
-            token, 
-            SECRET_KEY, 
-            algorithms=[ALGORITHM]
-        )
-        username: str = payload.get("sub")
-        
-        if username is None:
-            raise credentials_exception
-            
-    except JWTError:
-        raise credentials_exception
-        
-    return username
+    return await get_current_user_combined(request)
+
 
 # 新增：组合认证依赖，支持Keycloak和原始JWT
 async def get_current_user_combined(request: Request) -> str:

@@ -11,6 +11,13 @@ function isXHSUrl(url) {
 
 // 发送拦截事件到内容脚本
 function dispatchInterceptEvent(data) {
+    console.log('[Injected] 发送拦截事件:', {
+        url: data.url,
+        method: data.method,
+        type: data.type,
+        hasResponse: !!data.response
+    });
+    
     const event = new CustomEvent('XHS_REQUEST_INTERCEPTED', {
         detail: data
     });

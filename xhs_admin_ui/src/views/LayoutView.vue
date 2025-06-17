@@ -22,16 +22,10 @@
           <el-sub-menu index="comment">
             <template #title>
               <el-icon><ChatDotRound /></el-icon>
-              <span>评论管理</span>
+              <span>小红书管理</span>
             </template>
             <el-menu-item index="/comment/list">评论列表</el-menu-item>
-          </el-sub-menu>
-          <el-sub-menu index="user">
-            <template #title>
-              <el-icon><User /></el-icon>
-              <span>用户管理</span>
-            </template>
-            <el-menu-item index="/user/list">用户列表</el-menu-item>
+            <el-menu-item index="/xiaohongshu/users">小红书用户</el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="system">
             <template #title>
@@ -39,8 +33,8 @@
               <span>系统管理</span>
             </template>
             <el-menu-item index="/system">系统设置</el-menu-item>
+            <el-menu-item index="/system/user-list">用户列表</el-menu-item>
             <el-menu-item index="/system/capture-rules">抓取规则管理</el-menu-item>
-            <el-menu-item index="/system/network-data">网络数据监控</el-menu-item>
           </el-sub-menu>
         </el-menu>
       </el-aside>
@@ -93,7 +87,6 @@ import { useRouter, useRoute } from 'vue-router'
 import { 
   Monitor, 
   Setting, 
-  User, 
   ChatDotRound, 
   Fold, 
   Expand, 

@@ -68,14 +68,29 @@ export function updateEmptyState() {
 }
 
 export function updateCaptureRulesDisplay() {
-    if (!elements.rulesList) return;
+    if (!elements.rulesList || !elements.captureRulesInfo) return;
+    
+    console.log('[Popup] 更新抓取规则显示:', appState.captureRules);
+    
     if (appState.captureRules.length > 0) {
-        elements.captureRulesInfo.style.display = 'block';
+        elements.captureRulesInfo.textContent = `已加载 ${appState.captureRules.length} 条抓取规则`;
         elements.rulesList.innerHTML = appState.captureRules
-            .map(rule => `<li><strong>${escapeHtml(rule.name)}:</strong> <code>${escapeHtml(rule.pattern)}</code></li>`)
+            .map(rule => `
+                <div class="rule-item">
+                    <div class="rule-content">
+                        <div class="rule-name">${escapeHtml(rule.name)}</div>
+                        <div class="rule-pattern">${escapeHtml(rule.pattern)}</div>
+                        <div class="rule-description">${escapeHtml(rule.description || '')}</div>
+                    </div>
+                    <div class="rule-priority">P${rule.priority || 0}</div>
+                </div>
+            `)
             .join('');
+        elements.rulesList.style.display = 'block';
     } else {
-        elements.captureRulesInfo.style.display = 'none';
+        elements.captureRulesInfo.textContent = '暂无抓取规则';
+        elements.rulesList.innerHTML = '';
+        elements.rulesList.style.display = 'none';
     }
 }
 

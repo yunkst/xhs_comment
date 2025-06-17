@@ -7,7 +7,7 @@ import { uploadNetworkData } from './api.js';
  * @param {string} url - 要检查的URL
  * @returns {object|null} - 匹配的规则对象或null
  */
-function findMatchingRule(url) {
+export function findMatchingRule(url) {
     if (!globalState.captureRules) return null;
     return globalState.captureRules.find(rule => matchUrlPattern(url, rule.pattern));
 }

@@ -39,10 +39,16 @@ const router = createRouter({
           meta: { title: '评论列表' }
         },
         {
-          path: 'user/list',
-          name: 'userList',
-          component: () => import('../views/user/UserListView.vue'),
-          meta: { title: '用户列表' }
+          path: 'xiaohongshu/users',
+          name: 'xhsUserList',
+          component: () => import('../views/content/XhsUserListView.vue'),
+          meta: { title: '小红书用户' }
+        },
+        {
+          path: 'content/notes',
+          name: 'ContentNotes',
+          component: () => import('@/views/content/NotesView.vue'),
+          meta: { title: '笔记管理', icon: 'Document' }
         },
         {
           path: 'system',
@@ -51,16 +57,16 @@ const router = createRouter({
           meta: { title: '系统设置' }
         },
         {
+          path: 'system/user-list',
+          name: 'systemUserList',
+          component: () => import('../views/user/UserListView.vue'),
+          meta: { title: '用户列表' }
+        },
+        {
           path: 'system/capture-rules',
           name: 'captureRules',
           component: () => import('../views/system/CaptureRuleView.vue'),
           meta: { title: '抓取规则管理' }
-        },
-        {
-          path: 'system/network-data',
-          name: 'networkData',
-          component: () => import('../views/system/NetworkDataView.vue'),
-          meta: { title: '网络数据监控' }
         }
       ]
     },

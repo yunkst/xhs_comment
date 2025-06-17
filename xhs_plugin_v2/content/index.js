@@ -2,7 +2,9 @@
 (function() {
     'use strict';
     
-    console.log('小红书网络请求监控 - 内容脚本已加载');
+    console.log('[Content] 小红书网络请求监控 - 内容脚本已加载');
+    console.log('[Content] 当前页面URL:', window.location.href);
+    console.log('[Content] Chrome runtime 可用:', !!chrome?.runtime);
     
     // 插件配置
     let contentConfig = {
@@ -86,7 +88,13 @@
     window.addEventListener('XHS_REQUEST_INTERCEPTED', function(event) {
         const requestData = event.detail;
         
-        console.log('[Content] 收到拦截事件:', requestData.url, requestData.method);
+        console.log('[Content] 收到拦截事件:', {
+            url: requestData.url,
+            method: requestData.method,
+            type: requestData.type,
+            hasResponse: !!requestData.response,
+            timestamp: requestData.timestamp
+        });
         
         // 发送给后台脚本记录
         chrome.runtime.sendMessage({

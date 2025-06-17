@@ -15,6 +15,9 @@ class UserInfo(BaseModel):
     avatar: Optional[str] = None
     url: Optional[str] = None
     tag: Optional[str] = None
+    official_verify_type: Optional[int] = None
+    red_official_verify_type: Optional[int] = None
+    indicator: Optional[Dict] = None
 
 # --- 传入数据负载模型 ---
 class IncomingPayload(BaseModel):

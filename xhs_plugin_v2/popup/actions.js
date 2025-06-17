@@ -41,8 +41,11 @@ export function loadRequestStats() {
 }
 
 export function loadCaptureRules() {
+    console.log('[Popup] 请求获取抓取规则...');
     chrome.runtime.sendMessage({ action: 'getCaptureRules' }, function(response) {
+        console.log('[Popup] 收到抓取规则响应:', response);
         appState.captureRules = response?.data || [];
+        console.log('[Popup] 设置抓取规则到状态:', appState.captureRules);
         updateCaptureRulesDisplay();
     });
 }

@@ -3,25 +3,34 @@
 
 包含评论、笔记等内容数据结构
 """
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field
 from datetime import datetime
+
+# --- 新增模型 ---
+class IllegalInfo(BaseModel):
+    """违规信息模型"""
+    illegal_type: Optional[int] = None
+    illegal_text: Optional[str] = None
 
 # --- 评论相关模型 (Raw) ---
 class CommentItem(BaseModel):
     """原始评论数据模型"""
     id: str
     noteId: Optional[str] = None
+    authorId: Optional[str] = None
     authorName: Optional[str] = None
     authorUrl: Optional[str] = None
     authorAvatar: Optional[str] = None
     content: Optional[str] = None
     repliedToUser: Optional[str] = None
-    timestamp: Optional[str] = None
+    timestamp: Optional[datetime] = None
     likeCount: Optional[str] = '0'
     ipLocation: Optional[str] = None
     replies: List['CommentItem'] = []
     fetchTimestamp: datetime = Field(default_factory=datetime.utcnow)
+    illegal_info: Optional[IllegalInfo] = None
+    target_comment: Optional[Dict] = None # 用于存储被回复的评论信息
 
 # --- 结构化评论模型 ---
 class StructuredComment(BaseModel):
@@ -37,6 +46,7 @@ class StructuredComment(BaseModel):
     repliedOrder: Optional[int] = None  # 在父评论下的回复顺序 (从0开始)
     isRepliedByAuthor: Optional[bool] = None  # 是否被笔记作者回复
     fetchTimestamp: datetime = Field(default_factory=datetime.utcnow)  # 获取时间
+    illegal_info: Optional[IllegalInfo] = None
 
 # --- 笔记模型 ---
 class Note(BaseModel):
@@ -49,6 +59,7 @@ class Note(BaseModel):
     authorId: Optional[str] = None  # 作者ID
     title: Optional[str] = None  # 标题
     fetchTimestamp: datetime = Field(default_factory=datetime.utcnow)  # 获取时间
+    illegal_info: Optional[IllegalInfo] = None
 
 # 更新向前引用
 CommentItem.update_forward_refs() 

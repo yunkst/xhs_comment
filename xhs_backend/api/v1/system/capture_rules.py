@@ -9,7 +9,7 @@ import logging
 from datetime import datetime
 
 from database import get_database
-from api.deps import get_current_user
+from api.deps import get_current_user_combined
 from api.models.common import CaptureRule, CaptureRulesResponse
 
 # 配置日志
@@ -21,7 +21,7 @@ router = APIRouter(prefix="/capture-rules")
 
 
 @router.get("", response_model=CaptureRulesResponse, summary="获取抓取规则")
-async def get_capture_rules(current_user: str = Depends(get_current_user)):
+async def get_capture_rules(current_user: str = Depends(get_current_user_combined)):
     """
     获取抓取规则列表
     
@@ -35,17 +35,20 @@ async def get_capture_rules(current_user: str = Depends(get_current_user)):
 
         # 查询启用的规则并排序
         cursor = rules_collection.find({"enabled": True}).sort("priority", -1)
-        rules = await cursor.to_list(length=100)
+        rules_docs = await cursor.to_list(length=100)
         
-        # 处理ObjectId
-        for rule in rules:
-            rule["_id"] = str(rule["_id"])
+        # 转换为CaptureRule模型
+        rules = []
+        for rule_doc in rules_docs:
+            rule_doc.pop('_id', None)  # 移除MongoDB的_id字段
+            rules.append(CaptureRule(**rule_doc))
         
-        return {
-            "success": True,
-            "rules": rules,
-            "message": f"成功获取 {len(rules)} 条抓取规则"
-        }
+        return CaptureRulesResponse(
+            success=True,
+            rules=rules,
+            total_count=len(rules),
+            message=f"成功获取 {len(rules)} 条抓取规则"
+        )
         
     except Exception as e:
         logger.exception("获取抓取规则失败")
@@ -56,7 +59,7 @@ async def get_capture_rules(current_user: str = Depends(get_current_user)):
 
 @router.get("/all", response_model=CaptureRulesResponse, summary="获取所有抓取规则")
 async def get_all_capture_rules(
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -92,7 +95,7 @@ async def get_all_capture_rules(
 @router.post("", summary="创建抓取规则")
 async def create_capture_rule(
     rule: CaptureRule,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -136,7 +139,7 @@ async def create_capture_rule(
 async def update_capture_rule(
     rule_name: str,
     rule_update: CaptureRule,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """
@@ -179,7 +182,7 @@ async def update_capture_rule(
 @router.delete("/{rule_name}", summary="删除抓取规则")
 async def delete_capture_rule(
     rule_name: str,
-    current_user: str = Depends(get_current_user),
+    current_user: str = Depends(get_current_user_combined),
     db=Depends(get_database)
 ):
     """

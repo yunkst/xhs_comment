@@ -133,21 +133,140 @@ export function copyModalDetails() {
 }
 
 function createModalContent(log) {
+    console.log('[Modal] 日志数据结构:', log);
+    console.log('[Modal] 响应数据检查:', {
+        hasResponse: !!log.response,
+        responseType: typeof log.response,
+        responseKeys: log.response ? Object.keys(log.response) : [],
+        hasResponseData: !!log.responseData,
+        responseDataType: typeof log.responseData,
+        hasResponseBody: !!(log.response && log.response.body),
+        responseBodyType: log.response && log.response.body ? typeof log.response.body : 'undefined'
+    });
+    
     let html = '';
     const statusClass = getStatusBadgeClass(log).replace('status-', 'modal-status-');
     const methodClass = `modal-method-${log.method.toLowerCase()}`;
     
+    // 基本信息
     html += `<div class="modal-section"><div class="modal-section-header">📋 基本信息</div><div class="modal-section-content"><div class="modal-info-grid">`;
     html += `<span class="modal-info-label">URL:</span><span class="modal-info-value">${escapeHtml(log.url)}</span>`;
     html += `<span class="modal-info-label">方法:</span><span class="modal-info-value"><span class="modal-badge ${methodClass}">${log.method}</span></span>`;
     html += `<span class="modal-info-label">状态:</span><span class="modal-info-value"><span class="modal-badge ${statusClass}">${getStatusText(log)}</span></span>`;
+    
+    if (log.requestId) {
+        html += `<span class="modal-info-label">请求ID:</span><span class="modal-info-value">${escapeHtml(log.requestId)}</span>`;
+    }
+    if (log.timestamp) {
+        html += `<span class="modal-info-label">时间:</span><span class="modal-info-value">${log.timeString || formatTime(log.timestamp)}</span>`;
+    }
+    if (log.type) {
+        html += `<span class="modal-info-label">类型:</span><span class="modal-info-value">${escapeHtml(log.type)}</span>`;
+    }
+    
     html += `</div></div></div>`;
 
+    // 请求头
     if (log.requestHeaders && log.requestHeaders.length > 0) {
         const headers = log.requestHeaders.map(h => `${h.name}: ${h.value}`).join('\n');
         html += `<div class="modal-section"><div class="modal-section-header">📤 请求头</div><div class="modal-section-content"><div class="modal-code">${escapeHtml(headers)}</div></div></div>`;
+    } else if (log.headers && typeof log.headers === 'object') {
+        const headerStrings = Object.entries(log.headers).map(([key, value]) => `${key}: ${value}`);
+        if (headerStrings.length > 0) {
+            html += `<div class="modal-section"><div class="modal-section-header">📤 请求头</div><div class="modal-section-content"><div class="modal-code">${escapeHtml(headerStrings.join('\n'))}</div></div></div>`;
+        }
+    }
+
+    // 请求体
+    if (log.body) {
+        let bodyContent = '';
+        if (typeof log.body === 'string') {
+            bodyContent = log.body;
+        } else if (typeof log.body === 'object') {
+            try {
+                bodyContent = JSON.stringify(log.body, null, 2);
+            } catch (e) {
+                bodyContent = String(log.body);
+            }
+        } else {
+            bodyContent = String(log.body);
+        }
+        html += `<div class="modal-section"><div class="modal-section-header">📤 请求体</div><div class="modal-section-content"><div class="modal-code">${escapeHtml(bodyContent)}</div></div></div>`;
+    }
+
+    // 响应头
+    if (log.responseHeaders && log.responseHeaders.length > 0) {
+        const headers = log.responseHeaders.map(h => `${h.name || h[0]}: ${h.value || h[1]}`).join('\n');
+        html += `<div class="modal-section"><div class="modal-section-header">📥 响应头</div><div class="modal-section-content"><div class="modal-code">${escapeHtml(headers)}</div></div></div>`;
+    } else if (log.response && log.response.headers && Array.isArray(log.response.headers)) {
+        const headers = log.response.headers.map(([key, value]) => `${key}: ${value}`).join('\n');
+        html += `<div class="modal-section"><div class="modal-section-header">📥 响应头</div><div class="modal-section-content"><div class="modal-code">${escapeHtml(headers)}</div></div></div>`;
+    }
+
+    // 响应数据
+    if (log.response && log.response.body) {
+        let responseContent = '';
+        if (typeof log.response.body === 'string') {
+            try {
+                // 尝试格式化JSON
+                const jsonData = JSON.parse(log.response.body);
+                responseContent = JSON.stringify(jsonData, null, 2);
+            } catch (e) {
+                responseContent = log.response.body;
+            }
+        } else if (typeof log.response.body === 'object') {
+            try {
+                responseContent = JSON.stringify(log.response.body, null, 2);
+            } catch (e) {
+                responseContent = String(log.response.body);
+            }
+        } else {
+            responseContent = String(log.response.body);
+        }
+        html += `<div class="modal-section"><div class="modal-section-header">📥 响应数据</div><div class="modal-section-content"><div class="modal-code" style="max-height: 400px; overflow-y: auto;">${escapeHtml(responseContent)}</div></div></div>`;
+    } else if (log.responseData) {
+        // 兼容其他可能的响应数据字段
+        let responseContent = '';
+        if (typeof log.responseData === 'string') {
+            try {
+                const jsonData = JSON.parse(log.responseData);
+                responseContent = JSON.stringify(jsonData, null, 2);
+            } catch (e) {
+                responseContent = log.responseData;
+            }
+        } else if (typeof log.responseData === 'object') {
+            try {
+                responseContent = JSON.stringify(log.responseData, null, 2);
+            } catch (e) {
+                responseContent = String(log.responseData);
+            }
+        } else {
+            responseContent = String(log.responseData);
+        }
+        html += `<div class="modal-section"><div class="modal-section-header">📥 响应数据</div><div class="modal-section-content"><div class="modal-code" style="max-height: 400px; overflow-y: auto;">${escapeHtml(responseContent)}</div></div></div>`;
+    } else {
+        html += `<div class="modal-section"><div class="modal-section-header">📥 响应数据</div><div class="modal-section-content"><div class="modal-code">暂无响应数据</div></div></div>`;
+    }
+
+    // 性能数据
+    if (log.performanceData) {
+        let perfContent = '';
+        if (typeof log.performanceData === 'object') {
+            try {
+                perfContent = JSON.stringify(log.performanceData, null, 2);
+            } catch (e) {
+                perfContent = String(log.performanceData);
+            }
+        } else {
+            perfContent = String(log.performanceData);
+        }
+        html += `<div class="modal-section"><div class="modal-section-header">⚡ 性能数据</div><div class="modal-section-content"><div class="modal-code">${escapeHtml(perfContent)}</div></div></div>`;
+    }
+
+    // 错误信息
+    if (log.error) {
+        html += `<div class="modal-section"><div class="modal-section-header">❌ 错误信息</div><div class="modal-section-content"><div class="modal-code" style="color: #dc3545;">${escapeHtml(log.error)}</div></div></div>`;
     }
     
-    // Simplified for brevity
     return html;
 } 

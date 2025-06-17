@@ -81,7 +81,7 @@ async def get_comments(
         
         return {
             "success": True,
-            "data": comments_list,
+            "items": comments_list,
             "total": total,
             "page": page,
             "page_size": page_size,

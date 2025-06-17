@@ -215,6 +215,10 @@ export const noteApi = {
   // 删除笔记
   deleteNote: (noteId) => {
     return api.delete(`/api/v1/content/notes/${noteId}`);
+  },
+  // 搜索笔记
+  searchNotes: (params) => {
+    return api.get('/api/v1/content/notes', { params });
   }
 };
 
@@ -222,7 +226,7 @@ export const noteApi = {
 export const userManagementApi = {
   // 获取用户列表
   getUserList: (params) => {
-    return api.get('/api/v1/user/profile', { params });
+    return api.get('/api/v1/user/profile/list', { params });
   },
   // 获取用户统计
   getUsersStats: () => {
@@ -251,6 +255,22 @@ export const userManagementApi = {
   // 解除封禁 (使用新的用户管理域)
   unbanUser: (userId) => {
     return api.post(`/api/v1/user/profile/${userId}/unban`);
+  }
+};
+
+// 小红书用户管理接口
+export const xhsUserApi = {
+  // 获取小红书用户列表
+  getXhsUserList: (params) => {
+    return api.get('/api/v1/user/profile/xhs/list', { params });
+  },
+  // 获取小红书用户详情
+  getXhsUserDetail: (userId) => {
+    return api.get(`/api/v1/user/profile/xhs/${userId}`);
+  },
+  // 批量获取小红书用户信息
+  getXhsUsersBatch: (userIds) => {
+    return api.get(`/api/v1/user/profile/xhs/batch?user_ids=${userIds.join(',')}`);
   }
 };
 
@@ -360,26 +380,6 @@ export const captureRuleApi = {
   }
 };
 
-// 网络数据监控接口
-export const networkDataApi = {
-  // 获取网络请求数据
-  getNetworkData: (params) => {
-    return api.get('/api/v1/system/network-data', { params });
-  },
-  // 获取网络数据统计
-  getNetworkDataStats: () => {
-    return api.get('/api/v1/system/network-data/stats');
-  },
-  // 批量处理网络数据
-  batchProcessNetworkData: (data) => {
-    return api.post('/api/v1/system/network-data/batch-process', data);
-  },
-  // 接收网络数据（供插件使用）
-  receiveNetworkData: (data) => {
-    return api.post('/api/v1/system/network-data', data);
-  }
-};
-
 // 用户备注接口 (迁移到用户管理域)
 export const userNoteApi = {
   // 添加用户备注
@@ -394,17 +394,6 @@ export const userNoteApi = {
   getUserNotesBatch: (userIds) => {
     return api.get(`/api/v1/user/profile/notes/batch?user_ids=${userIds.join(',')}`);
   }
-};
-
-// 获取用户列表（小红书用户）- 使用新的用户管理域
-export const getUserList = async (page = 1, pageSize = 10) => {
-  const response = await api.get('/api/v1/user/profile/list', {
-    params: {
-      page: page,
-      page_size: pageSize
-    }
-  });
-  return response; // 直接返回拦截器处理后的完整响应
 };
 
 // API迁移信息
@@ -441,10 +430,6 @@ export const legacyApi = {
   getCaptureRules: captureRuleApi.getCaptureRules,
   getAllCaptureRules: captureRuleApi.getAllCaptureRules,
   
-  // 旧的网络数据别名
-  getNetworkData: networkDataApi.getNetworkData,
-  postNetworkData: networkDataApi.receiveNetworkData,
-  
   // 旧的用户备注别名
   addUserNote: userNoteApi.addUserNote,
   getUserNotes: userNoteApi.getUserNotes,
@@ -456,16 +441,16 @@ export const legacyApi = {
 };
 
 export default {
-  userApi,
-  commentApi,
-  noteApi,
-  userManagementApi,
-  notificationApi,
-  systemApi,
-  userNoteApi,
-  ssoApi,
-  captureRuleApi,
-  networkDataApi,
-  migrationApi,
-  legacyApi  // 向后兼容层
+  ...userApi,
+  ...ssoApi,
+  ...commentApi,
+  ...noteApi,
+  ...userManagementApi,
+  ...systemApi,
+  ...userNoteApi,
+  ...notificationApi,
+  ...captureRuleApi,
+  ...migrationApi,
+  legacyApi,  // 向后兼容层
+  ...xhsUserApi
 }; 

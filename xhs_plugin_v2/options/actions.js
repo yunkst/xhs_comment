@@ -169,4 +169,19 @@ export function loadCaptureRules() {
         appState.captureRules = response?.data || [];
         updateCaptureRulesDisplay();
     });
+}
+
+/**
+ * 刷新抓取规则（从后端重新获取）
+ */
+export function refreshCaptureRules() {
+    chrome.runtime.sendMessage({ action: 'refreshRules' }, (response) => {
+        if (response?.success) {
+            // 重新加载抓取规则
+            loadCaptureRules();
+            showStatus('抓取规则已刷新', 'success');
+        } else {
+            showStatus(`刷新抓取规则失败: ${response?.error || '未知错误'}`, 'error');
+        }
+    });
 } 
