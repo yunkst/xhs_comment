@@ -48,7 +48,7 @@ const router = createRouter({
           path: 'content/notes',
           name: 'ContentNotes',
           component: () => import('@/views/content/NotesView.vue'),
-          meta: { title: '笔记管理', icon: 'Document' }
+          meta: { title: '小红书笔记', icon: 'Document' }
         },
         {
           path: 'system',

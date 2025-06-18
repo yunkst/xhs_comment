@@ -19,7 +19,28 @@ function handleMessage(request, sender, sendResponse) {
     }
 }
 
+// 触发历史评论功能初始化
+function triggerHistoryCommentsInit() {
+    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
+        if (tabs[0] && tabs[0].url && tabs[0].url.includes('xiaohongshu.com/notification')) {
+            console.log('[Popup] 检测到当前在通知页面，触发历史评论功能初始化');
+            chrome.tabs.sendMessage(tabs[0].id, {
+                action: 'initializeHistoryComments'
+            }, function(response) {
+                if (chrome.runtime.lastError) {
+                    console.log('[Popup] 发送初始化消息失败:', chrome.runtime.lastError.message);
+                } else {
+                    console.log('[Popup] 历史评论功能初始化触发成功');
+                }
+            });
+        }
+    });
+}
+
 export function setupEventListeners() {
+    // 在popup打开时触发历史评论功能初始化
+    triggerHistoryCommentsInit();
+    
     elements.ssoStartLogin.addEventListener('click', sso.startSsoLogin);
     elements.ssoCheckLogin.addEventListener('click', () => sso.checkSsoLoginStatus(false));
     elements.logoutBtn.addEventListener('click', sso.logout);

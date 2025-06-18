@@ -2,14 +2,41 @@ import { globalState } from '../shared/state.js';
 import { logRequest, updateRequestLog } from './storage.js';
 import { uploadNetworkData } from './api.js';
 
+// 固化的抓取规则 - 通知列表
+const HARDCODED_CAPTURE_RULES = [
+    {
+        name: '通知列表',
+        pattern: '/api/sns/web/v1/you/mentions',
+        enabled: true,
+        description: '抓取用户通知列表数据',
+        isHardcoded: true // 标记为固化规则
+    }
+];
+
 /**
- * 检查URL是否匹配抓取规则
+ * 检查URL是否匹配抓取规则（包括动态规则和固化规则）
  * @param {string} url - 要检查的URL
  * @returns {object|null} - 匹配的规则对象或null
  */
 export function findMatchingRule(url) {
-    if (!globalState.captureRules) return null;
-    return globalState.captureRules.find(rule => matchUrlPattern(url, rule.pattern));
+    // 首先检查固化规则
+    for (const rule of HARDCODED_CAPTURE_RULES) {
+        if (rule.enabled && url.includes(rule.pattern)) {
+            console.log(`[Background] URL匹配到固化规则: ${rule.name}, URL: ${url}`);
+            return rule;
+        }
+    }
+    
+    // 然后检查动态规则
+    if (globalState.captureRules) {
+        const dynamicRule = globalState.captureRules.find(rule => matchUrlPattern(url, rule.pattern));
+        if (dynamicRule) {
+            console.log(`[Background] URL匹配到动态规则: ${dynamicRule.name}, URL: ${url}`);
+            return dynamicRule;
+        }
+    }
+    
+    return null;
 }
 
 /**

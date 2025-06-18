@@ -101,7 +101,8 @@ class NetworkDataProcessor:
         rule_mapping = {
             '评论接口': 'comment',
             '通知接口': 'notification',
-            '评论通知接口': 'comment_notification_feed', 
+            '评论通知接口': 'comment_notification_feed',
+            '通知列表': 'comment_notification_feed',  # 固化抓取规则的通知列表
             '笔记内容接口': 'note',
             '用户信息接口': 'user',
             '搜索接口': 'search',
@@ -214,12 +215,14 @@ class NetworkDataProcessor:
         }
     
     def _extract_user_from_dict(self, user_data: Dict) -> Optional[UserInfo]:
-        if not user_data or not user_data.get('id'):
+        # 支持多种用户ID字段名
+        user_id = user_data.get('userid') or user_data.get('id')
+        if not user_data or not user_id:
             return None
         return UserInfo(
-            id=user_data.get('id'),
+            id=user_id,
             name=user_data.get('nickname'),
-            avatar=user_data.get('avatar'),
+            avatar=user_data.get('image') or user_data.get('avatar'),
             official_verify_type=user_data.get('official_verify_type'),
             red_official_verify_type=user_data.get('red_official_verify_type'),
             indicator=user_data.get('indicator')
@@ -228,11 +231,16 @@ class NetworkDataProcessor:
     def _extract_note_from_mention(self, item_info: Dict) -> Optional[Note]:
         if not item_info or not item_info.get('id'):
             return None
+        
+        # 提取用户信息
+        user_info = item_info.get('user_info', {})
+        author_id = user_info.get('userid') or user_info.get('id')
+        
         return Note(
             noteId=item_info.get('id'),
             title=item_info.get('title'),
-            noteContent=item_info.get('desc'), # Assuming 'desc' is the content
-            authorId=item_info.get('user_info', {}).get('id'),
+            noteContent=item_info.get('content') or item_info.get('desc'), # 支持多种内容字段
+            authorId=author_id,
             illegal_info=IllegalInfo(**item_info['illegal_info']) if 'illegal_info' in item_info else None,
             publishTime=self._safe_ts_to_dt(item_info.get('add_time'))
         )
@@ -266,12 +274,17 @@ class NetworkDataProcessor:
     def _extract_notification_from_mention(self, message: Dict) -> Optional[NotificationItem]:
         if not message or not message.get('id'):
             return None
+        
+        # 提取用户ID，支持多种字段名
+        user_info = message.get('user_info', {})
+        user_id = user_info.get('userid') or user_info.get('id')
+        
         return NotificationItem(
             id=message.get('id'),
             notification_name=message.get('notification_name'),
             title=message.get('title'),
             time=self._safe_ts_to_dt(message.get('time')),
-            user_id=message.get('user_info', {}).get('id'),
+            user_id=user_id,
             item_id=message.get('item_info', {}).get('id'),
             comment_id=message.get('comment_info', {}).get('id'),
             user_info=self._extract_user_from_dict(message.get('user_info')),
@@ -430,12 +443,35 @@ class NetworkDataProcessor:
                     res = await save_notes(notes_dicts)
                     total_saved += res.get('inserted', 0) + res.get('updated', 0)
 
-                # Save comments
+                # Save comments - 修复：转换为结构化评论并保存
                 comments_list = parsed_data.get('comments', [])
                 if comments_list:
-                    comments_dicts = [c.model_dump() for c in comments_list]
-                    res = await save_comments_with_upsert(comments_dicts)
-                    total_saved += res.get('inserted', 0) + res.get('updated', 0)
+                    # 将CommentItem转换为结构化评论格式
+                    structured_comments = []
+                    for comment in comments_list:
+                        comment_dict = comment.model_dump()
+                        # 转换为结构化评论格式
+                        structured_comment = {
+                            "commentId": comment_dict.get('id'),
+                            "noteId": comment_dict.get('noteId'),
+                            "content": comment_dict.get('content'),
+                            "authorId": comment_dict.get('authorId'),
+                            "authorName": comment_dict.get('authorName'),
+                            "authorAvatar": comment_dict.get('authorAvatar'),
+                            "timestamp": comment_dict.get('timestamp'),
+                            "repliedId": None,  # mentions API中的评论通常是顶级评论
+                            "repliedOrder": None,
+                            "fetchTimestamp": datetime.utcnow(),
+                            "likeCount": comment_dict.get('likeCount'),
+                            "ipLocation": comment_dict.get('ipLocation'),
+                            "illegal_info": comment_dict.get('illegal_info')
+                        }
+                        structured_comments.append(structured_comment)
+                    
+                    # 保存到结构化评论集合
+                    from ..services.comment import save_structured_comments
+                    res = await save_structured_comments(structured_comments)
+                    total_saved += res.get('upserted', 0) + res.get('matched', 0)
 
                 # Save notifications
                 notifications_list = parsed_data.get('notifications', [])

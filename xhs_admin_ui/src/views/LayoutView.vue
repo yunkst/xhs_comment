@@ -26,6 +26,7 @@
             </template>
             <el-menu-item index="/comment/list">评论列表</el-menu-item>
             <el-menu-item index="/xiaohongshu/users">小红书用户</el-menu-item>
+            <el-menu-item index="/content/notes">小红书笔记</el-menu-item>
           </el-sub-menu>
           <el-sub-menu index="system">
             <template #title>

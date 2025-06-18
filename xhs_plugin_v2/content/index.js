@@ -25,11 +25,17 @@
                     injectMonitoringScripts();
                 } else {
                     console.log('[XHS Monitor] 当前页面不在监控范围内:', currentUrl);
+                    // 即使不在监控范围内，也要注入基础脚本以支持历史评论功能
+                    if (isUrlMatched(currentUrl)) {
+                        injectBasicScripts();
+                    }
                 }
             } else {
                 // 如果无法获取配置，使用默认行为
                 console.warn('[XHS Monitor] 无法获取配置，使用默认监控');
-                injectMonitoringScripts();
+                if (isUrlMatched(window.location.href)) {
+                    injectMonitoringScripts();
+                }
             }
         });
     }
@@ -45,6 +51,27 @@
         return false;
     }
     
+    // 注入基础脚本（仅历史评论功能）
+    function injectBasicScripts() {
+        console.log('[XHS Monitor] 正在注入基础脚本（历史评论功能）...');
+        
+        // 注入基础脚本
+        const script = document.createElement('script');
+        script.src = chrome.runtime.getURL('injected/index.js');
+        script.type = 'module';
+        script.onload = function() {
+            this.remove();
+            console.log('[XHS Monitor] 基础脚本已注入（历史评论功能）');
+        };
+        
+        // 尽早注入脚本
+        const targetElement = document.head || document.documentElement;
+        targetElement.appendChild(script);
+        
+        // 添加页面标记
+        document.documentElement.setAttribute('data-xhs-monitor', 'basic');
+    }
+
     // 注入监控脚本
     function injectMonitoringScripts() {
         console.log('[XHS Monitor] 正在注入监控脚本...');
@@ -85,7 +112,7 @@
     }
     
     // 监听来自注入脚本的消息
-    window.addEventListener('XHS_REQUEST_INTERCEPTED', function(event) {
+    document.addEventListener('XHS_REQUEST_INTERCEPTED', function(event) {
         const requestData = event.detail;
         
         console.log('[Content] 收到拦截事件:', {
@@ -124,12 +151,96 @@
         });
     });
     
+    // 监听代理请求事件
+    document.addEventListener('XHS_PROXY_REQUEST', function(event) {
+        const requestData = event.detail;
+        
+        console.log('[Content] 收到代理请求:', requestData);
+        
+        // 发送给后台脚本处理
+        chrome.runtime.sendMessage({
+            action: 'proxyRequest',
+            data: requestData
+        }, function(response) {
+            console.log('[Content] 收到代理请求响应:', response);
+            
+            // 检查Chrome runtime错误
+            if (chrome.runtime.lastError) {
+                console.error('[Content] Chrome runtime错误:', chrome.runtime.lastError);
+                const errorEvent = new CustomEvent('XHS_PROXY_RESPONSE', {
+                    detail: {
+                        requestId: requestData.requestId,
+                        success: false,
+                        status: 500,
+                        data: null,
+                        error: chrome.runtime.lastError.message
+                    }
+                });
+                document.dispatchEvent(errorEvent);
+                return;
+            }
+            
+            // 将响应发送回注入脚本
+            const responseEvent = new CustomEvent('XHS_PROXY_RESPONSE', {
+                detail: {
+                    requestId: requestData.requestId,
+                    success: response ? response.success : false,
+                    status: response ? response.status : 500,
+                    data: response ? response.data : null,
+                    error: response ? response.error : '未收到响应'
+                }
+            });
+            document.dispatchEvent(responseEvent);
+        });
+    });
+    
+    // 监听配置请求事件
+    document.addEventListener('XHS_GET_CONFIG', function(event) {
+        const requestData = event.detail;
+        
+        console.log('[Content] 收到配置请求:', requestData);
+        console.log('[Content] Chrome runtime 状态:', !!chrome?.runtime);
+        
+        // 发送给后台脚本获取配置
+        chrome.runtime.sendMessage({
+            action: 'getApiConfig'
+        }, function(response) {
+            console.log('[Content] 收到API配置响应:', response);
+            
+            // 检查Chrome runtime错误
+            if (chrome.runtime.lastError) {
+                console.error('[Content] Chrome runtime错误:', chrome.runtime.lastError);
+                const errorEvent = new CustomEvent('XHS_CONFIG_RESPONSE', {
+                    detail: {
+                        requestId: requestData.requestId,
+                        success: false,
+                        config: null,
+                        error: chrome.runtime.lastError.message
+                    }
+                });
+                document.dispatchEvent(errorEvent);
+                return;
+            }
+            
+            // 将配置发送回注入脚本
+            const configEvent = new CustomEvent('XHS_CONFIG_RESPONSE', {
+                detail: {
+                    requestId: requestData.requestId,
+                    success: response ? response.success : false,
+                    config: response ? response.config : null,
+                    error: response ? response.error : '未收到响应'
+                }
+            });
+            document.dispatchEvent(configEvent);
+        });
+    });
+    
     // 监听页面卸载，清理资源
     window.addEventListener('beforeunload', function() {
         console.log('[XHS Monitor] 页面即将卸载');
     });
     
-    // 监听配置变化
+    // 监听配置变化和其他消息
     chrome.runtime.onMessage.addListener(function(request, sender, sendResponse) {
         if (request.action === 'configUpdated') {
             console.log('[XHS Monitor] 配置已更新，重新加载页面以应用新配置');
@@ -137,6 +248,14 @@
             if (confirm('插件配置已更新，是否重新加载页面以应用新配置？')) {
                 window.location.reload();
             }
+        } else if (request.action === 'initializeHistoryComments') {
+            console.log('[Content] 收到初始化历史评论功能的请求');
+            // 向注入脚本发送初始化消息
+            const event = new CustomEvent('XHS_INITIALIZE_HISTORY_COMMENTS', {
+                detail: { timestamp: Date.now() }
+            });
+            document.dispatchEvent(event);
+            sendResponse({ success: true });
         }
     });
     

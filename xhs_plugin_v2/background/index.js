@@ -23,26 +23,26 @@ async function initializePlugin() {
  * @param {function} sendResponse - 回调函数
  * @returns {boolean} - 返回true以支持异步响应
  */
-async function handleMessage(request, sender, sendResponse) {
+function handleMessage(request, sender, sendResponse) {
     switch (request.action) {
         case 'getRequests':
             sendResponse({ data: globalState.requestLog });
-            break;
+            return false;
         case 'getRequestLog':
             sendResponse({ success: true, data: globalState.requestLog });
-            break;
+            return false;
         case 'clearRequests':
             globalState.requestLog = [];
             globalState.requestStats.total = 0;
             globalState.requestStats.today = 0;
             sendResponse({ success: true });
-            break;
+            return false;
         case 'clearRequestLog':
             globalState.requestLog = [];
             globalState.requestStats.total = 0;
             globalState.requestStats.today = 0;
             sendResponse({ success: true });
-            break;
+            return false;
         case 'exportLog':
             try {
                 const jsonStr = JSON.stringify(globalState.requestLog, null, 2);
@@ -67,7 +67,7 @@ async function handleMessage(request, sender, sendResponse) {
             break;
         case 'getConfig':
             sendResponse({ config: globalState.config, apiConfig: globalState.apiConfig });
-            break;
+            return false;
         case 'saveConfig':
             globalState.config = request.config;
             chrome.storage.sync.set({ 'xhs_monitor_config': request.config }, () => {
@@ -82,6 +82,8 @@ async function handleMessage(request, sender, sendResponse) {
             return true; // 异步
         case 'logCustomRequest':
             // 来自content script的请求，检查URL是否匹配抓取规则
+            console.log(`[Background] 检查URL是否匹配抓取规则:`, request.data.url);
+            console.log(`[Background] 当前抓取规则数量:`, globalState.captureRules ? globalState.captureRules.length : 0);
             const matchedRule = findMatchingRule(request.data.url);
             if (matchedRule) {
                 console.log(`[Background] URL匹配到规则 '${matchedRule.name}':`, request.data.url);
@@ -123,38 +125,126 @@ async function handleMessage(request, sender, sendResponse) {
                 
                 sendResponse({ success: true, matched: true });
             } else {
-                // console.log('[Background] URL未匹配任何抓取规则:', request.data.url);
+                console.log('[Background] URL未匹配任何抓取规则:', request.data.url);
+                console.log('[Background] 可用的抓取规则:', globalState.captureRules);
                 sendResponse({ success: false, matched: false, reason: 'URL not matched' });
             }
-            break;
+            return false;
         case 'refreshRules':
-            try {
-                await loadCaptureRules();
-                sendResponse({ success: true });
-            } catch (error) {
-                sendResponse({ success: false, error: error.message });
-            }
+            loadCaptureRules()
+                .then(() => {
+                    sendResponse({ success: true });
+                })
+                .catch(error => {
+                    sendResponse({ success: false, error: error.message });
+                });
             return true; // 异步
         case 'refreshApiToken':
-            try {
-                await refreshApiToken();
-                sendResponse({ success: true, token: globalState.apiConfig.token });
-            } catch (error) {
-                sendResponse({ success: false, error: error.message });
-            }
+            refreshApiToken()
+                .then(() => {
+                    sendResponse({ success: true, token: globalState.apiConfig.token });
+                })
+                .catch(error => {
+                    sendResponse({ success: false, error: error.message });
+                });
             return true; // 异步
         case 'getRequestStats':
             sendResponse({ stats: globalState.requestStats });
-            break;
+            return false;
         case 'getCaptureRules':
             console.log('[Background] 收到getCaptureRules请求，当前规则:', globalState.captureRules);
             sendResponse({ data: globalState.captureRules });
-            break;
+            return false;
+        case 'getApiConfig':
+            // 为历史评论功能提供API配置
+            console.log('[Background] 收到getApiConfig请求，当前API配置:', globalState.apiConfig);
+            const apiConfigResponse = { 
+                success: true,
+                config: {
+                    apiBaseUrl: globalState.apiConfig?.host || 'http://localhost:8000',
+                    apiToken: globalState.apiConfig?.token || ''
+                }
+            };
+            console.log('[Background] 发送API配置响应:', apiConfigResponse);
+            sendResponse(apiConfigResponse);
+            return false; // 同步响应，不需要保持消息通道开放
+        case 'proxyRequest':
+            // 处理代理请求
+            console.log('[Background] 开始处理代理请求，requestId:', request.data.requestId);
+            handleProxyRequest(request.data)
+                .then(response => {
+                    console.log('[Background] 代理请求处理完成，发送响应:', response);
+                    sendResponse(response);
+                })
+                .catch(error => {
+                    console.error('[Background] 代理请求失败:', error);
+                    const errorResponse = {
+                        success: false,
+                        status: 500,
+                        error: error.message
+                    };
+                    console.log('[Background] 发送错误响应:', errorResponse);
+                    sendResponse(errorResponse);
+                });
+            return true; // 保持消息通道开放以便异步响应
         default:
             sendResponse({ error: 'Unknown action' });
-            break;
+            return false;
     }
-    return true;
+}
+
+/**
+ * 处理代理请求
+ * @param {object} requestData - 请求数据
+ * @returns {Promise<object>} - 响应数据
+ */
+async function handleProxyRequest(requestData) {
+    try {
+        console.log('[Background] 处理代理请求:', requestData);
+        
+        // 构建fetch选项
+        const fetchOptions = {
+            method: requestData.options.method || 'GET',
+            headers: requestData.options.headers || {}
+        };
+        
+        // 如果有请求体，添加到选项中
+        if (requestData.options.body) {
+            fetchOptions.body = requestData.options.body;
+        }
+        
+        console.log('[Background] 发送fetch请求:', requestData.url, fetchOptions);
+        
+        // 发送请求
+        const response = await fetch(requestData.url, fetchOptions);
+        
+        console.log('[Background] 收到响应:', response.status, response.statusText);
+        
+        // 根据响应内容类型处理数据
+        let responseData;
+        const contentType = response.headers.get('content-type');
+        
+        if (contentType && contentType.includes('application/json')) {
+            responseData = await response.json();
+        } else {
+            responseData = await response.text();
+        }
+        
+        console.log('[Background] 代理请求成功:', response.status, '数据:', responseData);
+        
+        return {
+            success: true,
+            status: response.status,
+            data: responseData
+        };
+    } catch (error) {
+        console.error('[Background] 代理请求出错:', error);
+        return {
+            success: false,
+            status: 500,
+            error: error.message
+        };
+    }
 }
 
 

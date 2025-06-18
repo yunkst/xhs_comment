@@ -1,6 +1,6 @@
 // injected/fetch.js
 
-import { isXHSUrl, dispatchInterceptEvent } from './utils.js';
+import { isXHSUrl, dispatchInterceptEvent, matchesHardcodedRule } from './utils.js';
 
 const originalFetch = window.fetch;
 
@@ -8,11 +8,16 @@ function interceptFetch() {
     window.fetch = function(input, init = {}) {
         const url = typeof input === 'string' ? input : input.url;
         
-        if (isXHSUrl(url)) {
+        // 检查是否匹配固化的抓取规则
+        const matchedRule = matchesHardcodedRule(url);
+        
+        if (matchedRule) {
             const method = init.method || 'GET';
             const headers = init.headers || {};
             const body = init.body || null;
             const requestId = `fetch_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            console.log(`[XHS Monitor] 匹配到固化规则: ${matchedRule.name}, URL: ${url}`);
             
             dispatchInterceptEvent({
                 url: url,
@@ -21,7 +26,8 @@ function interceptFetch() {
                 body: body,
                 type: 'fetch',
                 requestId: requestId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                captureRule: matchedRule // 添加匹配的规则信息
             });
             
             const fetchPromise = originalFetch.apply(this, arguments);
@@ -35,6 +41,7 @@ function interceptFetch() {
                         type: 'fetch_response',
                         requestId: requestId,
                         timestamp: Date.now(),
+                        captureRule: matchedRule,
                         response: {
                             status: response.status,
                             statusText: response.statusText,
@@ -54,6 +61,7 @@ function interceptFetch() {
                     method: method.toUpperCase(),
                     type: 'fetch_error',
                     requestId: requestId,
+                    captureRule: matchedRule,
                     error: error.message
                 });
                 throw error;

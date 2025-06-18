@@ -78,7 +78,7 @@
             const event = new CustomEvent('XHS_REQUEST_INTERCEPTED', {
                 detail: data
             });
-            window.dispatchEvent(event);
+            document.dispatchEvent(event);
         } catch (e) {
             // 静默处理错误
         }

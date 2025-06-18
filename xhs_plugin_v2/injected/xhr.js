@@ -1,4 +1,4 @@
-import { isXHSUrl, dispatchInterceptEvent } from './utils.js';
+import { isXHSUrl, dispatchInterceptEvent, matchesHardcodedRule } from './utils.js';
 
 const originalXHROpen = XMLHttpRequest.prototype.open;
 const originalXHRSend = XMLHttpRequest.prototype.send;
@@ -6,25 +6,31 @@ const originalSetRequestHeader = XMLHttpRequest.prototype.setRequestHeader;
 
 function interceptXHR() {
     XMLHttpRequest.prototype.open = function(method, url, async, user, password) {
-        if (isXHSUrl(url)) {
+        // 检查是否匹配固化的抓取规则
+        const matchedRule = matchesHardcodedRule(url);
+        
+        if (matchedRule) {
             this._xhsMethod = method;
             this._xhsUrl = url;
             this._xhsHeaders = {};
             this._xhsRequestId = `xhr_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
             this._xhsStartTime = Date.now();
+            this._xhsCaptureRule = matchedRule;
+            
+            console.log(`[XHS Monitor] XHR 匹配到固化规则: ${matchedRule.name}, URL: ${url}`);
         }
         return originalXHROpen.apply(this, arguments);
     };
 
     XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
-        if (this._xhsUrl && isXHSUrl(this._xhsUrl)) {
+        if (this._xhsUrl && this._xhsCaptureRule) {
             this._xhsHeaders[name] = value;
         }
         return originalSetRequestHeader.apply(this, arguments);
     };
 
     XMLHttpRequest.prototype.send = function(data) {
-        if (this._xhsUrl && isXHSUrl(this._xhsUrl)) {
+        if (this._xhsUrl && this._xhsCaptureRule) {
             const xhr = this;
             
             dispatchInterceptEvent({
@@ -34,7 +40,8 @@ function interceptXHR() {
                 body: data || null,
                 type: 'xhr',
                 requestId: this._xhsRequestId,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                captureRule: this._xhsCaptureRule
             });
 
             const originalOnReadyStateChange = xhr.onreadystatechange;
@@ -61,6 +68,7 @@ function interceptXHR() {
                         type: 'xhr_response',
                         requestId: xhr._xhsRequestId,
                         timestamp: Date.now(),
+                        captureRule: xhr._xhsCaptureRule,
                         response: {
                             status: xhr.status,
                             statusText: xhr.statusText,

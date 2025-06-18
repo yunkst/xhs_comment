@@ -17,7 +17,7 @@ class UserInfo(BaseModel):
     tag: Optional[str] = None
     official_verify_type: Optional[int] = None
     red_official_verify_type: Optional[int] = None
-    indicator: Optional[Dict] = None
+    indicator: Optional[str] = None  # 修改为字符串类型，如"作者"、"你的好友"等
 
 # --- 传入数据负载模型 ---
 class IncomingPayload(BaseModel):

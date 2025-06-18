@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "小红书网络请求监控插件",
-  "version": "1.0.0",
-  "description": "监控和记录所有发往xiaohongshu.com的网络请求",
+  "version": "2.1.0",
+  "description": "监控和记录所有发往xiaohongshu.com的网络请求，内置固化抓取规则",
   "permissions": [
     "webRequest",
     "storage",
@@ -48,7 +48,10 @@
         "injected/fetch.js",
         "injected/xhr.js",
         "injected/observer.js",
-        "injected/utils.js"
+        "injected/utils.js",
+        "injected/api-service.js",
+        "injected/dialog-manager.js",
+        "injected/notification-handler.js"
     ],
       "matches": ["<all_urls>"]
     }

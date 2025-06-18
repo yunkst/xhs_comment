@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>测试API配置获取</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #ff2442;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #e01e3a;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            font-family: monospace;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>小红书插件 API 配置测试</h1>
+        <p>这个页面用于测试插件的API配置获取功能。请确保插件已安装并激活。</p>
+        
+        <div>
+            <button onclick="testApiConfig()">测试API配置获取</button>
+            <button onclick="testProxyRequest()">测试代理请求</button>
+            <button onclick="clearResults()">清空结果</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function log(message, type = 'info') {
+            const resultsDiv = document.getElementById('results');
+            const resultDiv = document.createElement('div');
+            resultDiv.className = `result ${type}`;
+            resultDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            resultsDiv.appendChild(resultDiv);
+            resultsDiv.scrollTop = resultsDiv.scrollHeight;
+        }
+
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+        }
+
+        async function testApiConfig() {
+            try {
+                log('开始测试API配置获取...');
+                
+                if (typeof window.xhsApiService === 'undefined') {
+                    throw new Error('插件API服务未加载，请确保在小红书页面测试或插件未正确注入');
+                }
+                
+                const config = await window.xhsApiService.testGetApiConfig();
+                log(`API配置获取成功: ${JSON.stringify(config, null, 2)}`, 'success');
+            } catch (error) {
+                log(`API配置获取失败: ${error.message}`, 'error');
+                console.error('测试错误:', error);
+            }
+        }
+
+        async function testProxyRequest() {
+            try {
+                log('开始测试代理请求...');
+                
+                if (typeof window.xhsApiService === 'undefined') {
+                    throw new Error('插件API服务未加载，请确保在小红书页面测试或插件未正确注入');
+                }
+                
+                const result = await window.xhsApiService.testProxyRequest();
+                log(`代理请求测试成功: ${JSON.stringify(result, null, 2)}`, 'success');
+            } catch (error) {
+                log(`代理请求测试失败: ${error.message}`, 'error');
+                console.error('测试错误:', error);
+            }
+        }
+
+        // 页面加载时检查插件状态
+        window.addEventListener('load', function() {
+            setTimeout(() => {
+                if (typeof window.xhsApiService === 'undefined') {
+                    log('警告: 插件API服务未检测到。请在小红书页面打开此测试页面，或确保插件正确安装和激活。', 'error');
+                } else {
+                    log('插件API服务已检测到，可以开始测试。', 'success');
+                }
+            }, 1000);
+        });
+    </script>
+</body>
+</html> 
