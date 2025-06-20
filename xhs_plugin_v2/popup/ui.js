@@ -14,33 +14,57 @@ export function updateApiStatus() {
     const hasHost = !!appState.apiConfig.host;
     const hasToken = !!appState.apiConfig.token;
     
+    // 检查token是否可能过期（通过最近的错误状态判断）
+    const tokenMaybeExpired = appState.lastApiError && appState.lastApiError.includes('401');
+    
     if (hasHost && hasToken) {
-        elements.apiStatusIndicator.classList.add('connected');
-        elements.apiStatusText.textContent = `API已连接: ${appState.apiConfig.host.substring(0, 20)}... (已登录)`;
-        elements.ssoContainer.style.display = 'none';
-        elements.logoutContainer.classList.add('show');
+        if (tokenMaybeExpired) {
+            // Token可能已过期
+            elements.apiStatusIndicator.classList.remove('connected');
+            elements.apiStatusIndicator.style.backgroundColor = '#ff9500'; // 橙色警告
+            elements.apiStatusText.textContent = `⚠️ 登录可能已过期，请重新登录`;
+            elements.ssoContainer.style.display = 'block';
+            elements.logoutContainer.classList.remove('show');
+            updateSsoButtons();
+        } else {
+            // 正常连接状态
+            elements.apiStatusIndicator.classList.add('connected');
+            elements.apiStatusIndicator.style.backgroundColor = ''; // 重置颜色
+            elements.apiStatusText.textContent = `✅ API已连接: ${appState.apiConfig.host.substring(0, 20)}... (已登录)`;
+            elements.ssoContainer.style.display = 'none';
+            elements.logoutContainer.classList.add('show');
+        }
     } else if (hasHost) {
         elements.apiStatusIndicator.classList.remove('connected');
-        elements.apiStatusText.textContent = `API已配置: ${appState.apiConfig.host.substring(0, 20)}... (未登录)`;
+        elements.apiStatusIndicator.style.backgroundColor = ''; // 重置颜色
+        elements.apiStatusText.textContent = `⚙️ API已配置: ${appState.apiConfig.host.substring(0, 20)}... (未登录)`;
         elements.ssoContainer.style.display = 'block';
         elements.logoutContainer.classList.remove('show');
         updateSsoButtons();
     } else {
         elements.apiStatusIndicator.classList.remove('connected');
-        elements.apiStatusText.textContent = '未配置API服务';
-        elements.ssoContainer.style.display = 'none';
+        elements.apiStatusIndicator.style.backgroundColor = ''; // 重置颜色
+        elements.apiStatusText.textContent = '❌ 未配置API服务';
+        elements.ssoContainer.style.display = 'block'; // 显示SSO容器，让用户看到配置提示
         elements.logoutContainer.classList.remove('show');
+        updateSsoButtons();
     }
 }
 
 export function updateSsoButtons() {
+    const hasHost = !!appState.apiConfig.host;
+    
     if (appState.ssoSession.id && appState.ssoSession.status === 'pending') {
         elements.ssoCheckLogin.style.display = 'block';
         elements.ssoCheckLogin.classList.remove('hidden');
         elements.ssoStartLogin.innerHTML = '🔄 重新发起SSO登录';
     } else {
         elements.ssoCheckLogin.style.display = 'none';
-        elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
+        if (hasHost) {
+            elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
+        } else {
+            elements.ssoStartLogin.innerHTML = '⚙️ 先配置API地址';
+        }
     }
 }
 

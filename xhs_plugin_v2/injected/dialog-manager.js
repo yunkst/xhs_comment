@@ -245,24 +245,63 @@ function loadDialogContent(index, content) {
             .catch(error => {
                 console.error('[Dialog Manager] 获取历史评论时出错:', error);
                 
-                // 显示详细的错误信息
-                const errorHtml = `
-                    <div style="color: white; padding: 20px;">
-                        <h4 style="color: #ff2442; margin-bottom: 10px;">获取历史评论失败</h4>
-                        <p style="margin-bottom: 10px;"><strong>用户ID:</strong> ${userId}</p>
-                        <p style="margin-bottom: 10px;"><strong>错误信息:</strong> ${error.message}</p>
-                        <p style="margin-bottom: 10px;"><strong>可能原因:</strong></p>
-                        <ul style="margin-left: 20px; line-height: 1.6;">
-                            <li>API地址配置错误</li>
-                            <li>API令牌未设置或已过期</li>
-                            <li>后端服务未运行</li>
-                            <li>网络连接问题</li>
-                        </ul>
-                        <p style="margin-top: 15px;">
-                            <small>请检查插件配置并查看浏览器控制台获取更多调试信息</small>
-                        </p>
-                    </div>
-                `;
+                // 根据错误类型显示不同的错误信息
+                let errorHtml;
+                if (error.message.includes('登录已过期')) {
+                    errorHtml = `
+                        <div style="color: white; padding: 20px; text-align: center;">
+                            <h4 style="color: #ff2442; margin-bottom: 15px;">🔒 登录已过期</h4>
+                            <p style="margin-bottom: 15px; font-size: 16px;">您的登录令牌已过期，请重新登录</p>
+                            <div style="background-color: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                <p style="margin-bottom: 10px;"><strong>解决方案：</strong></p>
+                                <ol style="margin-left: 20px; line-height: 1.8; text-align: left;">
+                                    <li>点击插件图标</li>
+                                    <li>点击"🔐 单点登录 (SSO)"按钮</li>
+                                    <li>在新打开的页面中完成登录</li>
+                                    <li>刷新此页面重试</li>
+                                </ol>
+                            </div>
+                            <p style="color: #aaa; font-size: 12px;">
+                                如果问题持续存在，请联系管理员
+                            </p>
+                        </div>
+                    `;
+                } else if (error.message.includes('未配置')) {
+                    errorHtml = `
+                        <div style="color: white; padding: 20px; text-align: center;">
+                            <h4 style="color: #ff9500; margin-bottom: 15px;">⚙️ 配置未完成</h4>
+                            <p style="margin-bottom: 15px; font-size: 16px;">插件尚未配置完成</p>
+                            <div style="background-color: #2a2a2a; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
+                                <p style="margin-bottom: 10px;"><strong>请完成以下配置：</strong></p>
+                                <ol style="margin-left: 20px; line-height: 1.8; text-align: left;">
+                                    <li>右键点击插件图标，选择"选项"</li>
+                                    <li>输入正确的API服务器地址</li>
+                                    <li>点击"单点登录 (SSO)"完成登录</li>
+                                    <li>刷新此页面重试</li>
+                                </ol>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    // 其他错误的通用处理
+                    errorHtml = `
+                        <div style="color: white; padding: 20px;">
+                            <h4 style="color: #ff2442; margin-bottom: 10px;">❌ 获取历史评论失败</h4>
+                            <p style="margin-bottom: 10px;"><strong>用户ID:</strong> ${userId}</p>
+                            <p style="margin-bottom: 10px;"><strong>错误信息:</strong> ${error.message}</p>
+                            <p style="margin-bottom: 10px;"><strong>可能原因:</strong></p>
+                            <ul style="margin-left: 20px; line-height: 1.6;">
+                                <li>网络连接问题</li>
+                                <li>后端服务暂时不可用</li>
+                                <li>用户数据不存在</li>
+                                <li>服务器内部错误</li>
+                            </ul>
+                            <p style="margin-top: 15px;">
+                                <small>请稍后重试，或查看浏览器控制台获取更多调试信息</small>
+                            </p>
+                        </div>
+                    `;
+                }
                 content.innerHTML = errorHtml;
             });
     } catch (error) {

@@ -51,6 +51,12 @@ const router = createRouter({
           meta: { title: '小红书笔记', icon: 'Document' }
         },
         {
+          path: 'content/notifications',
+          name: 'ContentNotifications',
+          component: () => import('@/views/content/NotificationView.vue'),
+          meta: { title: '小红书通知', icon: 'Bell' }
+        },
+        {
           path: 'system',
           name: 'system',
           component: () => import('../views/system/SystemView.vue'),

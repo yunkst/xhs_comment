@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>用户备注功能测试</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .test-container {
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            position: relative;
+        }
+        .test-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .test-content {
+            color: #666;
+            margin-bottom: 10px;
+        }
+        .test-user {
+            color: #ff2442;
+            font-weight: bold;
+        }
+        .test-time {
+            color: #999;
+            font-size: 12px;
+        }
+        .note-input {
+            position: absolute;
+            right: 20px;
+            top: 20px;
+            width: 200px;
+            min-height: 60px;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            resize: none;
+            font-size: 12px;
+        }
+        .status {
+            margin-top: 20px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .status.success {
+            background-color: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .status.info {
+            background-color: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        .button {
+            background-color: #ff2442;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .button:hover {
+            background-color: #e6213d;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 用户备注功能测试页面</h1>
+    
+    <div class="status info">
+        <strong>测试说明：</strong>
+        <ul>
+            <li>此页面模拟小红书通知页面的结构</li>
+            <li>请确保插件已正确加载</li>
+            <li>检查控制台日志查看功能状态</li>
+            <li>备注输入框应该自动出现在每个通知的右侧</li>
+        </ul>
+    </div>
+
+    <!-- 模拟通知容器 -->
+    <div class="tabs-content-container">
+        <!-- 通知1 -->
+        <div class="container test-container">
+            <div class="test-title">
+                <span class="test-user">@用户123</span> 赞了你的笔记
+            </div>
+            <div class="test-content">
+                这是一条关于护肤的笔记，分享了一些实用的护肤技巧...
+            </div>
+            <div class="test-time">2小时前</div>
+        </div>
+
+        <!-- 通知2 -->
+        <div class="container test-container">
+            <div class="test-title">
+                <span class="test-user">@美妆达人</span> 评论了你的笔记
+            </div>
+            <div class="test-content">
+                "这个产品真的很好用，我也买了同款！"
+            </div>
+            <div class="test-time">5小时前</div>
+        </div>
+
+        <!-- 通知3 -->
+        <div class="container test-container">
+            <div class="test-title">
+                <span class="test-user">@旅行爱好者</span> 关注了你
+            </div>
+            <div class="test-content">
+                期待看到更多精彩内容！
+            </div>
+            <div class="test-time">1天前</div>
+        </div>
+    </div>
+
+    <div class="status" id="status">
+        等待插件初始化...
+    </div>
+
+    <div style="margin-top: 20px;">
+        <button class="button" onclick="testPluginStatus()">检查插件状态</button>
+        <button class="button" onclick="testApiService()">测试API服务</button>
+        <button class="button" onclick="testUserNotes()">测试备注功能</button>
+        <button class="button" onclick="clearStatus()">清除状态</button>
+    </div>
+
+    <script>
+        // 测试函数
+        function updateStatus(message, type = 'info') {
+            const statusEl = document.getElementById('status');
+            statusEl.textContent = message;
+            statusEl.className = `status ${type}`;
+            console.log(`[Test] ${message}`);
+        }
+
+        function testPluginStatus() {
+            updateStatus('检查插件状态...', 'info');
+            
+            // 检查全局对象是否存在
+            const checks = [
+                { name: 'xhsApiService', obj: window.xhsApiService },
+                { name: 'xhsUserNotes', obj: window.xhsUserNotes },
+                { name: 'xhsDialogManager', obj: window.xhsDialogManager }
+            ];
+            
+            let allPassed = true;
+            let results = [];
+            
+            checks.forEach(check => {
+                if (check.obj) {
+                    results.push(`✅ ${check.name}: 已加载`);
+                } else {
+                    results.push(`❌ ${check.name}: 未加载`);
+                    allPassed = false;
+                }
+            });
+            
+            const message = results.join('\n');
+            updateStatus(message, allPassed ? 'success' : 'error');
+        }
+
+        function testApiService() {
+            updateStatus('测试API服务...', 'info');
+            
+            if (!window.xhsApiService) {
+                updateStatus('❌ API服务未加载', 'error');
+                return;
+            }
+            
+            // 测试配置获取
+            window.xhsApiService.testGetApiConfig()
+                .then(config => {
+                    updateStatus(`✅ API配置获取成功: ${config.apiBaseUrl}`, 'success');
+                })
+                .catch(error => {
+                    updateStatus(`❌ API配置获取失败: ${error.message}`, 'error');
+                });
+        }
+
+        function testUserNotes() {
+            updateStatus('测试用户备注功能...', 'info');
+            
+            if (!window.xhsUserNotes) {
+                updateStatus('❌ 用户备注模块未加载', 'error');
+                return;
+            }
+            
+            // 模拟通知数据
+            const mockNotification = {
+                userInfo: { id: 'test_user_123' },
+                content: '这是一条测试通知内容',
+                type: 'like'
+            };
+            
+            // 查找第一个容器
+            const container = document.querySelector('.container');
+            if (container) {
+                try {
+                    window.xhsUserNotes.addNoteInputToContainer(container, 'test_user_123', mockNotification);
+                    updateStatus('✅ 备注输入框添加成功', 'success');
+                } catch (error) {
+                    updateStatus(`❌ 备注功能测试失败: ${error.message}`, 'error');
+                }
+            } else {
+                updateStatus('❌ 未找到测试容器', 'error');
+            }
+        }
+
+        function clearStatus() {
+            updateStatus('状态已清除', 'info');
+        }
+
+        // 自动检查插件状态
+        setTimeout(() => {
+            testPluginStatus();
+        }, 2000);
+
+        // 监听插件加载事件
+        document.addEventListener('DOMContentLoaded', function() {
+            updateStatus('页面加载完成，等待插件初始化...', 'info');
+        });
+
+        // 每5秒检查一次插件状态
+        setInterval(() => {
+            const noteInputs = document.querySelectorAll('.xhs-note-input');
+            if (noteInputs.length > 0) {
+                updateStatus(`✅ 发现 ${noteInputs.length} 个备注输入框`, 'success');
+            }
+        }, 5000);
+    </script>
+</body>
+</html> 

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { navigateToLogin } from '../utils/auth';
+import { ElMessage } from 'element-plus';
 
 // 创建axios实例
 const api = axios.create({
@@ -14,6 +15,8 @@ const api = axios.create({
 let isRefreshing = false;
 // 重试队列，每一项将是一个待执行的函数形式
 let refreshSubscribers = [];
+// 是否已经显示过登录过期提示
+let hasShownTokenExpiredMessage = false;
 
 // 将所有请求加入队列
 const subscribeTokenRefresh = (cb) => {
@@ -31,9 +34,11 @@ const refreshToken = async () => {
   try {
     const refreshToken = localStorage.getItem('refresh_token');
     if (!refreshToken) {
+      console.log('[Auth] 没有refresh_token，无法刷新');
       return null;
     }
     
+    console.log('[Auth] 尝试刷新token...');
     const response = await axios.post(
       `${import.meta.env.VITE_API_BASE_URL || ''}/api/v1/user/auth/sso-refresh`,
       { refresh_token: refreshToken },
@@ -47,15 +52,38 @@ const refreshToken = async () => {
       localStorage.setItem('refresh_token', data.refresh_token);
     }
     
+    console.log('[Auth] Token刷新成功');
+    // 重置过期提示标记
+    hasShownTokenExpiredMessage = false;
+    
     return data.access_token;
   } catch (error) {
-    console.error('刷新令牌失败,删除所有token', error);
+    console.error('[Auth] 刷新令牌失败:', error);
     // 刷新失败，清除所有令牌
     localStorage.removeItem('token');
     localStorage.removeItem('refresh_token');
     localStorage.removeItem('id_token');
     return null;
   }
+};
+
+// 处理认证失败
+const handleAuthFailure = () => {
+  console.log('[Auth] 处理认证失败，清除token并跳转登录页');
+  
+  // 清除所有token
+  localStorage.removeItem('token');
+  localStorage.removeItem('refresh_token');
+  localStorage.removeItem('id_token');
+  
+  // 只显示一次过期提示
+  if (!hasShownTokenExpiredMessage) {
+    hasShownTokenExpiredMessage = true;
+    ElMessage.warning('登录已过期，请重新登录');
+  }
+  
+  // 跳转到登录页
+  navigateToLogin();
 };
 
 // 请求拦截器
@@ -80,37 +108,61 @@ api.interceptors.response.use(
   async error => {
     const originalRequest = error.config;
     
+    console.log('[Auth] API请求失败:', {
+      url: originalRequest?.url,
+      status: error.response?.status,
+      message: error.message
+    });
+    
     // 如果状态码是401(未授权)
     if (error.response && error.response.status === 401 && !originalRequest._retry) {
+      console.log('[Auth] 收到401未授权响应，尝试刷新token');
+      
       // 如果refresh_token存在且尚未开始刷新
       if (localStorage.getItem('refresh_token') && !isRefreshing) {
         originalRequest._retry = true;
         isRefreshing = true;
         
-        const newToken = await refreshToken();
-        isRefreshing = false;
-        
-        if (newToken) {
-          // 通知所有请求继续执行
-          onRefreshed(newToken);
-          // 重试当前请求
-          originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
-          return axios(originalRequest);
+        try {
+          const newToken = await refreshToken();
+          isRefreshing = false;
+          
+          if (newToken) {
+            console.log('[Auth] Token刷新成功，重试原始请求');
+            // 通知所有请求继续执行
+            onRefreshed(newToken);
+            // 重试当前请求
+            originalRequest.headers['Authorization'] = `Bearer ${newToken}`;
+            return api(originalRequest);
+          } else {
+            console.log('[Auth] Token刷新失败，跳转登录页');
+            handleAuthFailure();
+          }
+        } catch (refreshError) {
+          console.error('[Auth] Token刷新过程中出错:', refreshError);
+          isRefreshing = false;
+          handleAuthFailure();
         }
       }
       
       // 如果已经在刷新，则将请求加入队列
       if (isRefreshing) {
-        return new Promise((resolve) => {
+        console.log('[Auth] 正在刷新token，将请求加入队列');
+        return new Promise((resolve, reject) => {
           subscribeTokenRefresh(token => {
-            originalRequest.headers['Authorization'] = `Bearer ${token}`;
-            resolve(axios(originalRequest));
+            if (token) {
+              originalRequest.headers['Authorization'] = `Bearer ${token}`;
+              resolve(api(originalRequest));
+            } else {
+              reject(new Error('Token刷新失败'));
+            }
           });
         });
       }
       
       // Token刷新失败或没有refresh_token，跳转到登录页
-      navigateToLogin();
+      console.log('[Auth] 无法刷新token，跳转登录页');
+      handleAuthFailure();
     }
     
     return Promise.reject(error);
@@ -135,6 +187,14 @@ export const userApi = {
   // 检查OTP状态
   checkOtpStatus: () => {
     return api.get('/api/v1/user/auth/otp-status');
+  },
+  // 检查登录状态
+  checkLoginStatus: () => {
+    return api.get('/api/v1/user/auth/check-login-status');
+  },
+  // 获取当前用户信息
+  getCurrentUser: () => {
+    return api.get('/api/v1/user/auth/me');
   }
 };
 
@@ -236,10 +296,6 @@ export const userManagementApi = {
   getUserDetail: (userId) => {
     return api.get(`/api/v1/user/profile/${userId}`);
   },
-  // 获取当前用户信息
-  getCurrentUser: () => {
-    return api.get('/api/v1/user/auth/me');
-  },
   // 禁言用户 (使用新的用户管理域)
   muteUser: (userId, data) => {
     return api.post(`/api/v1/user/profile/${userId}/mute`, data);
@@ -278,23 +334,27 @@ export const xhsUserApi = {
 export const notificationApi = {
   // 获取通知列表
   getNotificationList: (params) => {
-    return api.get('/api/v1/notification/notifications', { params });
+    return api.get('/api/notifications', { params });
   },
   // 获取通知统计
   getNotificationsStats: () => {
-    return api.get('/api/v1/notification/notifications/stats');
+    return api.get('/api/notifications/stats');
   },
-  // 获取通知类型
+  // 获取通知类型列表
   getNotificationTypes: () => {
-    return api.get('/api/v1/notification/notifications/types');
+    return api.get('/api/notifications/types');
   },
   // 获取单条通知详情
   getNotification: (notificationId) => {
-    return api.get(`/api/v1/notification/notifications/${notificationId}`);
+    return api.get(`/api/notifications/${notificationId}`);
   },
   // 删除通知
   deleteNotification: (notificationId) => {
-    return api.delete(`/api/v1/notification/notifications/${notificationId}`);
+    return api.delete(`/api/notifications/${notificationId}`);
+  },
+  // 搜索通知
+  searchNotifications: (params) => {
+    return api.get('/api/notifications', { params });
   }
 };
 

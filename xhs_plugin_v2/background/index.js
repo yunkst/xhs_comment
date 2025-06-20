@@ -220,6 +220,48 @@ async function handleProxyRequest(requestData) {
         
         console.log('[Background] 收到响应:', response.status, response.statusText);
         
+        // 检查401错误并尝试刷新token
+        if (response.status === 401) {
+            console.log('[Background] 代理请求收到401，尝试刷新token...');
+            
+            try {
+                // 尝试刷新token
+                await refreshApiToken();
+                
+                // 更新请求头中的Authorization
+                if (globalState.apiConfig?.token && fetchOptions.headers) {
+                    fetchOptions.headers['Authorization'] = `Bearer ${globalState.apiConfig.token}`;
+                    console.log('[Background] 已更新Authorization头，重试请求');
+                    
+                    // 重新发送请求
+                    const retryResponse = await fetch(requestData.url, fetchOptions);
+                    console.log('[Background] 重试请求响应:', retryResponse.status, retryResponse.statusText);
+                    
+                    // 处理重试响应
+                    let retryData;
+                    const retryContentType = retryResponse.headers.get('content-type');
+                    
+                    if (retryContentType && retryContentType.includes('application/json')) {
+                        retryData = await retryResponse.json();
+                    } else {
+                        retryData = await retryResponse.text();
+                    }
+                    
+                    console.log('[Background] 重试请求成功:', retryResponse.status, '数据:', retryData);
+                    
+                    return {
+                        success: retryResponse.ok,
+                        status: retryResponse.status,
+                        data: retryData,
+                        retried: true
+                    };
+                }
+            } catch (refreshError) {
+                console.error('[Background] Token刷新失败:', refreshError);
+                // 继续处理原始401响应
+            }
+        }
+        
         // 根据响应内容类型处理数据
         let responseData;
         const contentType = response.headers.get('content-type');
@@ -230,10 +272,10 @@ async function handleProxyRequest(requestData) {
             responseData = await response.text();
         }
         
-        console.log('[Background] 代理请求成功:', response.status, '数据:', responseData);
+        console.log('[Background] 代理请求完成:', response.status, '数据:', responseData);
         
         return {
-            success: true,
+            success: response.ok,
             status: response.status,
             data: responseData
         };

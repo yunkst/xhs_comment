@@ -236,13 +236,50 @@ class NetworkDataProcessor:
         user_info = item_info.get('user_info', {})
         author_id = user_info.get('userid') or user_info.get('id')
         
+        # 调试日志：输出原始数据结构
+        logger.debug(f"提取笔记信息，原始item_info: {json.dumps(item_info, ensure_ascii=False, indent=2)}")
+        
+        # 尝试多种可能的字段名来提取笔记信息
+        note_id = item_info.get('id')
+        title = (item_info.get('title') or 
+                item_info.get('note_title') or 
+                item_info.get('display_title') or 
+                item_info.get('content', '').split('\n')[0][:50] if item_info.get('content') else None)  # 如果没有标题，用内容的第一行
+        
+        content = (item_info.get('content') or 
+                  item_info.get('desc') or 
+                  item_info.get('note_content') or 
+                  item_info.get('display_content'))
+        
+        # 尝试多种时间字段
+        publish_time = (self._safe_ts_to_dt(item_info.get('add_time')) or
+                       self._safe_ts_to_dt(item_info.get('publish_time')) or
+                       self._safe_ts_to_dt(item_info.get('create_time')) or
+                       self._safe_ts_to_dt(item_info.get('time')))
+        
+        # 尝试提取交互数据
+        interact_info = item_info.get('interact_info', {})
+        like_count = (interact_info.get('liked_count') or 
+                     interact_info.get('like_count') or 
+                     item_info.get('like_count') or 
+                     item_info.get('liked_count') or 0)
+        
+        comment_count = (interact_info.get('comment_count') or 
+                        item_info.get('comment_count') or 
+                        item_info.get('comments_count') or 0)
+        
+        logger.info(f"提取笔记信息 - ID: {note_id}, 标题: {title}, 内容长度: {len(content) if content else 0}, "
+                   f"发布时间: {publish_time}, 点赞数: {like_count}, 评论数: {comment_count}")
+        
         return Note(
-            noteId=item_info.get('id'),
-            title=item_info.get('title'),
-            noteContent=item_info.get('content') or item_info.get('desc'), # 支持多种内容字段
+            noteId=note_id,
+            title=title,
+            noteContent=content,
             authorId=author_id,
-            illegal_info=IllegalInfo(**item_info['illegal_info']) if 'illegal_info' in item_info else None,
-            publishTime=self._safe_ts_to_dt(item_info.get('add_time'))
+            publishTime=publish_time,
+            noteLike=like_count,
+            noteCommitCount=comment_count,
+            illegal_info=IllegalInfo(**item_info['illegal_info']) if 'illegal_info' in item_info else None
         )
         
     def _extract_comment_from_mention(self, message: Dict) -> Optional[CommentItem]:

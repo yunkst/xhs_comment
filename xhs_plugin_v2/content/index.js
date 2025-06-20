@@ -16,6 +16,13 @@
     function shouldInjectMonitoring() {
         const currentUrl = window.location.href;
         
+        // 对于小红书页面，直接注入，不等待配置
+        if (isUrlMatched(currentUrl)) {
+            console.log('[XHS Monitor] 检测到小红书页面，直接注入脚本');
+            injectMonitoringScripts();
+            return;
+        }
+        
         // 向background获取配置并检查
         chrome.runtime.sendMessage({ action: 'getConfig' }, function(response) {
             if (response && response.config) {
@@ -25,15 +32,11 @@
                     injectMonitoringScripts();
                 } else {
                     console.log('[XHS Monitor] 当前页面不在监控范围内:', currentUrl);
-                    // 即使不在监控范围内，也要注入基础脚本以支持历史评论功能
-                    if (isUrlMatched(currentUrl)) {
-                        injectBasicScripts();
-                    }
                 }
             } else {
-                // 如果无法获取配置，使用默认行为
+                // 如果无法获取配置，对小红书页面使用默认行为
                 console.warn('[XHS Monitor] 无法获取配置，使用默认监控');
-                if (isUrlMatched(window.location.href)) {
+                if (isUrlMatched(currentUrl)) {
                     injectMonitoringScripts();
                 }
             }
@@ -51,30 +54,15 @@
         return false;
     }
     
-    // 注入基础脚本（仅历史评论功能）
-    function injectBasicScripts() {
-        console.log('[XHS Monitor] 正在注入基础脚本（历史评论功能）...');
-        
-        // 注入基础脚本
-        const script = document.createElement('script');
-        script.src = chrome.runtime.getURL('injected/index.js');
-        script.type = 'module';
-        script.onload = function() {
-            this.remove();
-            console.log('[XHS Monitor] 基础脚本已注入（历史评论功能）');
-        };
-        
-        // 尽早注入脚本
-        const targetElement = document.head || document.documentElement;
-        targetElement.appendChild(script);
-        
-        // 添加页面标记
-        document.documentElement.setAttribute('data-xhs-monitor', 'basic');
-    }
-
     // 注入监控脚本
     function injectMonitoringScripts() {
         console.log('[XHS Monitor] 正在注入监控脚本...');
+        
+        // 检查是否已经注入过
+        if (document.documentElement.getAttribute('data-xhs-monitor')) {
+            console.log('[XHS Monitor] 脚本已经注入过，跳过');
+            return;
+        }
         
         // 注入原始监控脚本
         const script1 = document.createElement('script');
@@ -83,6 +71,9 @@
         script1.onload = function() {
             this.remove();
             console.log('[XHS Monitor] 基础监控脚本已注入');
+        };
+        script1.onerror = function() {
+            console.error('[XHS Monitor] 基础监控脚本注入失败');
         };
         
         // 注入增强拦截器（如果启用）
@@ -93,6 +84,9 @@
             script2.onload = function() {
                 this.remove();
                 console.log('[XHS Monitor] 隐蔽增强拦截器已注入');
+            };
+            script2.onerror = function() {
+                console.error('[XHS Monitor] 增强拦截器注入失败');
             };
         }
         
@@ -109,6 +103,8 @@
             document.documentElement.setAttribute('data-xhs-monitor-enhanced', 'true');
             document.documentElement.setAttribute('data-xhs-monitor-mode', 'stealth');
         }
+        
+        console.log('[XHS Monitor] 监控脚本注入完成');
     }
     
     // 监听来自注入脚本的消息

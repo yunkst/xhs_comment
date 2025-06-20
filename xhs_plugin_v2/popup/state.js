@@ -53,5 +53,6 @@ export let appState = {
     filteredLog: [],
     currentFilter: 'all',
     ssoConfig: {},
-    captureRules: []
+    captureRules: [],
+    lastApiError: null // 记录最近的API错误，用于检测token过期
 }; 

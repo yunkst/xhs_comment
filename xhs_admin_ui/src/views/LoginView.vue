@@ -1,114 +1,159 @@
 <template>
   <div class="login-container">
-    <el-card class="login-card">
-      <div class="title">
-        <h2>小红书评论维护系统</h2>
+    <div class="login-box">
+      <div class="login-header">
+        <h1>小红书评论维护系统</h1>
+        <p>请登录以继续使用</p>
       </div>
       
-      <!-- 登录/注册切换标签 -->
-      <el-tabs v-model="activeTab" class="login-tabs" @tab-change="handleTabChange">
+      <el-tabs v-model="activeTab" @tab-change="handleTabChange" class="login-tabs">
+        <!-- 登录标签页 -->
         <el-tab-pane label="登录" name="login">
-      <el-form :model="loginForm" :rules="loginRules" ref="loginFormRef" label-width="0" class="login-form">
-        <el-form-item prop="username">
-          <el-input v-model="loginForm.username" prefix-icon="el-icon-user" placeholder="用户名">
-            <template #prefix>
-              <el-icon><User /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input v-model="loginForm.password" prefix-icon="el-icon-lock" type="password" placeholder="密码" @keyup.enter="handleLogin">
-            <template #prefix>
-              <el-icon><Lock /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-form-item prop="otp_code" v-if="otpEnabled">
-          <el-input v-model="loginForm.otp_code" prefix-icon="el-icon-key" placeholder="动态验证码" @keyup.enter="handleLogin">
-            <template #prefix>
-              <el-icon><Key /></el-icon>
-            </template>
-          </el-input>
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" :loading="loading" class="login-button" @click="handleLogin">登录</el-button>
-        </el-form-item>
-        
-        <div class="divider">
-          <span>或</span>
-        </div>
-        
-        <el-form-item>
-          <el-button type="success" :loading="ssoLoading" class="login-button sso-button" @click="handleSsoLogin">
-            <el-icon class="sso-icon"><Connection /></el-icon>
-            单点登录 (SSO)
-          </el-button>
-        </el-form-item>
-      </el-form>
+          <el-form 
+            ref="loginFormRef" 
+            :model="loginForm" 
+            :rules="loginRules" 
+            label-width="80px"
+            class="login-form"
+          >
+            <el-form-item label="用户名" prop="username">
+              <el-input 
+                v-model="loginForm.username" 
+                placeholder="请输入用户名"
+                @keyup.enter="handleLogin"
+              />
+            </el-form-item>
+            
+            <el-form-item label="密码" prop="password">
+              <el-input 
+                v-model="loginForm.password" 
+                type="password" 
+                placeholder="请输入密码"
+                show-password
+                @keyup.enter="handleLogin"
+              />
+            </el-form-item>
+            
+            <el-form-item 
+              v-if="otpEnabled" 
+              label="验证码" 
+              prop="otp_code"
+            >
+              <div class="otp-input-group">
+                <el-input 
+                  v-model="loginForm.otp_code" 
+                  placeholder="请输入6位动态验证码"
+                  maxlength="6"
+                  @keyup.enter="handleLogin"
+                />
+                <el-button 
+                  type="text" 
+                  @click="loadOtpQrcode"
+                  class="qrcode-btn"
+                >
+                  获取二维码
+                </el-button>
+              </div>
+            </el-form-item>
+            
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                :loading="loading" 
+                @click="handleLogin"
+                class="login-btn"
+              >
+                {{ loading ? '登录中...' : '登录' }}
+              </el-button>
+            </el-form-item>
+          </el-form>
         </el-tab-pane>
         
         <!-- 注册标签页 -->
-        <el-tab-pane label="注册" name="register" v-if="allowRegister">
-          <el-form :model="registerForm" :rules="registerRules" ref="registerFormRef" label-width="0" class="login-form">
-            <el-form-item prop="username">
-              <el-input v-model="registerForm.username" placeholder="用户名">
-                <template #prefix>
-                  <el-icon><User /></el-icon>
-                </template>
-              </el-input>
-            </el-form-item>
-            <el-form-item prop="password">
-              <el-input v-model="registerForm.password" type="password" placeholder="密码">
-                <template #prefix>
-                  <el-icon><Lock /></el-icon>
-                </template>
-              </el-input>
-            </el-form-item>
-            <el-form-item prop="confirmPassword">
-              <el-input v-model="registerForm.confirmPassword" type="password" placeholder="确认密码" @keyup.enter="handleRegister">
-                <template #prefix>
-                  <el-icon><Lock /></el-icon>
-                </template>
-              </el-input>
-            </el-form-item>
-            <el-form-item>
-              <el-button type="primary" :loading="registerLoading" class="login-button" @click="handleRegister">注册</el-button>
+        <el-tab-pane v-if="allowRegister" label="注册" name="register">
+          <el-form 
+            ref="registerFormRef" 
+            :model="registerForm" 
+            :rules="registerRules" 
+            label-width="80px"
+            class="register-form"
+          >
+            <el-form-item label="用户名" prop="username">
+              <el-input 
+                v-model="registerForm.username" 
+                placeholder="请输入用户名"
+                @keyup.enter="handleRegister"
+              />
             </el-form-item>
             
-            <div class="register-notice" v-if="otpEnabled">
-              <el-alert
-                title="注册须知"
-                type="info"
-                :closable="false"
-                description="注册成功后，系统将生成OTP二维码供您设置动态验证码，请妥善保管。"
-                show-icon
+            <el-form-item label="密码" prop="password">
+              <el-input 
+                v-model="registerForm.password" 
+                type="password" 
+                placeholder="请输入密码"
+                show-password
+                @keyup.enter="handleRegister"
               />
-            </div>
+            </el-form-item>
+            
+            <el-form-item label="确认密码" prop="confirmPassword">
+              <el-input 
+                v-model="registerForm.confirmPassword" 
+                type="password" 
+                placeholder="请再次输入密码"
+                show-password
+                @keyup.enter="handleRegister"
+              />
+            </el-form-item>
+            
+            <el-form-item>
+              <el-button 
+                type="primary" 
+                :loading="registerLoading" 
+                @click="handleRegister"
+                class="register-btn"
+              >
+                {{ registerLoading ? '注册中...' : '注册' }}
+              </el-button>
+            </el-form-item>
           </el-form>
         </el-tab-pane>
       </el-tabs>
-    </el-card>
-
-    <!-- OTP设置对话框 -->
-    <el-dialog v-model="qrcodeDialogVisible" title="OTP设置" width="350px">
-      <div v-if="otpQrcode" class="qrcode-container">
-        <p>请使用Google Authenticator或其他OTP应用扫描下方二维码</p>
-        <img :src="otpQrcode" alt="OTP二维码" />
-        <div style="margin-top: 15px;">
-          <el-alert
-            title="设置完成后请返回登录页面使用您的账号和动态验证码登录"
-            type="success"
-            :closable="false"
-            show-icon
-          />
+      
+      <!-- OTP二维码显示 -->
+      <div v-if="otpQrcode" class="qrcode-display">
+        <h3>动态验证码设置</h3>
+        <div class="qrcode-container">
+          <img :src="otpQrcode" alt="OTP QR Code" />
         </div>
+        <p class="qrcode-tip">
+          请使用Google Authenticator等OTP应用扫描二维码
+        </p>
       </div>
-      <div v-else class="qrcode-container">
-        <el-alert type="info" :closable="false">正在加载OTP二维码...</el-alert>
+    </div>
+    
+    <!-- OTP设置对话框 -->
+    <el-dialog 
+      v-model="qrcodeDialogVisible" 
+      title="设置动态验证码" 
+      width="400px"
+      :close-on-click-modal="false"
+    >
+      <div class="qrcode-dialog-content">
+        <p>请使用Google Authenticator等OTP应用扫描以下二维码：</p>
+        <div class="qrcode-container" v-if="otpQrcode">
+          <img :src="otpQrcode" alt="OTP QR Code" />
+        </div>
+        <p class="qrcode-tip">
+          扫描完成后，请使用您的账号、密码和动态验证码登录
+        </p>
       </div>
       <template #footer>
-        <el-button @click="qrcodeDialogVisible = false">关闭</el-button>
-        <el-button type="primary" @click="handleQrcodeComplete">设置完成</el-button>
+        <span class="dialog-footer">
+          <el-button type="primary" @click="handleQrcodeComplete">
+            我已完成设置
+          </el-button>
+        </span>
       </template>
     </el-dialog>
   </div>
@@ -116,42 +161,56 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { User, Lock, Key, Connection } from '@element-plus/icons-vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { userApi, ssoApi } from '../services/api'
+import { userApi } from '../services/api'
+import { setAuthTokens } from '../utils/auth'
 
+// 路由
 const router = useRouter()
-const loginFormRef = ref(null)
-const registerFormRef = ref(null)
+
+// 响应式数据
+const activeTab = ref('login')
 const loading = ref(false)
 const registerLoading = ref(false)
-const ssoLoading = ref(false)
-const qrcodeDialogVisible = ref(false)
-const otpQrcode = ref('')
-const activeTab = ref('login')
-const allowRegister = ref(true)
+const allowRegister = ref(false)
 const otpEnabled = ref(true)
+const otpQrcode = ref('')
+const qrcodeDialogVisible = ref(false)
 
+// 表单引用
+const loginFormRef = ref()
+const registerFormRef = ref()
+
+// 登录表单数据
 const loginForm = reactive({
   username: '',
   password: '',
   otp_code: ''
 })
 
+// 注册表单数据
 const registerForm = reactive({
   username: '',
   password: '',
   confirmPassword: ''
 })
 
+// 登录表单验证规则
 const loginRules = reactive({
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
-  password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
-  otp_code: []
+  username: [
+    { required: true, message: '请输入用户名', trigger: 'blur' }
+  ],
+  password: [
+    { required: true, message: '请输入密码', trigger: 'blur' }
+  ],
+  otp_code: [
+    { required: true, message: '请输入动态验证码', trigger: 'blur' }
+  ]
 })
 
-const registerRules = {
+// 注册表单验证规则
+const registerRules = reactive({
   username: [
     { required: true, message: '请输入用户名', trigger: 'blur' },
     { min: 3, max: 20, message: '用户名长度在 3 到 20 个字符', trigger: 'blur' }
@@ -164,10 +223,8 @@ const registerRules = {
     { required: true, message: '请确认密码', trigger: 'blur' },
     {
       validator: (rule, value, callback) => {
-        if (value === '') {
-          callback(new Error('请再次输入密码'))
-        } else if (value !== registerForm.password) {
-          callback(new Error('两次输入密码不一致'))
+        if (value !== registerForm.password) {
+          callback(new Error('两次输入的密码不一致'))
         } else {
           callback()
         }
@@ -175,72 +232,9 @@ const registerRules = {
       trigger: 'blur'
     }
   ]
-}
+})
 
-// 辅助函数: 从当前URL获取参数，支持不同路由模式
-const getUrlParams = () => {
-  const result = {}
-  
-  // 尝试从常规search参数获取
-  const searchParams = new URLSearchParams(window.location.search)
-  for (const [key, value] of searchParams.entries()) {
-    result[key] = value
-  }
-  
-  // 尝试从hash部分获取
-  try {
-    // 检查是否有?标记查询参数
-    const hashParts = window.location.hash.split('?')
-    if (hashParts.length > 1) {
-      // 提取查询参数部分
-      const hashSearchPart = hashParts[1]
-      const hashParams = new URLSearchParams(hashSearchPart)
-      for (const [key, value] of hashParams.entries()) {
-        // 如果常规search没有此参数，才从hash中添加
-        if (!result[key]) {
-          result[key] = value
-        }
-      }
-    }
-  } catch (e) {
-    console.error('[SSO调试] 解析hash参数错误:', e)
-  }
-  
-  // 检查vue-router params中是否有sso_callback参数
-  try {
-    const routeQuery = router.currentRoute.value.query
-    if (routeQuery && routeQuery.sso_callback && !result.sso_callback) {
-      result.sso_callback = routeQuery.sso_callback
-      console.log('[SSO调试] 从路由query中获取到sso_callback:', routeQuery.sso_callback)
-    }
-  } catch (e) {
-    console.error('[SSO调试] 获取路由参数错误:', e)
-  }
-  
-  console.log('[SSO调试] 合并后的URL参数:', result)
-  return result
-}
-
-// 处理SSO登录
-const handleSsoLogin = async () => {
-  ssoLoading.value = true;
-  ElMessage.info('SSO 功能已更新。请通过插件发起登录。');
-  // try {
-  //   // 获取SSO登录URL
-  //   const response = await ssoApi.getSsoLoginUrl() // 这个后端接口可能在新流程中已移除或改变
-  //   // 重定向到SSO登录页面
-  //   window.location.href = response.auth_url
-  // } catch (error) {
-  //   console.error('获取SSO登录URL失败:', error)
-  //   if (error.response && error.response.data && error.response.data.detail) {
-  //     ElMessage.error(`SSO登录失败: ${error.response.data.detail}`)
-  //   } else {
-  //     ElMessage.error('SSO登录失败，请稍后再试')
-  //   }
-  // }
-  ssoLoading.value = false;
-}
-
+// 处理登录
 const handleLogin = async () => {
   if (!loginFormRef.value) return
   
@@ -258,11 +252,8 @@ const handleLogin = async () => {
         otp_code: loginForm.otp_code
       })
       
-      // 存储令牌
-      localStorage.setItem('token', response.access_token)
-      if (response.refresh_token) {
-        localStorage.setItem('refresh_token', response.refresh_token)
-      }
+      // 使用auth工具函数设置令牌，这会自动启动定期检查
+      setAuthTokens(response.access_token, response.refresh_token)
       
       console.log('[SSO重构] LoginView - 登录成功')
       loading.value = false
@@ -475,90 +466,106 @@ onMounted(() => {
 
 <style scoped>
 .login-container {
+  min-height: 100vh;
   display: flex;
-  justify-content: center;
   align-items: center;
-  height: 100vh;
-  width: 100vw;
-  background-color: #f5f7f9;
-  overflow: hidden;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
-.login-card {
+.login-box {
   width: 400px;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  background: white;
+  border-radius: 10px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
 }
 
-.title {
+.login-header {
   text-align: center;
   margin-bottom: 30px;
-  color: #409EFF;
 }
 
-.login-form {
-  padding: 0 20px;
+.login-header h1 {
+  color: #333;
+  margin-bottom: 10px;
+  font-size: 24px;
 }
 
-.login-button {
-  width: 100%;
-}
-
-.divider {
-  display: flex;
-  align-items: center;
-  text-align: center;
-  margin: 15px 0;
-}
-
-.divider::before,
-.divider::after {
-  content: '';
-  flex: 1;
-  border-bottom: 1px solid #dcdfe6;
-}
-
-.divider span {
-  padding: 0 10px;
-  color: #909399;
+.login-header p {
+  color: #666;
   font-size: 14px;
-}
-
-.sso-button {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.sso-icon {
-  margin-right: 5px;
-}
-
-.qrcode-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-}
-
-.qrcode-container img {
-  margin-top: 15px;
-  max-width: 200px;
 }
 
 .login-tabs {
   margin-bottom: 20px;
 }
 
-.login-tabs .el-tabs__header {
-  margin: 0 0 15px 0;
+.login-form,
+.register-form {
+  margin-top: 20px;
 }
 
-.register-notice {
-  margin-top: 15px;
+.login-btn,
+.register-btn {
+  width: 100%;
+  height: 40px;
+  font-size: 16px;
 }
 
-.register-notice .el-alert {
-  margin-bottom: 0;
+.otp-input-group {
+  display: flex;
+  gap: 10px;
+}
+
+.otp-input-group .el-input {
+  flex: 1;
+}
+
+.qrcode-btn {
+  white-space: nowrap;
+}
+
+.qrcode-display {
+  margin-top: 20px;
+  text-align: center;
+  padding: 20px;
+  border: 1px solid #e4e7ed;
+  border-radius: 6px;
+  background-color: #fafafa;
+}
+
+.qrcode-display h3 {
+  margin-bottom: 15px;
+  color: #333;
+}
+
+.qrcode-container {
+  margin: 15px 0;
+}
+
+.qrcode-container img {
+  max-width: 200px;
+  height: auto;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.qrcode-tip {
+  color: #666;
+  font-size: 12px;
+  margin-top: 10px;
+}
+
+.qrcode-dialog-content {
+  text-align: center;
+}
+
+.qrcode-dialog-content .qrcode-container {
+  margin: 20px 0;
+}
+
+.qrcode-dialog-content .qrcode-container img {
+  max-width: 250px;
 }
 </style> 

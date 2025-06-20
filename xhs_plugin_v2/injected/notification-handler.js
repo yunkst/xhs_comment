@@ -158,19 +158,47 @@ function addButtonsToNotifications() {
     // 首先提取通知数据
     extractNotificationsFromDOM();
     
-    // 内部函数：为容器添加按钮
+    // 内部函数：为容器添加按钮和备注输入框
     function addButtonsToContainers(containers) {
         if (!containers || containers.length === 0) {
             console.log('[Notification Handler] 没有找到容器');
             return;
         }
         
-        console.log(`[Notification Handler] 为 ${containers.length} 个容器添加按钮`);
+        console.log(`[Notification Handler] 为 ${containers.length} 个容器添加按钮和备注输入框`);
+        
+        // 收集新的用户ID，以便批量获取他们的备注
+        const newUserIds = new Set();
+        notificationsData.forEach(notification => {
+            const userId = notification.userInfo?.id;
+            if (userId && window.xhsApiService && window.xhsApiService.userNotes && 
+                !window.xhsApiService.userNotes.hasOwnProperty('_loaded_user_' + userId)) {
+                newUserIds.add(userId);
+                // 标记这个用户ID已经被处理，避免重复请求
+                window.xhsApiService.userNotes['_loaded_user_' + userId] = true;
+            }
+        });
+        
+        // 如果有新用户，批量获取他们的备注
+        if (newUserIds.size > 0) {
+            console.log(`[Notification Handler] 发现 ${newUserIds.size} 个新用户，批量获取他们的备注`);
+            // 异步获取所有用户的备注，不阻塞UI
+            (async function() {
+                try {
+                    if (window.xhsApiService && window.xhsApiService.fetchUserNotesInBatch) {
+                        const userIdsArray = Array.from(newUserIds);
+                        await window.xhsApiService.fetchUserNotesInBatch(userIdsArray);
+                    }
+                } catch(error) {
+                    console.error(`[Notification Handler] 批量获取用户备注失败:`, error);
+                }
+            })();
+        }
         
         containers.forEach((container, index) => {
             // 检查容器是否已经有按钮
             if (container.querySelector('.xhs-plugin-action-btn')) {
-                console.log(`[Notification Handler] 容器 ${index} 已有按钮，跳过`);
+                console.log(`[Notification Handler] 容器 ${index} 已有按钮，跳过按钮添加`);
             } else {
                 console.log(`[Notification Handler] 为通知 ${index} 添加按钮`);
                 // 创建按钮元素
@@ -233,16 +261,41 @@ function addButtonsToNotifications() {
                     container.style.position = 'relative';
                 }
                 
-                // 为容器添加额外的右侧内边距，避免内容被按钮遮挡
-                container.style.paddingRight = '120px';
+                // 为容器添加额外的右侧内边距，避免内容被按钮和备注输入框遮挡
+                container.style.paddingRight = '300px'; // 增加右侧内边距以容纳备注输入框
                 
                 // 将按钮添加到容器中
                 container.appendChild(button);
                 console.log(`[Notification Handler] 按钮 ${index} 添加成功`);
             }
+            
+            // 添加备注输入框
+            if (notificationsData[index]) {
+                const notification = notificationsData[index];
+                const userId = notification.userInfo?.id;
+                
+                if (userId) {
+                    // 检查容器是否已经有备注输入框
+                    if (!container.querySelector('.xhs-note-input')) {
+                        console.log(`[Notification Handler] 为通知 ${index} 添加备注输入框`);
+                        if (window.xhsUserNotes && window.xhsUserNotes.addNoteInputToContainer) {
+                            window.xhsUserNotes.addNoteInputToContainer(container, userId, notification);
+                        } else {
+                            console.warn('[Notification Handler] 用户备注模块未初始化');
+                        }
+                    } else {
+                        // 更新已存在的备注输入框
+                        if (window.xhsUserNotes && window.xhsUserNotes.updateExistingNoteInput) {
+                            window.xhsUserNotes.updateExistingNoteInput(container, userId, notification);
+                        }
+                    }
+                } else {
+                    console.warn(`[Notification Handler] 通知 ${index} 缺少用户ID，无法添加备注输入框`);
+                }
+            }
         });
         
-        console.log(`[Notification Handler] 完成按钮添加，共处理 ${containers.length} 个容器`);
+        console.log(`[Notification Handler] 完成按钮和备注输入框添加，共处理 ${containers.length} 个容器`);
     }
     
     // 初始添加按钮
