@@ -60,7 +60,7 @@ onMounted(async () => {
       if (typeof ssoApi.approveSsoSession !== 'function') {
           throw new Error ('ssoApi.approveSsoSession 方法未定义，请检查 services/api.js');
       }
-      const response = await ssoApi.approveSsoSession({ session_id: sessionId.value }); // token 会由axios拦截器自动添加
+      const response = await ssoApi.approveSsoSession(sessionId.value); // token 会由axios拦截器自动添加
       console.log('[SSO Initiate] approve_sso_session 响应:', response);
       
       if (response && (response.status === 'success' || response.data?.status === 'success')) { // 兼容不同响应结构

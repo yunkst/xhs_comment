@@ -1,6 +1,9 @@
 import { globalState } from '../shared/state.js';
 import { setupWebRequestListeners } from './webRequest.js';
 
+// 注意：抓取规则现在完全从后端获取，不再在插件中固化
+// 这样便于灵活调整规则而无需更新所有用户的插件
+
 /**
  * 从后端加载抓取规则
  * @returns {Promise<void>}
@@ -13,52 +16,13 @@ export async function loadCaptureRules() {
 
         console.log('[Background] 开始从后端加载抓取规则...');
         
-        const headers = { 'Content-Type': 'application/json' };
-        
-        // 如果有认证令牌，添加到请求头
-        if (globalState.apiConfig.token) {
-            headers['Authorization'] = `Bearer ${globalState.apiConfig.token}`;
-        }
-        
-        const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/capture-rules`, {
+        // 获取抓取规则接口无需认证
+        const response = await fetch(`${globalState.apiConfig.host}/api/system/capture-rules`, {
             method: 'GET',
-            headers: headers
+            headers: { 'Content-Type': 'application/json' }
         });
 
-        if (response.status === 401) {
-            console.log('[Background] 获取抓取规则时收到401，尝试刷新令牌...');
-            await refreshApiToken();
-            
-            // 重新构建请求头
-            const retryHeaders = { 'Content-Type': 'application/json' };
-            if (globalState.apiConfig.token) {
-                retryHeaders['Authorization'] = `Bearer ${globalState.apiConfig.token}`;
-            }
-            
-            // 重试请求
-            const retryResponse = await fetch(`${globalState.apiConfig.host}/api/v1/system/capture-rules`, {
-                method: 'GET',
-                headers: retryHeaders
-            });
-            
-            if (!retryResponse.ok) {
-                throw new Error(`重试获取抓取规则失败: ${retryResponse.status}`);
-            }
-            
-            // 使用重试的响应
-            const retryData = await retryResponse.json();
-            if (retryData.success && retryData.rules) {
-                globalState.captureRules = retryData.rules;
-                console.log(`[Background] 重试成功，加载 ${retryData.rules.length} 条抓取规则:`, 
-                    retryData.rules.map(r => `${r.name}: ${r.pattern}`));
-                
-                // 重新设置WebRequest监听器
-                setupWebRequestListeners();
-            } else {
-                throw new Error(`重试获取抓取规则失败: ${retryData.error || '未知错误'}`);
-            }
-            return;
-        }
+
         
         if (!response.ok) {
             throw new Error(`获取抓取规则失败: ${response.status}`);
@@ -67,10 +31,10 @@ export async function loadCaptureRules() {
         const data = await response.json();
         
         if (data.success && data.rules) {
-            globalState.captureRules = data.rules;
-            console.log(`[Background] 成功加载 ${data.rules.length} 条抓取规则:`, 
-                data.rules.map(r => `${r.name}: ${r.pattern}`));
-            console.log(`[Background] 全局状态中的抓取规则:`, globalState.captureRules);
+            // 直接使用后端返回的规则
+            globalState.captureRules = data.rules || [];
+            console.log(`[Background] 成功从后端加载 ${globalState.captureRules.length} 条抓取规则:`, 
+                globalState.captureRules.map(r => `${r.name}: ${r.pattern}`));
             
             // 重新设置WebRequest监听器
             setupWebRequestListeners();
@@ -80,12 +44,14 @@ export async function loadCaptureRules() {
 
     } catch (error) {
         console.error('[Background] 加载抓取规则时出错:', error);
-        if (error.message === '未配置API地址') {
-            globalState.captureRules = [];
-            console.log('[Background] 未配置API地址，使用空抓取规则');
-            return;
-        }
-        throw error;
+        
+        // 无法连接后端时，使用空规则列表，避免插件完全无法工作
+        globalState.captureRules = [];
+        console.warn('[Background] 无法从后端获取抓取规则，插件将不会拦截任何请求');
+        console.warn('[Background] 请检查后端连接或API配置');
+        
+        // 仍然设置监听器，以便后续可以重试
+        setupWebRequestListeners();
     }
 }
 
@@ -154,7 +120,7 @@ export async function uploadNetworkData(details, matchedRule) {
         
         console.log('[Background] 上传 Payload:', payload);
 
-        const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/network-data/upload`, {
+        const response = await fetch(`${globalState.apiConfig.host}/api/system/network-data/upload`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -165,10 +131,28 @@ export async function uploadNetworkData(details, matchedRule) {
 
         if (response.status === 401) {
             console.warn('[Background] 上传数据时收到401，尝试刷新令牌并重试...');
+            
+            try {
             await refreshApiToken();
+                
+                // 检查token是否刷新成功
+                if (!globalState.apiConfig.token) {
+                    console.log('[Background] 上传数据时token刷新失败，清除过期凭据');
+                    clearExpiredCredentials();
+                    notifyPopupTokenExpired('上传数据时token刷新失败');
+                    return;
+                }
+                
             // 重试时需要重新获取 token，因此直接再次调用即可
             await uploadNetworkData(details, matchedRule);
             return; // 避免执行下面的逻辑
+                
+            } catch (refreshError) {
+                console.error('[Background] 上传数据时token刷新失败:', refreshError);
+                clearExpiredCredentials();
+                notifyPopupTokenExpired(`上传数据失败: ${refreshError.message}`);
+                return;
+            }
         }
 
         if (!response.ok) {
@@ -195,6 +179,8 @@ export async function uploadNetworkData(details, matchedRule) {
 export async function refreshApiToken() {
     if (!globalState.apiConfig?.host || !globalState.apiConfig.refreshToken) {
         console.log('[Background] 无法刷新令牌：缺少API主机或刷新令牌');
+        // 通知popup token刷新失败，需要重新登录
+        notifyPopupTokenExpired('缺少刷新令牌');
         return;
     }
     
@@ -221,11 +207,73 @@ export async function refreshApiToken() {
             // 保存新的凭据
             chrome.storage.local.set({ 'xhs_api_config': globalState.apiConfig });
             console.log('[Background] API令牌刷新成功');
+            
+            // 通知popup token刷新成功
+            notifyPopupTokenRefreshed();
         } else {
             console.error('[Background] 刷新令牌响应格式不正确');
+            notifyPopupTokenExpired('响应格式不正确');
         }
 
     } catch (error) {
         console.error('[Background] 刷新API令牌时出错:', error);
+        
+        // 如果是401或403错误，说明refresh token也过期了，需要重新登录
+        if (error.message.includes('401') || error.message.includes('403')) {
+            console.log('[Background] 刷新令牌过期，清除凭据');
+            // 清除过期的凭据
+            clearExpiredCredentials();
+            
+            // 通知popup需要重新登录
+            notifyPopupTokenExpired('刷新令牌已过期');
+        } else {
+            notifyPopupTokenExpired(error.message);
+        }
     }
+}
+
+/**
+ * 通知popup token已过期，需要重新登录
+ * @param {string} reason - 过期原因
+ */
+function notifyPopupTokenExpired(reason) {
+    try {
+        chrome.runtime.sendMessage({
+            action: 'tokenExpired',
+            reason: reason,
+            timestamp: Date.now()
+        });
+    } catch (error) {
+        console.log('[Background] 无法通知popup token过期:', error);
+    }
+}
+
+/**
+ * 通知popup token刷新成功
+ */
+function notifyPopupTokenRefreshed() {
+    try {
+        chrome.runtime.sendMessage({
+            action: 'tokenRefreshed',
+            timestamp: Date.now()
+        });
+    } catch (error) {
+        console.log('[Background] 无法通知popup token刷新成功:', error);
+    }
+}
+
+/**
+ * 清除过期的凭据
+ */
+function clearExpiredCredentials() {
+    console.log('[Background] 清除过期的API凭据');
+    
+    // 清除内存中的凭据
+    globalState.apiConfig.token = '';
+    globalState.apiConfig.refreshToken = '';
+    
+    // 清除存储中的凭据
+    chrome.storage.local.set({ 'xhs_api_config': globalState.apiConfig }, () => {
+        console.log('[Background] 过期凭据已从存储中清除');
+    });
 } 

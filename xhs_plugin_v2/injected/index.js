@@ -9,10 +9,64 @@ import { extractNotificationsFromDOM, addButtonsToNotifications, getActiveTabTyp
 
 console.log('[XHS Plugin] 小红书网络请求拦截器模块已注入');
 
+// 初始化全局状态
+window.globalState = window.globalState || {
+    captureRules: [],
+    apiConfig: null
+};
+
 // 动态导入用户备注模块
 let userNotesModule = null;
 let userNotesLoaded = false;
 let notificationHandlerInitialized = false;
+
+// 从background script获取抓取规则
+async function loadCaptureRules() {
+    try {
+        console.log('[XHS Plugin] 正在从background获取抓取规则...');
+        
+        return new Promise((resolve, reject) => {
+            const requestId = Date.now();
+            
+            // 监听响应
+            const responseHandler = (event) => {
+                const data = event.detail;
+                if (data && data.requestId === requestId) {
+                    document.removeEventListener('XHS_CONFIG_RESPONSE', responseHandler);
+                    
+                    if (data.success && data.globalState) {
+                        window.globalState = data.globalState;
+                        console.log(`[XHS Plugin] 成功获取 ${window.globalState.captureRules?.length || 0} 条抓取规则`);
+                        console.log('[XHS Plugin] 抓取规则详情:', window.globalState.captureRules);
+                        resolve(window.globalState.captureRules);
+                    } else {
+                        console.warn('[XHS Plugin] 获取抓取规则失败:', data.error);
+                        resolve([]);
+                    }
+                }
+            };
+            
+            document.addEventListener('XHS_CONFIG_RESPONSE', responseHandler);
+            
+            // 超时处理
+            setTimeout(() => {
+                document.removeEventListener('XHS_CONFIG_RESPONSE', responseHandler);
+                console.warn('[XHS Plugin] 获取抓取规则超时，将使用空规则列表');
+                resolve([]);
+            }, 5000);
+            
+            // 通过postMessage与content script通信
+            const event = new CustomEvent('XHS_GET_CONFIG', {
+                detail: { requestId: requestId }
+            });
+            document.dispatchEvent(event);
+        });
+        
+    } catch (error) {
+        console.error('[XHS Plugin] 获取抓取规则失败:', error);
+        return [];
+    }
+}
 
 // 加载用户备注模块
 async function loadUserNotesModule() {
@@ -47,15 +101,24 @@ async function loadUserNotesModule() {
     }
 }
 
-// 依次启动各个拦截器
-try {
-    interceptFetch();
-    interceptXHR();
-    observeDOM();
-    console.log('[XHS Plugin] 所有网络请求拦截器已成功初始化');
-} catch (error) {
-    console.error('[XHS Plugin] 初始化网络拦截器时发生错误:', error);
+// 启动初始化流程
+async function initialize() {
+    try {
+        // 首先加载抓取规则
+        await loadCaptureRules();
+        
+        // 然后启动各个拦截器
+        interceptFetch();
+        interceptXHR();
+        observeDOM();
+        console.log('[XHS Plugin] 所有网络请求拦截器已成功初始化');
+    } catch (error) {
+        console.error('[XHS Plugin] 初始化网络拦截器时发生错误:', error);
+    }
 }
+
+// 立即执行初始化
+initialize();
 
 // 尝试初始化通知处理器的函数
 function tryInitializeNotificationHandler() {

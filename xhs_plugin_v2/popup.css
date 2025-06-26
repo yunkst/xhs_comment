@@ -277,3 +277,59 @@ body {
     margin-left: 8px;
     white-space: nowrap;
 } 
+
+/* Toast 消息样式 */
+.toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    padding: 12px 16px;
+    border-radius: 6px;
+    color: white;
+    font-size: 14px;
+    font-weight: 500;
+    z-index: 10000;
+    opacity: 0;
+    transform: translateX(100%);
+    transition: all 0.3s ease;
+    max-width: 300px;
+    word-wrap: break-word;
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+.toast-success {
+    background: #28a745;
+    border-left: 4px solid #1e7e34;
+}
+
+.toast-error {
+    background: #dc3545;
+    border-left: 4px solid #c82333;
+}
+
+.toast-warning {
+    background: #ffc107;
+    color: #212529;
+    border-left: 4px solid #e0a800;
+}
+
+.toast-info {
+    background: #17a2b8;
+    border-left: 4px solid #138496;
+}
+
+/* 状态指示器改进 */
+.status-indicator.token-expired {
+    background-color: #ff9500 !important;
+    animation: pulse-warning 2s infinite;
+}
+
+@keyframes pulse-warning {
+    0% { opacity: 1; }
+    50% { opacity: 0.7; }
+    100% { opacity: 1; }
+} 

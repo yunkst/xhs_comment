@@ -18,7 +18,8 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.5",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "vite-plugin-vue-devtools": "^7.7.7"
   },
   "description": "小红书评论维护系统前端管理界面 - 基于Vue3和Element Plus的现代化管理后台",
   "keywords": [

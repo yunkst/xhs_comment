@@ -42,7 +42,8 @@ export let appState = {
         status: 'idle', // 'idle', 'pending', 'completed', 'failed'
         pollInterval: null,
         pollCount: 0,
-        maxPollCount: 60
+        maxPollCount: 60,
+        apiVersion: 'v1' // 记录使用的API版本: 'v1' 或 'legacy'
     },
     requestStats: {
         total: 0,
@@ -56,3 +57,15 @@ export let appState = {
     captureRules: [],
     lastApiError: null // 记录最近的API错误，用于检测token过期
 }; 
+
+/**
+ * 获取API配置
+ * @returns {Object} API配置对象
+ */
+export function getApiConfig() {
+    return {
+        baseUrl: appState.apiConfig.host,
+        token: appState.apiConfig.token,
+        refreshToken: appState.apiConfig.refreshToken
+    };
+} 

@@ -219,6 +219,10 @@ export const ssoApi = {
   // 获取SSO会话状态
   getSsoSessionStatus: (sessionId) => {
     return api.get(`/api/v1/user/auth/sso-session/${sessionId}`);
+  },
+  // 批准SSO会话
+  approveSsoSession: (sessionId) => {
+    return api.post('/api/v1/user/auth/sso-approve-session', { session_id: sessionId });
   }
 };
 

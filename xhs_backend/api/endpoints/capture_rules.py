@@ -18,91 +18,40 @@ logger = logging.getLogger(__name__)
 # 创建路由器
 router = APIRouter(prefix="/capture-rules", tags=["抓取规则管理"])
 
-# 默认抓取规则配置
+# 核心抓取规则配置 - 基于实际小红书接口
 DEFAULT_CAPTURE_RULES = [
     {
-        "name": "通知接口",
-        "pattern": "*/api/sns/web/v1/notify/*",
+        "name": "通知列表",
+        "pattern": "/api/sns/web/v1/you/mentions",
         "enabled": True,
-        "description": "小红书通知相关API",
-        "data_type": "notification",
+        "description": "抓取用户通知列表数据",
+        "data_type": "notification_feed",
         "priority": 10
     },
     {
-        "name": "评论接口",
-        "pattern": "*/api/sns/web/v1/comment/*",
+        "name": "评论页面接口",
+        "pattern": "/api/sns/web/v2/comment/page",
         "enabled": True,
-        "description": "小红书评论相关API",
-        "data_type": "comment",
+        "description": "抓取笔记评论页面数据",
+        "data_type": "comment_page",
         "priority": 10
-    },
-    {
-        "name": "用户信息接口",
-        "pattern": "*/api/sns/web/v1/user/*",
-        "enabled": True,
-        "description": "小红书用户信息API",
-        "data_type": "user",
-        "priority": 8
-    },
-    {
-        "name": "笔记内容接口",
-        "pattern": "*/api/sns/web/v1/feed/*",
-        "enabled": True,
-        "description": "小红书笔记内容API",
-        "data_type": "note",
-        "priority": 9
-    },
-    {
-        "name": "搜索接口",
-        "pattern": "*/api/sns/web/v1/search/*",
-        "enabled": True,
-        "description": "小红书搜索API",
-        "data_type": "search",
-        "priority": 5
-    },
-    {
-        "name": "热门推荐接口",
-        "pattern": "*/api/sns/web/v1/homefeed/*",
-        "enabled": True,
-        "description": "小红书首页推荐API",
-        "data_type": "recommendation",
-        "priority": 3
     }
 ]
 
 @router.get("", response_model=CaptureRulesResponse)
-async def get_capture_rules(db=Depends(get_database)):
+async def get_capture_rules():
     """
     获取URL抓取规则配置
     
     此接口供插件调用，获取需要监控的URL规则
     无需认证，以便插件快速获取配置
+    直接返回固定的抓取规则，不与数据库交互
     """
     try:
-        # 从数据库获取抓取规则
-        collection = db.capture_rules
-        
-        # 如果数据库中没有规则，初始化默认规则
-        if collection.count_documents({}) == 0:
-            # 插入默认规则
-            rules_to_insert = []
-            for rule_data in DEFAULT_CAPTURE_RULES:
-                rule_data['created_at'] = datetime.utcnow()
-                rule_data['updated_at'] = datetime.utcnow()
-                rules_to_insert.append(rule_data)
-            
-            collection.insert_many(rules_to_insert)
-        
-        # 查询启用的规则，按优先级排序
-        rules_cursor = collection.find(
-            {"enabled": True}
-        ).sort("priority", -1)
-        
+        # 直接返回固定的抓取规则
         rules = []
-        for rule_doc in rules_cursor:
-            # 移除MongoDB的_id字段
-            rule_doc.pop('_id', None)
-            rules.append(CaptureRule(**rule_doc))
+        for rule_data in DEFAULT_CAPTURE_RULES:
+            rules.append(CaptureRule(**rule_data))
         
         return CaptureRulesResponse(
             success=True,

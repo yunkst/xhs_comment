@@ -2,6 +2,32 @@
  * 用户备注模块 - 为通知列表添加备注功能
  */
 
+/**
+ * 检测当前页面类型
+ * @returns {string} 页面类型: 'notification', 'note', 'home', 'other'
+ */
+function detectPageType() {
+    const url = window.location.href;
+    const pathname = window.location.pathname;
+    
+    // 检测通知页面
+    if (url.includes('/notification') || pathname.includes('/notification')) {
+        return 'notification';
+    }
+    
+    // 检测笔记详情页面
+    if (url.includes('/explore/') || url.includes('/discovery/item/') || pathname.includes('/explore/')) {
+        return 'note';
+    }
+    
+    // 检测首页
+    if (pathname === '/' || url.includes('/home') || url.includes('/recommend')) {
+        return 'home';
+    }
+    
+    return 'other';
+}
+
 // 添加备注输入框到通知容器
 function addNoteInputToContainer(container, userId, notification) {
     if (!container || !userId) {
@@ -20,6 +46,16 @@ function addNoteInputToContainer(container, userId, notification) {
     const notificationHash = generateNotificationHash(notification);
     console.log(`[User Notes] 为用户 ${userId} 添加备注输入框，哈希: ${notificationHash}`);
     
+    // 检测当前页面类型，动态设置合适的z-index
+    const currentPageType = detectPageType();
+    let zIndex = 100; // 默认较低的z-index
+    
+    if (currentPageType === 'notification') {
+        zIndex = 100; // 通知页面使用低层级，避免遮挡其他元素
+    } else {
+        zIndex = 10; // 其他页面使用更低层级或隐藏
+    }
+    
     // 创建备注输入框容器
     const noteInputContainer = document.createElement('div');
     noteInputContainer.className = 'xhs-note-container';
@@ -28,9 +64,11 @@ function addNoteInputToContainer(container, userId, notification) {
         right: -15px;
         top: 20px;
         transform: translateY(-50%);
-        display: flex;
+        display: ${currentPageType === 'notification' ? 'flex' : 'none'};
         align-items: center;
-        z-index: 1000;
+        z-index: ${zIndex};
+        opacity: ${currentPageType === 'notification' ? '1' : '0'};
+        transition: all 0.3s ease;
     `;
     
     // 创建备注输入框

@@ -197,11 +197,11 @@
         console.log('[Content] 收到配置请求:', requestData);
         console.log('[Content] Chrome runtime 状态:', !!chrome?.runtime);
         
-        // 发送给后台脚本获取配置
+        // 发送给后台脚本获取全局状态（包括抓取规则）
         chrome.runtime.sendMessage({
-            action: 'getApiConfig'
+            action: 'getGlobalState'
         }, function(response) {
-            console.log('[Content] 收到API配置响应:', response);
+            console.log('[Content] 收到全局状态响应:', response);
             
             // 检查Chrome runtime错误
             if (chrome.runtime.lastError) {
@@ -210,7 +210,7 @@
                     detail: {
                         requestId: requestData.requestId,
                         success: false,
-                        config: null,
+                        globalState: null,
                         error: chrome.runtime.lastError.message
                     }
                 });
@@ -218,12 +218,12 @@
                 return;
             }
             
-            // 将配置发送回注入脚本
+            // 将全局状态发送回注入脚本
             const configEvent = new CustomEvent('XHS_CONFIG_RESPONSE', {
                 detail: {
                     requestId: requestData.requestId,
                     success: response ? response.success : false,
-                    config: response ? response.config : null,
+                    globalState: response ? response.globalState : null,
                     error: response ? response.error : '未收到响应'
                 }
             });

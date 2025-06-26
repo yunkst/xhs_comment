@@ -2,6 +2,32 @@
  * 通知处理模块 - 在小红书通知页面添加历史评论按钮
  */
 
+/**
+ * 检测当前页面类型
+ * @returns {string} 页面类型: 'notification', 'note', 'home', 'other'
+ */
+function detectPageType() {
+    const url = window.location.href;
+    const pathname = window.location.pathname;
+    
+    // 检测通知页面
+    if (url.includes('/notification') || pathname.includes('/notification')) {
+        return 'notification';
+    }
+    
+    // 检测笔记详情页面
+    if (url.includes('/explore/') || url.includes('/discovery/item/') || pathname.includes('/explore/')) {
+        return 'note';
+    }
+    
+    // 检测首页
+    if (pathname === '/' || url.includes('/home') || url.includes('/recommend')) {
+        return 'home';
+    }
+    
+    return 'other';
+}
+
 // 存储通知数据的全局变量
 let notificationsData = [];
 
@@ -201,6 +227,26 @@ function addButtonsToNotifications() {
                 console.log(`[Notification Handler] 容器 ${index} 已有按钮，跳过按钮添加`);
             } else {
                 console.log(`[Notification Handler] 为通知 ${index} 添加按钮`);
+                // 检测当前页面类型，动态设置合适的z-index和显示状态
+                const currentPageType = detectPageType();
+                let buttonZIndex = 10;
+                let buttonDisplay = 'flex';
+                let buttonOpacity = '1';
+                
+                if (currentPageType === 'notification') {
+                    buttonZIndex = 50; // 通知页面使用较低层级
+                    buttonDisplay = 'flex';
+                    buttonOpacity = '1';
+                } else if (currentPageType === 'note') {
+                    buttonZIndex = 10; // 笔记详情页面使用极低层级
+                    buttonDisplay = 'none'; // 完全隐藏，避免遮挡内容
+                    buttonOpacity = '0';
+                } else {
+                    buttonZIndex = 20; // 其他页面使用低层级
+                    buttonDisplay = 'none'; // 隐藏按钮
+                    buttonOpacity = '0';
+                }
+
                 // 创建按钮元素
                 const button = document.createElement('div');
                 button.className = 'xhs-plugin-action-btn';
@@ -211,7 +257,7 @@ function addButtonsToNotifications() {
                     border-radius: 14px;
                     background-color: #ff2442;
                     color: white;
-                    display: flex;
+                    display: ${buttonDisplay};
                     align-items: center;
                     justify-content: center;
                     position: absolute;
@@ -219,11 +265,12 @@ function addButtonsToNotifications() {
                     top: 50%;
                     transform: translateY(-50%);
                     cursor: pointer;
-                    z-index: 999;
+                    z-index: ${buttonZIndex};
                     font-size: 12px;
                     font-weight: bold;
                     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
                     transition: all 0.3s ease;
+                    opacity: ${buttonOpacity};
                 `;
                 button.innerHTML = '历史评论';
                 

@@ -168,6 +168,20 @@ function handleMessage(request, sender, sendResponse) {
             console.log('[Background] 发送API配置响应:', apiConfigResponse);
             sendResponse(apiConfigResponse);
             return false; // 同步响应，不需要保持消息通道开放
+        case 'getGlobalState':
+            // 为注入脚本提供全局状态（包括抓取规则）
+            console.log('[Background] 收到getGlobalState请求');
+            const globalStateResponse = {
+                success: true,
+                globalState: {
+                    captureRules: globalState.captureRules || [],
+                    apiConfig: globalState.apiConfig,
+                    config: globalState.config
+                }
+            };
+            console.log('[Background] 发送全局状态响应，抓取规则数量:', globalStateResponse.globalState.captureRules.length);
+            sendResponse(globalStateResponse);
+            return false;
         case 'proxyRequest':
             // 处理代理请求
             console.log('[Background] 开始处理代理请求，requestId:', request.data.requestId);
@@ -187,6 +201,18 @@ function handleMessage(request, sender, sendResponse) {
                     sendResponse(errorResponse);
                 });
             return true; // 保持消息通道开放以便异步响应
+        case 'checkWebRequestStatus':
+            // 检查webRequest监听器状态
+            const webRequestStatus = {
+                success: true,
+                webRequestAvailable: typeof chrome.webRequest !== 'undefined',
+                captureRulesCount: globalState.captureRules ? globalState.captureRules.length : 0,
+                captureRules: globalState.captureRules || [],
+                requestLogCount: globalState.requestLog ? globalState.requestLog.length : 0
+            };
+            console.log('[Background] webRequest状态检查:', webRequestStatus);
+            sendResponse(webRequestStatus);
+            return false;
         default:
             sendResponse({ error: 'Unknown action' });
             return false;
@@ -228,14 +254,55 @@ async function handleProxyRequest(requestData) {
                 // 尝试刷新token
                 await refreshApiToken();
                 
+                // 检查token是否刷新成功
+                if (!globalState.apiConfig?.token) {
+                    console.log('[Background] 代理请求token刷新失败，返回401响应');
+                    // token刷新失败，返回原始的401响应
+                    let responseData;
+                    const contentType = response.headers.get('content-type');
+                    
+                    if (contentType && contentType.includes('application/json')) {
+                        responseData = await response.json();
+                    } else {
+                        responseData = await response.text();
+                    }
+                    
+                    return {
+                        success: false,
+                        status: 401,
+                        data: responseData,
+                        error: 'Token已过期且刷新失败'
+                    };
+                }
+                
                 // 更新请求头中的Authorization
-                if (globalState.apiConfig?.token && fetchOptions.headers) {
+                if (fetchOptions.headers) {
                     fetchOptions.headers['Authorization'] = `Bearer ${globalState.apiConfig.token}`;
                     console.log('[Background] 已更新Authorization头，重试请求');
                     
                     // 重新发送请求
                     const retryResponse = await fetch(requestData.url, fetchOptions);
                     console.log('[Background] 重试请求响应:', retryResponse.status, retryResponse.statusText);
+                    
+                    // 如果重试后还是401，说明token彻底失效
+                    if (retryResponse.status === 401) {
+                        console.log('[Background] 重试后仍收到401，token彻底失效');
+                        // 清除失效的凭据
+                        globalState.apiConfig.token = '';
+                        globalState.apiConfig.refreshToken = '';
+                        chrome.storage.local.set({ 'xhs_api_config': globalState.apiConfig });
+                        
+                        // 通知popup需要重新登录
+                        try {
+                            chrome.runtime.sendMessage({
+                                action: 'tokenExpired',
+                                reason: '代理请求重试后仍收到401',
+                                timestamp: Date.now()
+                            });
+                        } catch (error) {
+                            console.log('[Background] 无法通知popup token过期:', error);
+                        }
+                    }
                     
                     // 处理重试响应
                     let retryData;
@@ -247,7 +314,7 @@ async function handleProxyRequest(requestData) {
                         retryData = await retryResponse.text();
                     }
                     
-                    console.log('[Background] 重试请求成功:', retryResponse.status, '数据:', retryData);
+                    console.log('[Background] 重试请求结果:', retryResponse.status, '数据:', retryData);
                     
                     return {
                         success: retryResponse.ok,
@@ -257,7 +324,23 @@ async function handleProxyRequest(requestData) {
                     };
                 }
             } catch (refreshError) {
-                console.error('[Background] Token刷新失败:', refreshError);
+                console.error('[Background] 代理请求token刷新失败:', refreshError);
+                // Token刷新失败，清除过期凭据
+                globalState.apiConfig.token = '';
+                globalState.apiConfig.refreshToken = '';
+                chrome.storage.local.set({ 'xhs_api_config': globalState.apiConfig });
+                
+                // 通知popup需要重新登录
+                try {
+                    chrome.runtime.sendMessage({
+                        action: 'tokenExpired',
+                        reason: `代理请求token刷新失败: ${refreshError.message}`,
+                        timestamp: Date.now()
+                    });
+                } catch (error) {
+                    console.log('[Background] 无法通知popup token过期:', error);
+                }
+                
                 // 继续处理原始401响应
             }
         }

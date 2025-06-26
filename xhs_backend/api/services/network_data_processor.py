@@ -27,6 +27,7 @@ class NetworkDataProcessor:
     def __init__(self):
         self.parsers = {
             'comment': self._parse_comment_data,
+            'comment_page': self._parse_comment_page_data,  # 新增评论页面解析器
             'notification': self._parse_notification_data,
             'comment_notification_feed': self._parse_comment_notification_feed_data, # 重构后的提及通知解析器
             'note': self._parse_note_data,
@@ -100,6 +101,7 @@ class NetworkDataProcessor:
         
         rule_mapping = {
             '评论接口': 'comment',
+            '评论页面接口': 'comment_page',  # 新增评论页面接口
             '通知接口': 'notification',
             '评论通知接口': 'comment_notification_feed',
             '通知列表': 'comment_notification_feed',  # 固化抓取规则的通知列表
@@ -113,7 +115,8 @@ class NetworkDataProcessor:
             return rule_mapping[rule_name]
         
         url_patterns = {
-            'comment': [r'/api/sns/web/v1/comment/', r'/api/sns/web/v2/comment/'],
+            'comment': [r'/api/sns/web/v1/comment/'],
+            'comment_page': [r'/api/sns/web/v2/comment/page'],  # 新增评论页面URL模式
             'notification': [r'/api/sns/web/v1/notify/'],
             'comment_notification_feed': [r'/api/sns/web/v1/you/mentions'],
             'note': [r'/api/sns/web/v1/feed/', r'/api/sns/web/v1/note/'],
@@ -168,7 +171,13 @@ class NetworkDataProcessor:
         notifications, comments, notes, users = [], [], [], []
         user_ids = set()
 
+        # 检查响应是否成功
+        if not response_json.get('success', True) or response_json.get('code') != 0:
+            logger.warning(f"[通知列表解析] 接口返回失败响应: code={response_json.get('code')}, success={response_json.get('success')}, msg={response_json.get('msg')}")
+            return {}
+
         if 'data' not in response_json or 'message_list' not in response_json['data']:
+            logger.warning(f"[通知列表解析] 响应中缺少data字段或message_list字段")
             return {}
 
         for message in response_json['data']['message_list']:
@@ -348,6 +357,96 @@ class NetworkDataProcessor:
         
         return comments
     
+    async def _parse_comment_page_data(self, response_json: Dict, raw_data: RawNetworkData) -> Dict[str, List[Any]]:
+        """解析评论页面数据 - 从 /api/sns/web/v2/comment/page 接口"""
+        comments, users, notes = [], [], []
+        user_ids = set()
+        
+        # 检查响应是否成功
+        if not response_json.get('success', True) or response_json.get('code') != 0:
+            logger.warning(f"[评论页面解析] 接口返回失败响应: code={response_json.get('code')}, success={response_json.get('success')}, msg={response_json.get('msg')}")
+            return {}
+        
+        if 'data' not in response_json:
+            logger.warning(f"[评论页面解析] 响应中缺少data字段")
+            return {}
+        
+        data = response_json['data']
+        
+        # 从URL中提取note_id
+        note_id = None
+        if hasattr(raw_data, 'url') and raw_data.url:
+            import re
+            match = re.search(r'note_id=([^&]+)', raw_data.url)
+            if match:
+                note_id = match.group(1)
+        
+        # 解析评论列表
+        if 'comments' in data and isinstance(data['comments'], list):
+            for comment_data in data['comments']:
+                if not isinstance(comment_data, dict):
+                    continue
+                
+                # 提取评论信息
+                comment_dict = self._extract_comment_from_api_response(comment_data)
+                if comment_dict:
+                    # 如果从URL中提取到了note_id，设置到评论中
+                    if note_id and not comment_dict.get('noteId'):
+                        comment_dict['noteId'] = note_id
+                    
+                    comments.append(CommentItem(**comment_dict))
+                
+                # 提取评论作者用户信息
+                if 'user_info' in comment_data and isinstance(comment_data['user_info'], dict):
+                    user_obj = self._extract_user_from_dict(comment_data['user_info'])
+                    if user_obj and user_obj.id not in user_ids:
+                        users.append(user_obj)
+                        user_ids.add(user_obj.id)
+                
+                # 解析子评论
+                if 'sub_comments' in comment_data and isinstance(comment_data['sub_comments'], list):
+                    for sub_comment_data in comment_data['sub_comments']:
+                        if not isinstance(sub_comment_data, dict):
+                            continue
+                        
+                        sub_comment_dict = self._extract_comment_from_api_response(sub_comment_data)
+                        if sub_comment_dict:
+                            # 设置父评论ID
+                            sub_comment_dict['parentCommentId'] = comment_dict.get('id', '')
+                            if note_id and not sub_comment_dict.get('noteId'):
+                                sub_comment_dict['noteId'] = note_id
+                            
+                            comments.append(CommentItem(**sub_comment_dict))
+                        
+                        # 提取子评论作者用户信息
+                        if 'user_info' in sub_comment_data and isinstance(sub_comment_data['user_info'], dict):
+                            sub_user_obj = self._extract_user_from_dict(sub_comment_data['user_info'])
+                            if sub_user_obj and sub_user_obj.id not in user_ids:
+                                users.append(sub_user_obj)
+                                user_ids.add(sub_user_obj.id)
+        
+        # 构建笔记信息（如果有note_id）
+        if note_id:
+            # 创建一个基本的笔记对象
+            note_dict = {
+                'noteId': note_id,
+                'title': '',  # 评论页面接口通常不包含笔记标题
+                'noteContent': '',
+                'authorId': '',
+                'publishTime': None,
+                'noteLike': 0,
+                'noteCommitCount': len(comments),
+            }
+            notes.append(Note(**note_dict))
+        
+        logger.info(f"[评论页面解析] 提取到 {len(comments)} 条评论, {len(users)} 个用户, {len(notes)} 个笔记")
+        
+        return {
+            'comments': comments,
+            'users': users,
+            'notes': notes
+        }
+    
     async def _parse_notification_data(self, response_json: Dict, raw_data: RawNetworkData) -> List[NotificationItem]:
         """解析通知数据"""
         # This parser might need to be re-evaluated based on its API source.
@@ -392,16 +491,28 @@ class NetworkDataProcessor:
     def _extract_comment_from_api_response(self, comment_data: Dict) -> Optional[Dict[str, Any]]:
         """从API响应中提取评论信息"""
         try:
+            # 处理时间戳转换
+            create_time = comment_data.get('create_time')
+            if create_time and isinstance(create_time, (int, float)):
+                # 如果是毫秒时间戳，转换为秒
+                if create_time > 1e10:  # 大于10位数，认为是毫秒
+                    create_time = create_time / 1000
+                timestamp = datetime.fromtimestamp(create_time, tz=timezone.utc)
+            else:
+                timestamp = None
+            
             return {
                 'id': comment_data.get('id', ''),
                 'content': comment_data.get('content', ''),
                 'authorName': comment_data.get('user_info', {}).get('nickname', ''),
                 'authorId': comment_data.get('user_info', {}).get('user_id', ''),
-                'authorAvatar': comment_data.get('user_info', {}).get('avatar', ''),
-                'timestamp': comment_data.get('create_time', ''),
+                'authorAvatar': comment_data.get('user_info', {}).get('image', ''),
+                'timestamp': timestamp,
                 'likeCount': str(comment_data.get('like_count', 0)),
                 'ipLocation': comment_data.get('ip_location', ''),
                 'noteId': comment_data.get('note_id', ''),
+                'status': comment_data.get('status', 0),  # 新增status字段
+                'liked': comment_data.get('liked', False),  # 新增liked字段
             }
         except Exception as e:
             logger.error(f"提取评论信息失败: {e}")
@@ -448,6 +559,61 @@ class NetworkDataProcessor:
                 comments_dicts = [comment.model_dump() for comment in parsed_data]
                 result = await save_comments_with_upsert(comments_dicts)
                 return {'success': True, 'saved_count': result.get('inserted', 0) + result.get('updated', 0)}
+            
+            elif data_type == 'comment_page':
+                if not isinstance(parsed_data, dict):
+                    return {'success': False, 'error': 'Invalid data format for comment_page'}
+
+                total_saved = 0
+                
+                # Save users
+                users_list = parsed_data.get('users', [])
+                if users_list:
+                    saved_user_count = 0
+                    for user in users_list:
+                        res = await save_user_info(user.model_dump())
+                        if res.get('success'):
+                            saved_user_count += 1
+                    total_saved += saved_user_count
+
+                # Save notes
+                notes_list = parsed_data.get('notes', [])
+                if notes_list:
+                    notes_dicts = [note.model_dump() for note in notes_list]
+                    res = await save_notes(notes_dicts)
+                    total_saved += res.get('inserted', 0) + res.get('updated', 0)
+
+                # Save comments - 转换为结构化评论并保存
+                comments_list = parsed_data.get('comments', [])
+                if comments_list:
+                    # 将CommentItem转换为结构化评论格式
+                    structured_comments = []
+                    for comment in comments_list:
+                        comment_dict = comment.model_dump()
+                        # 转换为结构化评论格式
+                        structured_comment = {
+                            "commentId": comment_dict.get('id'),
+                            "noteId": comment_dict.get('noteId'),
+                            "content": comment_dict.get('content'),
+                            "authorId": comment_dict.get('authorId'),
+                            "authorName": comment_dict.get('authorName'),
+                            "authorAvatar": comment_dict.get('authorAvatar'),
+                            "timestamp": comment_dict.get('timestamp'),
+                            "repliedId": comment_dict.get('parentCommentId'),  # 父评论ID
+                            "repliedOrder": None,
+                            "fetchTimestamp": datetime.utcnow(),
+                            "likeCount": comment_dict.get('likeCount'),
+                            "ipLocation": comment_dict.get('ipLocation'),
+                            "illegal_info": comment_dict.get('illegal_info')
+                        }
+                        structured_comments.append(structured_comment)
+                    
+                    # 保存到结构化评论集合
+                    from ..services.comment import save_structured_comments
+                    res = await save_structured_comments(structured_comments)
+                    total_saved += res.get('upserted', 0) + res.get('matched', 0)
+                
+                return {'success': True, 'saved_count': total_saved}
             
             elif data_type == 'note':
                 result = await save_notes(parsed_data)

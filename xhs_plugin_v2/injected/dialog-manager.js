@@ -9,6 +9,32 @@ let isDragging = false;
 let dragOffsetX = 0;
 let dragOffsetY = 0;
 
+/**
+ * 检测当前页面类型
+ * @returns {string} 页面类型: 'notification', 'note', 'home', 'other'
+ */
+function detectPageType() {
+    const url = window.location.href;
+    const pathname = window.location.pathname;
+    
+    // 检测通知页面
+    if (url.includes('/notification') || pathname.includes('/notification')) {
+        return 'notification';
+    }
+    
+    // 检测笔记详情页面
+    if (url.includes('/explore/') || url.includes('/discovery/item/') || pathname.includes('/explore/')) {
+        return 'note';
+    }
+    
+    // 检测首页
+    if (pathname === '/' || url.includes('/home') || url.includes('/recommend')) {
+        return 'home';
+    }
+    
+    return 'other';
+}
+
 // 显示通知弹出框
 function showNotificationDialog(index) {
     console.log(`[Dialog Manager] 开始显示第 ${index+1} 个通知的弹出框`);
@@ -37,6 +63,18 @@ function showNotificationDialog(index) {
     // 创建新弹框
     const dialog = document.createElement('div');
     dialog.className = 'xhs-plugin-dialog';
+    // 检测当前页面类型，动态设置合适的z-index
+    const currentPageType = detectPageType();
+    let zIndex = 10000; // 默认z-index
+    
+    if (currentPageType === 'notification') {
+        zIndex = 10000; // 通知页面使用适中的层级
+    } else if (currentPageType === 'note') {
+        zIndex = 1000; // 笔记详情页面使用较低层级，避免遮挡内容
+    } else {
+        zIndex = 5000; // 其他页面使用中等层级
+    }
+    
     // 设置弹框的样式，使其悬浮在页面侧边
     dialog.style.cssText = `
         position: fixed;
@@ -50,12 +88,12 @@ function showNotificationDialog(index) {
         background-color: #222;
         border-radius: 8px;
         box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-        z-index: 999999;
+        z-index: ${zIndex};
         display: flex;
         flex-direction: column;
         color: white;
         overflow: hidden;
-        transition: box-shadow 0.3s;
+        transition: all 0.3s ease;
     `;
     
     // 创建弹出框头部
@@ -117,6 +155,101 @@ function showNotificationDialog(index) {
         font-size: 16px;
     `;
     
+    // 创建按钮容器
+    const buttonContainer = document.createElement('div');
+    buttonContainer.style.cssText = `
+        display: flex;
+        align-items: center;
+        gap: 5px;
+    `;
+    
+    // 创建最小化按钮（仅在笔记页面显示）
+    if (currentPageType === 'note') {
+        const minimizeBtn = document.createElement('div');
+        minimizeBtn.className = 'xhs-plugin-dialog-minimize';
+        minimizeBtn.textContent = '−';
+        minimizeBtn.title = '最小化（避免遮挡内容）';
+        minimizeBtn.style.cssText = `
+            cursor: pointer;
+            font-size: 20px;
+            color: #ccc;
+            line-height: 1;
+            padding: 0 5px;
+            transition: color 0.2s;
+        `;
+        
+        minimizeBtn.addEventListener('mouseenter', () => {
+            minimizeBtn.style.color = 'white';
+        });
+        
+        minimizeBtn.addEventListener('mouseleave', () => {
+            minimizeBtn.style.color = '#ccc';
+        });
+        
+        minimizeBtn.addEventListener('click', () => {
+            console.log('[Dialog Manager] 最小化弹框');
+            // 最小化弹框
+            dialog.style.width = '60px';
+            dialog.style.height = '60px';
+            dialog.style.borderRadius = '30px';
+            dialog.style.right = '20px';
+            dialog.style.bottom = '20px';
+            dialog.style.top = 'auto';
+            dialog.style.transform = 'none';
+            dialog.style.zIndex = '50'; // 更低的层级
+            
+            // 隐藏内容，只显示一个恢复按钮
+            header.style.display = 'none';
+            content.style.display = 'none';
+            
+            const restoreBtn = document.createElement('div');
+            restoreBtn.style.cssText = `
+                width: 100%;
+                height: 100%;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                color: white;
+                font-size: 24px;
+                cursor: pointer;
+                border-radius: 50%;
+                background: linear-gradient(45deg, #ff2442, #ff6b6b);
+                transition: transform 0.2s;
+            `;
+            restoreBtn.textContent = '💬';
+            restoreBtn.title = '点击恢复历史评论弹框';
+            
+            restoreBtn.addEventListener('mouseenter', () => {
+                restoreBtn.style.transform = 'scale(1.1)';
+            });
+            
+            restoreBtn.addEventListener('mouseleave', () => {
+                restoreBtn.style.transform = 'scale(1)';
+            });
+            
+            restoreBtn.addEventListener('click', () => {
+                console.log('[Dialog Manager] 恢复弹框');
+                // 恢复弹框
+                dialog.style.width = '400px';
+                dialog.style.height = '80vh';
+                dialog.style.borderRadius = '8px';
+                dialog.style.right = '5%';
+                dialog.style.bottom = 'auto';
+                dialog.style.top = '50%';
+                dialog.style.transform = 'translateY(-50%)';
+                dialog.style.zIndex = zIndex; // 恢复原来的层级
+                
+                header.style.display = 'flex';
+                content.style.display = 'flex';
+                restoreBtn.remove();
+            });
+            
+            dialog.appendChild(restoreBtn);
+        });
+        
+        buttonContainer.appendChild(minimizeBtn);
+    }
+    
     // 创建关闭按钮
     const closeBtn = document.createElement('div');
     closeBtn.className = 'xhs-plugin-dialog-close';
@@ -148,6 +281,8 @@ function showNotificationDialog(index) {
         currentDialogContent = null;
     });
     
+    buttonContainer.appendChild(closeBtn);
+    
     // 创建内容区域
     const content = document.createElement('div');
     content.className = 'xhs-plugin-dialog-content';
@@ -170,7 +305,7 @@ function showNotificationDialog(index) {
     
     // 组装弹出框
     header.appendChild(title);
-    header.appendChild(closeBtn);
+    header.appendChild(buttonContainer);
     dialog.appendChild(header);
     dialog.appendChild(content);
     
@@ -551,12 +686,135 @@ function createCommentElement(comment) {
     return commentElem;
 }
 
+/**
+ * 监听页面变化，动态调整弹框层级
+ */
+function setupPageChangeListener() {
+    let lastPageType = detectPageType();
+    
+    // 监听URL变化
+    const observer = new MutationObserver(() => {
+        const currentPageType = detectPageType();
+        if (currentPageType !== lastPageType) {
+            console.log(`[Dialog Manager] 页面类型变化: ${lastPageType} -> ${currentPageType}`);
+            lastPageType = currentPageType;
+            
+            // 调整现有弹框的层级
+            if (currentDialogElement) {
+                adjustDialogZIndex(currentDialogElement, currentPageType);
+            }
+            
+            // 调整备注输入框的显示状态
+            adjustNoteInputsVisibility(currentPageType);
+            
+            // 调整历史评论按钮的显示状态
+            adjustHistoryButtonsVisibility(currentPageType);
+        }
+    });
+    
+    observer.observe(document.body, {
+        childList: true,
+        subtree: true
+    });
+    
+    // 也监听 popstate 事件（浏览器前进后退）
+    window.addEventListener('popstate', () => {
+        setTimeout(() => {
+            const currentPageType = detectPageType();
+            if (currentPageType !== lastPageType) {
+                console.log(`[Dialog Manager] 通过导航变化页面类型: ${lastPageType} -> ${currentPageType}`);
+                lastPageType = currentPageType;
+                
+                if (currentDialogElement) {
+                    adjustDialogZIndex(currentDialogElement, currentPageType);
+                }
+                
+                adjustNoteInputsVisibility(currentPageType);
+                adjustHistoryButtonsVisibility(currentPageType);
+            }
+        }, 100);
+    });
+}
+
+/**
+ * 调整弹框的z-index
+ */
+function adjustDialogZIndex(dialog, pageType) {
+    let zIndex = 10000;
+    
+    if (pageType === 'notification') {
+        zIndex = 10000;
+    } else if (pageType === 'note') {
+        zIndex = 1000;
+    } else {
+        zIndex = 5000;
+    }
+    
+    dialog.style.zIndex = zIndex;
+    console.log(`[Dialog Manager] 调整弹框层级为: ${zIndex} (页面类型: ${pageType})`);
+}
+
+/**
+ * 调整备注输入框的显示状态
+ */
+function adjustNoteInputsVisibility(pageType) {
+    const noteContainers = document.querySelectorAll('.xhs-note-container');
+    noteContainers.forEach(container => {
+        if (pageType === 'notification') {
+            container.style.display = 'flex';
+            container.style.opacity = '1';
+            container.style.zIndex = '100';
+        } else {
+            container.style.display = 'none';
+            container.style.opacity = '0';
+            container.style.zIndex = '10';
+        }
+    });
+    
+    if (noteContainers.length > 0) {
+        console.log(`[Dialog Manager] 调整 ${noteContainers.length} 个备注输入框的显示状态 (页面类型: ${pageType})`);
+    }
+}
+
+/**
+ * 调整历史评论按钮的显示状态
+ */
+function adjustHistoryButtonsVisibility(pageType) {
+    const historyButtons = document.querySelectorAll('.xhs-plugin-action-btn');
+    historyButtons.forEach(button => {
+        if (pageType === 'notification') {
+            button.style.display = 'flex';
+            button.style.opacity = '1';
+            button.style.zIndex = '50';
+        } else if (pageType === 'note') {
+            button.style.display = 'none';
+            button.style.opacity = '0';
+            button.style.zIndex = '10';
+        } else {
+            button.style.display = 'none';
+            button.style.opacity = '0';
+            button.style.zIndex = '20';
+        }
+    });
+    
+    if (historyButtons.length > 0) {
+        console.log(`[Dialog Manager] 调整 ${historyButtons.length} 个历史评论按钮的显示状态 (页面类型: ${pageType})`);
+    }
+}
+
+// 初始化页面变化监听
+setupPageChangeListener();
+
 // 导出对话框管理器
 window.xhsDialogManager = {
     showNotificationDialog,
     loadDialogContent,
     renderHistoricalComments,
-    createCommentElement
+    createCommentElement,
+    adjustDialogZIndex,
+    adjustNoteInputsVisibility,
+    adjustHistoryButtonsVisibility,
+    detectPageType
 };
 
 export { showNotificationDialog, loadDialogContent, renderHistoricalComments, createCommentElement }; 

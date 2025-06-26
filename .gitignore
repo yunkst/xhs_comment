@@ -1,3 +1,4 @@
 ​xhs_chrome_plugin/html/*
 .env
 素材/
+node_modules/*

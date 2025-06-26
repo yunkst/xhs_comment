@@ -9,27 +9,20 @@ function isXHSUrl(url) {
     );
 }
 
-// 固化的抓取规则 - 通知列表
-const HARDCODED_CAPTURE_RULES = [
-    {
-        name: '通知列表',
-        pattern: '/api/sns/web/v1/you/mentions',
-        enabled: true,
-        description: '抓取用户通知列表数据'
-    }
-];
-
-// 检查URL是否匹配固化的抓取规则
-function matchesHardcodedRule(url) {
-    if (!url) return null;
+// 检查URL是否匹配动态抓取规则（从后端获取）
+function matchesCaptureRule(url) {
+    if (!url || !window.globalState?.captureRules) return null;
     
-    for (const rule of HARDCODED_CAPTURE_RULES) {
+    for (const rule of window.globalState.captureRules) {
         if (rule.enabled && url.includes(rule.pattern)) {
             return rule;
         }
     }
     return null;
 }
+
+// 为了兼容性，保留旧的函数名
+const matchesHardcodedRule = matchesCaptureRule;
 
 // 发送拦截事件到内容脚本
 function dispatchInterceptEvent(data) {
@@ -46,4 +39,4 @@ function dispatchInterceptEvent(data) {
     document.dispatchEvent(event);
 }
 
-export { isXHSUrl, dispatchInterceptEvent, matchesHardcodedRule, HARDCODED_CAPTURE_RULES }; 
+export { isXHSUrl, dispatchInterceptEvent, matchesHardcodedRule, matchesCaptureRule }; 

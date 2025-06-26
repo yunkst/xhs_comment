@@ -475,9 +475,13 @@ function getApiConfig() {
                 document.removeEventListener('XHS_CONFIG_RESPONSE', configHandler);
                 
                 if (response.success) {
-                    // 默认API地址，如果未配置则使用默认值
-                    const apiBaseUrl = response.config.apiBaseUrl || 'http://localhost:8000';
-                    const apiToken = response.config.apiToken || '';
+                    // 从globalState获取API配置信息
+                    const globalState = response.globalState || {};
+                    const apiConfig = globalState.apiConfig || {};
+                    
+                    // 使用host作为apiBaseUrl，token作为apiToken
+                    const apiBaseUrl = apiConfig.host || 'http://localhost:8000';
+                    const apiToken = apiConfig.token || '';
                     
                     console.log(`[API Service] API配置获取成功: ${apiBaseUrl}, token: ${apiToken ? '已设置' : '未设置'}`);
                     resolve({ apiBaseUrl, apiToken });
@@ -520,7 +524,7 @@ async function testProxyRequest() {
         console.log('[API Service] 测试 - 获取到配置:', config);
         
         // 测试一个简单的GET请求
-        const testUrl = `${config.apiBaseUrl}/api/v1/system/capture-rules`;
+        const testUrl = `${config.apiBaseUrl}/api/system/capture-rules`;
         console.log('[API Service] 测试 - 发送测试请求到:', testUrl);
         
         const response = await proxyFetch(testUrl, {

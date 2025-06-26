@@ -291,7 +291,7 @@ async def get_sso_userinfo(current_user: User = Depends(get_current_user)):
 
 # /check-login-status 接口，主要用于调试，可以保留
 @router.get("/check-login-status", tags=["SSO认证 (调试)"])
-async def check_login_status_debug(request: Request, current_user: Optional[User] = Depends(get_current_user)):
+async def check_login_status_debug(request: Request, current_user: Optional[str] = Depends(get_current_user)):
     """
     检查当前用户的登录状态 (通过请求头中的Bearer Token)
     """
@@ -299,11 +299,10 @@ async def check_login_status_debug(request: Request, current_user: Optional[User
     token_present = bool(auth_header and auth_header.startswith("Bearer "))
     
     if current_user:
-        logger.info(f"检查登录状态: 用户 {current_user.username} 已登录 (通过 get_current_user)")
+        logger.info(f"检查登录状态: 用户 {current_user} 已登录 (通过 get_current_user)")
         return {
             "status": "已登录",
-            "user_id": current_user.id,
-            "username": current_user.username,
+            "username": current_user,
             "token_source": "get_current_user"
         }
     elif token_present:

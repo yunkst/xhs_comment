@@ -1,12 +1,20 @@
 import { appState } from './state.js';
 import { updateApiStatus, showToast, updateSsoButtons } from './ui.js';
+import { getApiConfig } from './state.js';
 
 function saveSsoSession() {
     chrome.storage.local.set({ 'xhs_sso_session': appState.ssoSession });
 }
 
 function clearSsoSession() {
-    appState.ssoSession = { id: null, status: 'idle', pollInterval: null, pollCount: 0 };
+    appState.ssoSession = { 
+        id: null, 
+        status: 'idle', 
+        pollInterval: null, 
+        pollCount: 0,
+        maxPollCount: 60,
+        apiVersion: 'v1'
+    };
     chrome.storage.local.remove('xhs_sso_session');
 }
 
@@ -17,125 +25,185 @@ export function stopSsoPolling() {
     }
 }
 
+/**
+ * 启动SSO登录流程
+ */
 export async function startSsoLogin() {
-    if (!appState.apiConfig.host) {
-        showToast('请先在配置页面设置API地址', 'error');
-        // 打开配置页面
-        chrome.tabs.create({ url: chrome.runtime.getURL('options.html') });
-        return;
-    }
-    
     try {
-        showToast('正在发起SSO登录...', 'info');
+        const apiConfig = getApiConfig();
+        if (!apiConfig.baseUrl) {
+            throw new Error('API配置未设置');
+        }
+
+        console.log('[SSO] 开始SSO登录流程...');
         
-        const ssoUrl = `${appState.apiConfig.host}/api/auth/sso/initiate`;
-        const response = await fetch(ssoUrl, {
+        // 优先使用新版API，失败时降级到旧版
+        let response;
+        let apiVersion = 'v1';
+        
+        try {
+            // 尝试新版API
+            response = await fetch(`${apiConfig.baseUrl}/api/v1/user/auth/sso-session`, {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/json'
+                    'Content-Type': 'application/json',
             },
             body: JSON.stringify({
-                returnUrl: chrome.runtime.getURL('popup.html')
+                    client_type: 'plugin'
             })
         });
+            
+            if (!response.ok) {
+                throw new Error(`新版API失败: ${response.status}`);
+            }
+        } catch (error) {
+            console.log('[SSO] 新版API失败，尝试旧版API:', error.message);
+            apiVersion = 'legacy';
+            
+            // 降级到旧版API
+            response = await fetch(`${apiConfig.baseUrl}/api/auth/sso-session`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    client_type: 'plugin'
+                })
+            });
+        }
         
         if (!response.ok) {
-            throw new Error(`SSO初始化失败: ${response.status} ${response.statusText}`);
+            throw new Error(`SSO会话创建失败: ${response.status} ${response.statusText}`);
         }
         
-        const ssoData = await response.json();
-        
-        if (!ssoData.ssoUrl || !ssoData.sessionId) {
-            throw new Error('SSO响应数据不完整');
+        const data = await response.json();
+        console.log('[SSO] SSO会话创建成功:', data);
+
+        // 适配不同API版本的响应字段
+        const sessionId = data.session_id;
+        const loginUrl = data.initiate_url || data.login_url; // 新版用initiate_url，旧版用login_url
+
+        if (!sessionId || !loginUrl) {
+            throw new Error('服务器响应缺少必要字段');
         }
         
-        // 保存SSO会话信息
-        appState.ssoSession.id = ssoData.sessionId;
-        appState.ssoSession.status = 'pending';
-        appState.ssoSession.pollCount = 0;
-        saveSsoSession();
+        // 更新状态
+        chrome.storage.local.set({
+            ssoSession: {
+                sessionId: sessionId,
+                status: 'pending',
+                loginUrl: loginUrl,
+                createdAt: Date.now(),
+                apiVersion: apiVersion
+            }
+        });
         
-        // 打开SSO登录页面
-        chrome.tabs.create({ url: ssoData.ssoUrl });
-        
-        // 开始轮询检查登录状态
-        startSsoPolling();
-        
-        // 更新UI
-        updateSsoButtons();
-        showToast('请在新打开的页面中完成登录', 'success');
+        // 打开登录页面
+        chrome.tabs.create({ url: loginUrl });
+
+        return {
+            success: true,
+            sessionId: sessionId,
+            loginUrl: loginUrl
+        };
         
     } catch (error) {
-        console.error('[SSO] 启动SSO登录失败:', error);
-        showToast(`SSO登录失败: ${error.message}`, 'error');
-        
-        // 清理SSO会话状态
-        clearSsoSession();
-        updateSsoButtons();
+        console.error('[SSO] SSO登录启动失败:', error);
+        return {
+            success: false,
+            error: error.message
+        };
     }
 }
 
-export async function checkSsoLoginStatus(isAutoCheck = false) {
-    if (!appState.ssoSession.id) {
-        if (!isAutoCheck) showToast('没有正在进行的SSO会话', 'warn');
-        return;
-    }
-    
-    if (!appState.apiConfig.host) {
-        if (!isAutoCheck) showToast('API地址未配置', 'error');
-        return;
-    }
-    
+/**
+ * 检查SSO登录状态
+ */
+export async function checkSsoLoginStatus() {
     try {
-        const checkUrl = `${appState.apiConfig.host}/api/auth/sso/status/${appState.ssoSession.id}`;
-        const response = await fetch(checkUrl);
+        const result = await chrome.storage.local.get(['ssoSession']);
+        const ssoSession = result.ssoSession;
+
+        if (!ssoSession || !ssoSession.sessionId) {
+            return { success: false, error: 'No active SSO session' };
+    }
+    
+        const apiConfig = getApiConfig();
+        if (!apiConfig.baseUrl) {
+            throw new Error('API配置未设置');
+        }
+
+        console.log('[SSO] 检查SSO登录状态，会话ID:', ssoSession.sessionId);
+
+        // 根据记录的API版本选择端点
+        const endpoint = ssoSession.apiVersion === 'v1' 
+            ? `/api/v1/user/auth/sso-session/${ssoSession.sessionId}`
+            : `/api/auth/sso-session/${ssoSession.sessionId}`;
+
+        const response = await fetch(`${apiConfig.baseUrl}${endpoint}`, {
+            method: 'GET',
+            headers: {
+                'Content-Type': 'application/json',
+            }
+        });
         
         if (!response.ok) {
-            throw new Error(`检查SSO状态失败: ${response.status} ${response.statusText}`);
+            throw new Error(`状态检查失败: ${response.status} ${response.statusText}`);
         }
         
-        const statusData = await response.json();
+        const data = await response.json();
+        console.log('[SSO] SSO状态检查响应:', data);
         
-        if (statusData.status === 'completed' && statusData.token) {
-            // 登录成功
-            appState.apiConfig.token = statusData.token;
-            appState.apiConfig.refreshToken = statusData.refreshToken || '';
-            
-            // 保存配置
-            chrome.storage.local.set({ 'xhs_api_config': appState.apiConfig });
-            
-            // 清理SSO会话
-            clearSsoSession();
-            stopSsoPolling();
-            
-            // 更新UI
-            updateApiStatus();
-            updateSsoButtons();
-            
-            if (!isAutoCheck) {
-                showToast('SSO登录成功！', 'success');
-            }
-        } else if (statusData.status === 'failed') {
-            // 登录失败
-            clearSsoSession();
-            stopSsoPolling();
-            updateSsoButtons();
-            
-            if (!isAutoCheck) {
-                showToast('SSO登录失败', 'error');
-            }
-        } else if (statusData.status === 'pending') {
-            // 仍在等待中
-            if (!isAutoCheck) {
-                showToast('登录仍在进行中，请稍候...', 'info');
-            }
+        if (data.status === 'completed' && data.tokens) {
+            // 登录成功，保存令牌
+            const tokens = data.tokens;
+            const newApiConfig = {
+                ...apiConfig,
+                token: tokens.access_token,
+                refreshToken: tokens.refresh_token || null,
+                tokenType: tokens.token_type || 'bearer'
+            };
+
+            await chrome.storage.local.set({ 
+                'xhs_api_config': newApiConfig,
+                ssoSession: {
+                    ...ssoSession,
+                    status: 'completed',
+                    completedAt: Date.now()
+                }
+            });
+
+            console.log('[SSO] SSO登录完成，令牌已保存');
+            return {
+                success: true,
+                status: 'completed',
+                tokens: tokens
+            };
+        } else if (data.status === 'pending') {
+            return {
+                success: true,
+                status: 'pending'
+            };
+        } else if (data.status === 'expired') {
+            // 会话过期，清理状态
+            await chrome.storage.local.remove(['ssoSession']);
+            return {
+                success: false,
+                error: 'SSO会话已过期'
+            };
+        } else {
+            return {
+                success: false,
+                error: `未知状态: ${data.status}`
+            };
         }
         
     } catch (error) {
-        console.error('[SSO] 检查SSO状态失败:', error);
-        if (!isAutoCheck) {
-            showToast(`检查登录状态失败: ${error.message}`, 'error');
-        }
+        console.error('[SSO] SSO状态检查失败:', error);
+        return {
+            success: false,
+            error: error.message
+        };
     }
 }
 
