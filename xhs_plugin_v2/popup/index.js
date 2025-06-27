@@ -9,11 +9,10 @@ import { updateAllUI, showToast } from './ui.js';
 function initialize() {
     console.log('[XHS Monitor Popup] 初始化...');
     
-    // 加载所有必要的数据
+    // 加载必要的数据
     actions.loadApiConfig();
     actions.loadSsoSession();
     actions.loadMonitorConfig();
-    actions.loadRequestStats();
     actions.loadCaptureRules();
     
     // 设置事件监听器

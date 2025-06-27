@@ -1,42 +1,13 @@
 import { appState, elements } from './state.js';
 import * as sso from './sso.js';
-import { clearLogs, refreshCaptureRules, filterAndDisplayLog } from './actions.js';
+import { refreshCaptureRules } from './actions.js';
 import { updateAllUI, showToast } from './ui.js';
 
 let ssoPollingInterval = null;
 
-function openPage(url) {
-    chrome.tabs.create({ url });
-}
-
 function openOptionsPage(e) {
     e.preventDefault();
     chrome.runtime.openOptionsPage();
-}
-
-function handleMessage(request, sender, sendResponse) {
-    if (request.action === 'updateLog') {
-        appState.currentRequestLog = request.data;
-        filterAndDisplayLog();
-    }
-}
-
-// 触发历史评论功能初始化
-function triggerHistoryCommentsInit() {
-    chrome.tabs.query({active: true, currentWindow: true}, function(tabs) {
-        if (tabs[0] && tabs[0].url && tabs[0].url.includes('xiaohongshu.com/notification')) {
-            console.log('[Popup] 检测到当前在通知页面，触发历史评论功能初始化');
-            chrome.tabs.sendMessage(tabs[0].id, {
-                action: 'initializeHistoryComments'
-            }, function(response) {
-                if (chrome.runtime.lastError) {
-                    console.log('[Popup] 发送初始化消息失败:', chrome.runtime.lastError.message);
-                } else {
-                    console.log('[Popup] 历史评论功能初始化触发成功');
-                }
-            });
-        }
-    });
 }
 
 /**
@@ -164,9 +135,6 @@ function stopSsoPolling() {
 }
 
 export function setupEventListeners() {
-    // 在popup打开时触发历史评论功能初始化
-    triggerHistoryCommentsInit();
-    
     // 检查是否有正在进行的SSO会话，如果有则开始轮询
     chrome.storage.local.get(['ssoSession'], (result) => {
         if (result.ssoSession && result.ssoSession.status === 'pending') {
@@ -175,46 +143,23 @@ export function setupEventListeners() {
         }
     });
     
+    // SSO登录相关事件
     elements.ssoStartLogin.addEventListener('click', handleSsoLogin);
     elements.ssoCheckLogin.addEventListener('click', handleSsoCheck);
     elements.logoutBtn.addEventListener('click', handleLogout);
 
-    elements.viewLogsBtn.addEventListener('click', () => openPage(chrome.runtime.getURL('logs.html')));
-    elements.clearLogsBtn.addEventListener('click', clearLogs);
-
-    elements.configPageLink.addEventListener('click', openOptionsPage);
-    elements.configLink.addEventListener('click', openOptionsPage);
-    elements.helpLink.addEventListener('click', () => openPage('https://github.com/your-repo/issues')); // Replace with actual help link
-    elements.aboutLink.addEventListener('click', () => openPage('https://github.com/your-repo')); // Replace with actual about link
-    
+    // 抓取规则刷新
     if (elements.refreshRulesBtn) {
         elements.refreshRulesBtn.addEventListener('click', refreshCaptureRules);
     }
 
-    if (elements.filterSelect) {
-        elements.filterSelect.addEventListener('change', function() {
-            appState.currentFilter = this.value;
-            filterAndDisplayLog();
-        });
+    // 配置页面按钮
+    if (elements.configPageBtn) {
+        elements.configPageBtn.addEventListener('click', openOptionsPage);
     }
 
-    if (elements.optionsLink) {
-        elements.optionsLink.addEventListener('click', openOptionsPage);
-    }
-    
-    if (elements.logsLink) {
-        elements.logsLink.addEventListener('click', (e) => {
-            e.preventDefault();
-            openPage(chrome.runtime.getURL('logs.html'));
-        });
-    }
-
-    chrome.runtime.onMessage.addListener(handleMessage);
-
+    // 当popup关闭时清理轮询
     window.addEventListener('beforeunload', () => {
         stopSsoPolling();
     });
 } 
-
-// 导出轮询控制函数供其他模块使用
-export { startSsoPolling, stopSsoPolling }; 

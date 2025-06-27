@@ -1,5 +1,5 @@
 import { appState } from './state.js';
-import { updateAllUI, updateRequestStats, updateCaptureRulesDisplay, showToast, renderLog } from './ui.js';
+import { updateAllUI, updateCaptureRulesDisplay, showToast } from './ui.js';
 import * as sso from './sso.js';
 
 export function loadApiConfig() {
@@ -31,15 +31,6 @@ export function loadMonitorConfig() {
     });
 }
 
-export function loadRequestStats() {
-    chrome.runtime.sendMessage({ action: 'getRequestStats' }, function(response) {
-        if (response && response.stats) {
-            appState.requestStats = response.stats;
-            updateRequestStats();
-        }
-    });
-}
-
 export function loadCaptureRules() {
     console.log('[Popup] 请求获取抓取规则...');
     chrome.runtime.sendMessage({ action: 'getCaptureRules' }, function(response) {
@@ -47,17 +38,6 @@ export function loadCaptureRules() {
         appState.captureRules = response?.data || [];
         console.log('[Popup] 设置抓取规则到状态:', appState.captureRules);
         updateCaptureRulesDisplay();
-    });
-}
-
-export function clearLogs() {
-    chrome.runtime.sendMessage({ action: 'clearRequests' }, function(response) {
-        if (response.success) {
-            appState.currentRequestLog = [];
-            filterAndDisplayLog();
-            loadRequestStats();
-            showToast('日志已清空', 'success');
-        }
     });
 }
 
@@ -71,15 +51,4 @@ export async function refreshCaptureRules() {
             showToast(`刷新失败: ${response.error}`, 'error');
         }
     });
-}
-
-export function filterAndDisplayLog() {
-    if (appState.currentFilter === 'all') {
-        appState.filteredLog = appState.currentRequestLog;
-    } else {
-        appState.filteredLog = appState.currentRequestLog.filter(
-            log => log.rule === appState.currentFilter
-        );
-    }
-    renderLog();
 } 

@@ -10,8 +10,8 @@
 <body>
     <div class="container">
         <div class="header">
-            <h1>🔍 小红书网络监控</h1>
-            <p class="subtitle">实时监控和记录网络请求</p>
+            <h1>小红书网络监控</h1>
+            <p class="subtitle">网络请求监控插件</p>
         </div>
 
         <!-- API状态和SSO登录 -->
@@ -24,40 +24,18 @@
             <!-- SSO登录容器 -->
             <div class="sso-container" id="ssoContainer">
                 <button class="btn btn-primary" id="ssoStartLogin">
-                    🔐 单点登录 (SSO)
+                    单点登录
                 </button>
                 <button class="btn btn-success hidden" id="ssoCheckLogin">
-                    ✅ 已完成登录，点击继续
+                    已完成登录，点击继续
                 </button>
                 <!-- 退出登录容器 -->
                 <div class="logout-container" id="logoutContainer">
                     <button class="btn btn-danger" id="logoutBtn">
-                        🚪 退出登录
+                        退出登录
                     </button>
                 </div>
             </div>
-        </div>
-
-        <!-- 监控统计 -->
-        <div class="status-card">
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-number" id="totalRequests">0</div>
-                    <div class="stat-label">总请求数</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-number" id="todayRequests">0</div>
-                    <div class="stat-label">今日请求</div>
-                </div>
-            </div>
-            
-            <button class="btn btn-outline" id="viewLogsBtn">
-                📊 查看详细日志
-            </button>
-            
-            <button class="btn btn-secondary" id="clearLogsBtn">
-                🗑️ 清空日志
-            </button>
         </div>
 
         <!-- 抓取规则 -->
@@ -65,7 +43,7 @@
             <div class="rules-header">
                 <div class="rules-info" id="captureRulesInfo">正在加载抓取规则...</div>
                 <button class="btn btn-outline btn-small" id="refreshRulesBtn">
-                    🔄 刷新规则
+                    刷新规则
                 </button>
             </div>
             <div class="rules-list" id="rulesList">
@@ -73,26 +51,16 @@
             </div>
         </div>
 
-        <!-- 空状态提示 -->
-        <div class="status-card" id="emptyState">
-            <div class="empty-state">
-                <div class="icon">📡</div>
-                <div class="message">
-                    暂无监控数据<br>
-                    请访问小红书页面开始监控，或在<a href="#" class="config-link" id="configLink">配置页面</a>设置监控规则
-                </div>
-            </div>
+        <!-- 配置页面入口 -->
+        <div class="status-card">
+            <button class="btn btn-primary" id="configPageBtn">
+                进入配置页面
+            </button>
         </div>
 
         <!-- 配置警告 -->
         <div class="warning-message" id="configWarning" style="display: none;">
-            ⚠️ 监控功能已禁用或未配置URL规则，请检查配置设置
-        </div>
-
-        <div class="footer-links">
-            <a href="#" class="footer-link" id="configPageLink">⚙️ 配置</a>
-            <a href="#" class="footer-link" id="helpLink">❓ 帮助</a>
-            <a href="#" class="footer-link" id="aboutLink">ℹ️ 关于</a>
+            监控功能已禁用或未配置URL规则，请检查配置设置
         </div>
     </div>
 

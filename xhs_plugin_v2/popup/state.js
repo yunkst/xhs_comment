@@ -9,23 +9,11 @@ export const elements = {
     ssoCheckLogin: document.getElementById('ssoCheckLogin'),
     logoutContainer: document.getElementById('logoutContainer'),
     logoutBtn: document.getElementById('logoutBtn'),
-    totalRequests: document.getElementById('totalRequests'),
-    todayRequests: document.getElementById('todayRequests'),
-    viewLogsBtn: document.getElementById('viewLogsBtn'),
-    clearLogsBtn: document.getElementById('clearLogsBtn'),
-    emptyState: document.getElementById('emptyState'),
     configWarning: document.getElementById('configWarning'),
-    configPageLink: document.getElementById('configPageLink'),
-    configLink: document.getElementById('configLink'),
-    helpLink: document.getElementById('helpLink'),
-    aboutLink: document.getElementById('aboutLink'),
     captureRulesInfo: document.getElementById('captureRulesInfo'),
     rulesList: document.getElementById('rulesList'),
     refreshRulesBtn: document.getElementById('refreshRulesBtn'),
-    requestLogContainer: document.getElementById('requestLogContainer'),
-    filterSelect: document.getElementById('filterSelect'),
-    optionsLink: document.getElementById('optionsLink'),
-    logsLink: document.getElementById('logsLink')
+    configPageBtn: document.getElementById('configPageBtn')
 };
 
 /**
@@ -45,14 +33,7 @@ export let appState = {
         maxPollCount: 60,
         apiVersion: 'v1' // 记录使用的API版本: 'v1' 或 'legacy'
     },
-    requestStats: {
-        total: 0,
-        today: 0
-    },
     config: null,
-    currentRequestLog: [],
-    filteredLog: [],
-    currentFilter: 'all',
     ssoConfig: {},
     captureRules: [],
     lastApiError: null // 记录最近的API错误，用于检测token过期

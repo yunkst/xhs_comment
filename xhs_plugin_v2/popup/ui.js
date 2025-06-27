@@ -26,26 +26,26 @@ export function updateApiStatus() {
             // Token可能已过期 - 显示警告状态
             console.log('[Popup UI] Token可能已过期，显示重新登录界面');
             elements.apiStatusIndicator.classList.add('token-expired');
-            elements.apiStatusText.textContent = `⚠️ 登录已过期，请重新登录`;
+            elements.apiStatusText.textContent = `登录已过期，请重新登录`;
             elements.ssoContainer.style.display = 'block';
             elements.logoutContainer.classList.remove('show');
             updateSsoButtons();
         } else {
             // 正常连接状态
             elements.apiStatusIndicator.classList.add('connected');
-            elements.apiStatusText.textContent = `✅ API已连接: ${appState.apiConfig.host.substring(0, 20)}... (已登录)`;
+            elements.apiStatusText.textContent = `API已连接: ${appState.apiConfig.host.substring(0, 20)}... (已登录)`;
             elements.ssoContainer.style.display = 'none';
             elements.logoutContainer.classList.add('show');
         }
     } else if (hasHost) {
         // 有API地址但无token
-        elements.apiStatusText.textContent = `⚙️ API已配置: ${appState.apiConfig.host.substring(0, 20)}... (未登录)`;
+        elements.apiStatusText.textContent = `API已配置: ${appState.apiConfig.host.substring(0, 20)}... (未登录)`;
         elements.ssoContainer.style.display = 'block';
         elements.logoutContainer.classList.remove('show');
         updateSsoButtons();
     } else {
         // 没有API地址
-        elements.apiStatusText.textContent = '❌ 未配置API服务';
+        elements.apiStatusText.textContent = '未配置API服务';
         elements.ssoContainer.style.display = 'block';
         elements.logoutContainer.classList.remove('show');
         updateSsoButtons();
@@ -61,20 +61,20 @@ export function updateSsoButtons() {
         
         if (ssoSession && ssoSession.status === 'pending') {
             // 有正在进行的SSO会话
-        elements.ssoCheckLogin.style.display = 'block';
-        elements.ssoCheckLogin.classList.remove('hidden');
-        elements.ssoStartLogin.innerHTML = '🔄 重新发起SSO登录';
+            elements.ssoCheckLogin.style.display = 'block';
+            elements.ssoCheckLogin.classList.remove('hidden');
+            elements.ssoStartLogin.innerHTML = '重新发起SSO登录';
             elements.ssoStartLogin.disabled = false;
             elements.ssoCheckLogin.disabled = false;
-    } else {
-            // 没有正在进行的SSO会话
-        elements.ssoCheckLogin.style.display = 'none';
-            
-        if (hasHost) {
-            elements.ssoStartLogin.innerHTML = '🔐 单点登录 (SSO)';
-                elements.ssoStartLogin.disabled = false;
         } else {
-            elements.ssoStartLogin.innerHTML = '⚙️ 先配置API地址';
+            // 没有正在进行的SSO会话
+            elements.ssoCheckLogin.style.display = 'none';
+            
+            if (hasHost) {
+                elements.ssoStartLogin.innerHTML = '单点登录';
+                elements.ssoStartLogin.disabled = false;
+            } else {
+                elements.ssoStartLogin.innerHTML = '先配置API地址';
                 elements.ssoStartLogin.disabled = true;
             }
         }
@@ -82,25 +82,15 @@ export function updateSsoButtons() {
 }
 
 export function updateConfigWarning() {
-    if (!appState.config || !appState.config.enableMonitoring) {
+    // 简化警告逻辑：只在没有API配置且没有抓取规则时显示
+    const hasApiConfig = !!appState.apiConfig.host;
+    const hasRules = appState.captureRules && appState.captureRules.length > 0;
+    
+    if (!hasApiConfig && !hasRules) {
         elements.configWarning.style.display = 'block';
+        elements.configWarning.textContent = '请先配置API服务地址';
     } else {
         elements.configWarning.style.display = 'none';
-    }
-}
-
-export function updateRequestStats() {
-    elements.totalRequests.textContent = appState.requestStats.total;
-    elements.todayRequests.textContent = appState.requestStats.today;
-}
-
-export function updateEmptyState() {
-    if (appState.filteredLog.length === 0) {
-        elements.emptyState.style.display = 'block';
-        elements.requestLogContainer.style.display = 'none';
-    } else {
-        elements.emptyState.style.display = 'none';
-        elements.requestLogContainer.style.display = 'block';
     }
 }
 
@@ -147,24 +137,8 @@ export function showToast(message, type = 'info') {
     }, 3000);
 }
 
-export function renderLog() {
-    const logContainer = elements.requestLogContainer;
-    logContainer.innerHTML = ''; // Clear previous logs
-    
-    appState.filteredLog.forEach(log => {
-        const logItem = document.createElement('div');
-        logItem.className = 'log-item';
-        // ... (render log item details)
-        logContainer.appendChild(logItem);
-    });
-
-    updateEmptyState();
-}
-
 export function updateAllUI() {
     updateApiStatus();
     updateConfigWarning();
-    updateRequestStats();
-    updateEmptyState();
     updateCaptureRulesDisplay();
 } 
