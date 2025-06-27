@@ -405,56 +405,6 @@
   }
   ```
 
-### 8. 抓取规则管理接口 (`captureRuleApi`)
-
-#### 8.1 获取所有抓取规则（管理员）
-- **接口**: `GET /api/v1/system/capture-rules/all`
-- **描述**: 获取所有抓取规则，包括禁用的
-- **响应**:
-  ```json
-  {
-    "success": true,
-    "rules": [
-      {
-        "name": "string",
-        "pattern": "string",
-        "data_type": "comment",
-        "priority": 5,
-        "enabled": true,
-        "description": "string"
-      }
-    ],
-    "total_count": 10
-  }
-  ```
-
-#### 8.2 获取启用的抓取规则（插件用）
-- **接口**: `GET /api/v1/system/capture-rules`
-- **描述**: 获取启用的抓取规则供插件使用
-
-#### 8.3 创建抓取规则
-- **接口**: `POST /api/v1/system/capture-rules`
-- **描述**: 创建新的抓取规则
-- **参数**:
-  ```json
-  {
-    "name": "string",
-    "pattern": "string",
-    "data_type": "comment",
-    "priority": 5,
-    "enabled": true,
-    "description": "string"
-  }
-  ```
-
-#### 8.4 更新抓取规则
-- **接口**: `PUT /api/v1/system/capture-rules/{ruleName}`
-- **描述**: 更新指定的抓取规则
-
-#### 8.5 删除抓取规则
-- **接口**: `DELETE /api/v1/system/capture-rules/{ruleName}`
-- **描述**: 删除指定的抓取规则
-
 ## 错误处理
 
 ### 常见HTTP状态码

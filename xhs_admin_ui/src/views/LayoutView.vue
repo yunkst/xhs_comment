@@ -29,13 +29,6 @@
             <el-menu-item index="/content/notes">小红书笔记</el-menu-item>
             <el-menu-item index="/content/notifications">小红书通知</el-menu-item>
           </el-sub-menu>
-          <el-sub-menu index="system">
-            <template #title>
-              <el-icon><Setting /></el-icon>
-              <span>系统管理</span>
-            </template>
-            <el-menu-item index="/system/capture-rules">抓取规则管理</el-menu-item>
-          </el-sub-menu>
         </el-menu>
       </el-aside>
       
@@ -86,11 +79,10 @@ import { ref, computed } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { 
   Monitor, 
-  Setting, 
   ChatDotRound, 
   Fold, 
   Expand, 
-  ArrowDown 
+  ArrowDown
 } from '@element-plus/icons-vue'
 import { ElMessageBox } from 'element-plus'
 

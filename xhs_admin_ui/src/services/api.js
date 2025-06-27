@@ -279,25 +279,6 @@ export const userNoteApi = {
   }
 };
 
-// 抓取规则管理接口
-export const captureRuleApi = {
-  getAllCaptureRules: () => {
-    return api.get('/api/v1/system/capture-rules/all');
-  },
-  getCaptureRules: () => {
-    return api.get('/api/v1/system/capture-rules');
-  },
-  createCaptureRule: (data) => {
-    return api.post('/api/v1/system/capture-rules', data);
-  },
-  updateCaptureRule: (ruleName, data) => {
-    return api.put(`/api/v1/system/capture-rules/${ruleName}`, data);
-  },
-  deleteCaptureRule: (ruleName) => {
-    return api.delete(`/api/v1/system/capture-rules/${ruleName}`);
-  }
-};
-
 export default {
   ...userApi,
   ...ssoApi,
@@ -305,6 +286,5 @@ export default {
   ...noteApi,
   ...notificationApi,
   ...xhsUserApi,
-  ...userNoteApi,
-  ...captureRuleApi
+  ...userNoteApi
 }; 

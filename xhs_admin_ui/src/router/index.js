@@ -55,12 +55,6 @@ const router = createRouter({
           name: 'ContentNotifications',
           component: () => import('@/views/content/NotificationView.vue'),
           meta: { title: '小红书通知', icon: 'Bell' }
-        },
-        {
-          path: 'system/capture-rules',
-          name: 'captureRules',
-          component: () => import('../views/system/CaptureRuleView.vue'),
-          meta: { title: '抓取规则管理' }
         }
       ]
     },
