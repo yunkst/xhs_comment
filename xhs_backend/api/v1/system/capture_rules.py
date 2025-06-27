@@ -18,30 +18,41 @@ logger = logging.getLogger(__name__)
 # 创建路由器 (添加前缀)
 router = APIRouter(prefix="/capture-rules")
 
-
+# 核心抓取规则配置 - 基于实际小红书接口
+DEFAULT_CAPTURE_RULES = [
+    {
+        "name": "通知列表",
+        "pattern": "/api/sns/web/v1/you/mentions",
+        "enabled": True,
+        "description": "抓取用户通知列表数据",
+        "data_type": "notification_feed",
+        "priority": 10
+    },
+    {
+        "name": "评论页面接口",
+        "pattern": "/api/sns/web/v2/comment/page",
+        "enabled": True,
+        "description": "抓取笔记评论页面数据",
+        "data_type": "comment_page",
+        "priority": 10
+    }
+]
 
 @router.get("", response_model=CaptureRulesResponse, summary="获取抓取规则")
-async def get_capture_rules(current_user: str = Depends(get_current_user_combined)):
+async def get_capture_rules():
     """
     获取抓取规则列表
     
     返回插件用于匹配网络请求的规则列表
+    
+    注意：此接口无需认证，插件需要在用户登录之前获取规则
+    直接返回固定的抓取规则，不与数据库交互，确保插件能立即获取规则
     """
     try:
-        # 从数据库获取规则列表
-        db = await get_database()
-        rules_collection = db["capture_rules"]
-        
-
-        # 查询启用的规则并排序
-        cursor = rules_collection.find({"enabled": True}).sort("priority", -1)
-        rules_docs = await cursor.to_list(length=100)
-        
-        # 转换为CaptureRule模型
+        # 直接返回固定的抓取规则，不依赖数据库
         rules = []
-        for rule_doc in rules_docs:
-            rule_doc.pop('_id', None)  # 移除MongoDB的_id字段
-            rules.append(CaptureRule(**rule_doc))
+        for rule_data in DEFAULT_CAPTURE_RULES:
+            rules.append(CaptureRule(**rule_data))
         
         return CaptureRulesResponse(
             success=True,

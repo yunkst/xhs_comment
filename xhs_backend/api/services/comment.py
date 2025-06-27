@@ -273,19 +273,51 @@ async def get_user_historical_comments(user_id: str):
     # 1. 查询包含该用户评论的结构化评论数据
     structured_comments_collection = database[STRUCTURED_COMMENTS_COLLECTION]
     
-    # 查询条件：用户ID匹配 或 回复给该用户的评论
+    # 查询条件：用户ID匹配 或 回复给该用户的评论 或 用户回复给别人的评论
     # 先获取该用户发表的所有评论ID
     user_comments_query = {"authorId": user_id}
-    user_comments = await structured_comments_collection.find(user_comments_query, {"commentId": 1}).to_list(length=None)
+    user_comments = await structured_comments_collection.find(user_comments_query, {"commentId": 1, "repliedId": 1}).to_list(length=None)
     user_comment_ids = [comment.get("commentId") for comment in user_comments if comment.get("commentId")]
+    user_replied_to_ids = [comment.get("repliedId") for comment in user_comments if comment.get("repliedId")]
     
-    # 构建组合查询条件
-    query = {
-        "$or": [
-            {"authorId": user_id},  # 用户发表的评论
-            {"repliedId": {"$in": user_comment_ids}} if user_comment_ids else {"repliedId": "impossible_reply_id"}  # 回复给该用户的评论
-        ]
-    }
+    logger.info(f"用户 {user_id} 发表的评论数量: {len(user_comments)}")
+    logger.info(f"用户评论ID列表: {user_comment_ids}")
+    logger.info(f"用户回复的评论ID列表: {user_replied_to_ids}")
+    
+    # 构建组合查询条件 - 包含互动关系的评论
+    query_conditions = [
+        {"authorId": user_id},  # 用户发表的评论
+    ]
+    
+    # 回复给该用户的评论
+    if user_comment_ids:
+        query_conditions.append({"repliedId": {"$in": user_comment_ids}})
+        logger.info(f"添加查询条件：回复给用户的评论，用户评论ID数量: {len(user_comment_ids)}")
+    
+    # 用户回复的原评论（显示完整对话上下文）
+    if user_replied_to_ids:
+        query_conditions.append({"commentId": {"$in": user_replied_to_ids}})
+        logger.info(f"添加查询条件：用户回复的原评论，原评论ID数量: {len(user_replied_to_ids)}")
+    
+    # 与用户有互动关系的评论线程中的其他评论
+    if user_comment_ids:
+        # 查找所有回复用户评论的评论
+        reply_comments = await structured_comments_collection.find(
+            {"repliedId": {"$in": user_comment_ids}}, 
+            {"commentId": 1, "repliedId": 1}
+        ).to_list(length=None)
+        
+        logger.info(f"找到回复用户评论的评论数量: {len(reply_comments)}")
+        
+        # 获取这些回复评论的ID，用于查找它们的子回复
+        reply_comment_ids = [comment.get("commentId") for comment in reply_comments if comment.get("commentId")]
+        if reply_comment_ids:
+            query_conditions.append({"repliedId": {"$in": reply_comment_ids}})
+            logger.info(f"添加查询条件：回复评论的子回复，回复评论ID数量: {len(reply_comment_ids)}")
+    
+    query = {"$or": query_conditions}
+    logger.info(f"最终查询条件数量: {len(query_conditions)}")
+    logger.info(f"查询条件详情: {query}")
     
     # 执行查询
     structured_comments = await structured_comments_collection.find(query).to_list(length=None)

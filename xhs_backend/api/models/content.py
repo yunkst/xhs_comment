@@ -31,6 +31,7 @@ class CommentItem(BaseModel):
     fetchTimestamp: datetime = Field(default_factory=datetime.utcnow)
     illegal_info: Optional[IllegalInfo] = None
     target_comment: Optional[Dict] = None # 用于存储被回复的评论信息
+    parentCommentId: Optional[str] = None # 父评论ID，从target_comment中提取
 
 # --- 结构化评论模型 ---
 class StructuredComment(BaseModel):

@@ -15,6 +15,9 @@ from processing import transform_raw_comments_to_structured
 from api.deps import get_current_user_combined, get_pagination, PaginationParams
 from api.services.comment import save_comments_with_upsert, save_structured_comments, get_user_historical_comments
 from api.services.user import save_user_info
+from ..auth.keycloak import get_current_user
+from ..models.auth import User
+
 # 配置日志
 logger = logging.getLogger(__name__)
 
@@ -464,3 +467,138 @@ async def receive_comments_data(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"保存评论数据时出错: {str(e)}"
         )
+
+@router.get("/debug/comments/note/{note_id}")
+async def debug_get_comments_by_note(
+    note_id: str,
+    current_user: str = Depends(get_current_user_combined)
+):
+    """调试接口：获取特定笔记的所有评论（直接查询数据库）"""
+    try:
+        database = await get_database()
+        collection = database[STRUCTURED_COMMENTS_COLLECTION]
+        
+        # 直接查询该笔记的所有评论
+        comments = await collection.find({"noteId": note_id}).to_list(length=None)
+        
+        # 格式化返回数据
+        formatted_comments = []
+        for comment in comments:
+            formatted_comment = {
+                "commentId": comment.get("commentId"),
+                "noteId": comment.get("noteId"),
+                "content": comment.get("content"),
+                "authorId": comment.get("authorId"),
+                "authorName": comment.get("authorName"),
+                "authorAvatar": comment.get("authorAvatar"),
+                "timestamp": comment.get("timestamp").isoformat() if comment.get("timestamp") else None,
+                "repliedId": comment.get("repliedId"),
+                "likeCount": comment.get("likeCount"),
+                "ipLocation": comment.get("ipLocation"),
+                "fetchTimestamp": comment.get("fetchTimestamp").isoformat() if comment.get("fetchTimestamp") else None
+            }
+            formatted_comments.append(formatted_comment)
+        
+        logger.info(f"调试查询：笔记 {note_id} 共有 {len(formatted_comments)} 条评论")
+        
+        return {
+            "success": True,
+            "noteId": note_id,
+            "totalComments": len(formatted_comments),
+            "comments": formatted_comments
+        }
+    except Exception as e:
+        logger.error(f"调试查询笔记评论失败: {e}")
+        raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
+
+@router.get("/debug/comments/user/{user_id}")
+async def debug_get_comments_by_user(
+    user_id: str,
+    current_user: str = Depends(get_current_user_combined)
+):
+    """调试接口：获取特定用户的所有评论（直接查询数据库，不经过历史评论逻辑）"""
+    try:
+        database = await get_database()
+        collection = database[STRUCTURED_COMMENTS_COLLECTION]
+        
+        # 直接查询该用户的所有评论
+        user_comments = await collection.find({"authorId": user_id}).to_list(length=None)
+        
+        # 查询回复给该用户的评论
+        user_comment_ids = [comment.get("commentId") for comment in user_comments if comment.get("commentId")]
+        replied_comments = []
+        if user_comment_ids:
+            replied_comments = await collection.find({"repliedId": {"$in": user_comment_ids}}).to_list(length=None)
+        
+        # 格式化返回数据
+        all_comments = user_comments + replied_comments
+        formatted_comments = []
+        for comment in all_comments:
+            formatted_comment = {
+                "commentId": comment.get("commentId"),
+                "noteId": comment.get("noteId"),
+                "content": comment.get("content"),
+                "authorId": comment.get("authorId"),
+                "authorName": comment.get("authorName"),
+                "authorAvatar": comment.get("authorAvatar"),
+                "timestamp": comment.get("timestamp").isoformat() if comment.get("timestamp") else None,
+                "repliedId": comment.get("repliedId"),
+                "likeCount": comment.get("likeCount"),
+                "ipLocation": comment.get("ipLocation"),
+                "fetchTimestamp": comment.get("fetchTimestamp").isoformat() if comment.get("fetchTimestamp") else None,
+                "isUserComment": comment.get("authorId") == user_id
+            }
+            formatted_comments.append(formatted_comment)
+        
+        logger.info(f"调试查询：用户 {user_id} 相关的评论共 {len(formatted_comments)} 条")
+        
+        return {
+            "success": True,
+            "userId": user_id,
+            "userComments": len(user_comments),
+            "repliedComments": len(replied_comments),
+            "totalComments": len(formatted_comments),
+            "comments": formatted_comments
+        }
+    except Exception as e:
+        logger.error(f"调试查询用户评论失败: {e}")
+        raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")
+
+@router.get("/debug/comments/recent")
+async def debug_get_recent_comments(
+    limit: int = Query(default=20, description="返回的评论数量限制"),
+    current_user: str = Depends(get_current_user_combined)
+):
+    """调试接口：获取最近的评论记录"""
+    try:
+        database = await get_database()
+        collection = database[STRUCTURED_COMMENTS_COLLECTION]
+        
+        # 按fetchTimestamp降序查询最近的评论
+        comments = await collection.find({}).sort("fetchTimestamp", -1).limit(limit).to_list(length=None)
+        
+        # 格式化返回数据
+        formatted_comments = []
+        for comment in comments:
+            formatted_comment = {
+                "commentId": comment.get("commentId"),
+                "noteId": comment.get("noteId"),
+                "content": comment.get("content")[:100] + "..." if len(comment.get("content", "")) > 100 else comment.get("content"),
+                "authorId": comment.get("authorId"),
+                "authorName": comment.get("authorName"),
+                "timestamp": comment.get("timestamp").isoformat() if comment.get("timestamp") else None,
+                "repliedId": comment.get("repliedId"),
+                "fetchTimestamp": comment.get("fetchTimestamp").isoformat() if comment.get("fetchTimestamp") else None
+            }
+            formatted_comments.append(formatted_comment)
+        
+        logger.info(f"调试查询：获取最近的 {len(formatted_comments)} 条评论")
+        
+        return {
+            "success": True,
+            "totalComments": len(formatted_comments),
+            "comments": formatted_comments
+        }
+    except Exception as e:
+        logger.error(f"调试查询最近评论失败: {e}")
+        raise HTTPException(status_code=500, detail=f"查询失败: {str(e)}")

@@ -18,6 +18,7 @@ from ..services.comment import save_comments_with_upsert
 from ..services.note import save_notes
 from ..services.notification import save_notifications
 from ..services.user import save_user_info
+from database import get_database, NOTES_COLLECTION
 
 logger = logging.getLogger(__name__)
 
@@ -427,17 +428,42 @@ class NetworkDataProcessor:
         
         # 构建笔记信息（如果有note_id）
         if note_id:
-            # 创建一个基本的笔记对象
-            note_dict = {
-                'noteId': note_id,
-                'title': '',  # 评论页面接口通常不包含笔记标题
-                'noteContent': '',
-                'authorId': '',
-                'publishTime': None,
-                'noteLike': 0,
-                'noteCommitCount': len(comments),
-            }
-            notes.append(Note(**note_dict))
+            # 检查是否已经存在该笔记的完整信息
+            # 如果数据库中已有该笔记的完整信息，不要创建基础笔记对象
+            
+            try:
+                database = await get_database()
+                notes_collection = database[NOTES_COLLECTION]
+                existing_note = await notes_collection.find_one({"noteId": note_id})
+                
+                if existing_note:
+                    # 如果已存在笔记，使用现有的完整信息
+                    note_dict = {
+                        'noteId': existing_note.get('noteId'),
+                        'title': existing_note.get('title', ''),
+                        'noteContent': existing_note.get('noteContent', ''),
+                        'authorId': existing_note.get('authorId', ''),
+                        'publishTime': existing_note.get('publishTime'),
+                        'noteLike': existing_note.get('noteLike', 0),
+                        'noteCommitCount': len(comments),  # 使用当前评论数量
+                    }
+                    logger.info(f"[评论页面解析] 使用已存在的笔记信息: {note_id}, 标题: {existing_note.get('title', '无标题')}")
+                else:
+                    # 如果不存在，创建基本笔记对象，但不设置空标题
+                    note_dict = {
+                        'noteId': note_id,
+                        'title': None,  # 设为None而不是空字符串，避免覆盖后续的标题信息
+                        'noteContent': '',
+                        'authorId': '',
+                        'publishTime': None,
+                        'noteLike': 0,
+                        'noteCommitCount': len(comments),
+                    }
+                    logger.info(f"[评论页面解析] 创建基础笔记对象: {note_id}")
+                
+                notes.append(Note(**note_dict))
+            except Exception as e:
+                logger.warning(f"[评论页面解析] 查询现有笔记信息失败: {e}, 跳过笔记创建")
         
         logger.info(f"[评论页面解析] 提取到 {len(comments)} 条评论, {len(users)} 个用户, {len(notes)} 个笔记")
         
@@ -501,6 +527,15 @@ class NetworkDataProcessor:
             else:
                 timestamp = None
             
+            # 处理target_comment字段，建立回复关系
+            target_comment_id = None
+            if 'target_comment' in comment_data and comment_data['target_comment']:
+                target_comment_id = comment_data['target_comment'].get('id')
+                logger.info(f"[评论解析] 评论 {comment_data.get('id')} 的target_comment: {comment_data['target_comment']}")
+                logger.info(f"[评论解析] 提取到的target_comment_id: {target_comment_id}")
+            else:
+                logger.info(f"[评论解析] 评论 {comment_data.get('id')} 没有target_comment字段")
+            
             return {
                 'id': comment_data.get('id', ''),
                 'content': comment_data.get('content', ''),
@@ -513,6 +548,7 @@ class NetworkDataProcessor:
                 'noteId': comment_data.get('note_id', ''),
                 'status': comment_data.get('status', 0),  # 新增status字段
                 'liked': comment_data.get('liked', False),  # 新增liked字段
+                'parentCommentId': target_comment_id,  # 添加回复关系
             }
         except Exception as e:
             logger.error(f"提取评论信息失败: {e}")
@@ -606,6 +642,13 @@ class NetworkDataProcessor:
                             "ipLocation": comment_dict.get('ipLocation'),
                             "illegal_info": comment_dict.get('illegal_info')
                         }
+                        
+                        # 添加调试日志
+                        if comment_dict.get('parentCommentId'):
+                            logger.info(f"[评论页面数据处理] 子评论 {comment_dict.get('id')} 回复 {comment_dict.get('parentCommentId')}")
+                        else:
+                            logger.info(f"[评论页面数据处理] 主评论 {comment_dict.get('id')}")
+                        
                         structured_comments.append(structured_comment)
                     
                     # 保存到结构化评论集合

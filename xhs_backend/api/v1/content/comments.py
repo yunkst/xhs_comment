@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 
 from database import get_database, COMMENTS_COLLECTION, STRUCTURED_COMMENTS_COLLECTION
 from api.deps import get_current_user
+from api.services.comment import get_user_historical_comments
 
 # 配置日志
 logger = logging.getLogger(__name__)
@@ -247,4 +248,39 @@ async def delete_comment(
         raise HTTPException(
             status_code=500,
             detail=f"删除评论失败: {str(e)}"
+        )
+
+@router.get("/user/{user_id}", summary="获取用户历史评论")
+async def get_user_comments(
+    user_id: str,
+    current_user: str = Depends(get_current_user)
+):
+    """
+    获取指定用户的历史评论数据
+    
+    返回用户参与的所有评论互动，包括：
+    - 用户发表的评论
+    - 回复给用户的评论
+    - 用户回复的原评论
+    - 互动线程中的其他评论
+    """
+    try:
+        logger.info(f"开始获取用户 {user_id} 的历史评论")
+        
+        comments = await get_user_historical_comments(user_id)
+        
+        logger.info(f"成功获取用户 {user_id} 的历史评论，共 {len(comments)} 条笔记")
+        
+        return {
+            "success": True,
+            "data": comments,
+            "total": len(comments),
+            "message": f"成功获取用户历史评论，共 {len(comments)} 条笔记"
+        }
+        
+    except Exception as e:
+        logger.exception(f"获取用户 {user_id} 的历史评论时发生错误")
+        raise HTTPException(
+            status_code=500,
+            detail=f"获取用户历史评论失败: {str(e)}"
         )

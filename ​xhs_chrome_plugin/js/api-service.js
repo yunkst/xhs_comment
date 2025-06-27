@@ -56,7 +56,7 @@ async function fetchUserHistoricalComments(userId) {
       throw new Error('未配置API令牌，请在插件选项中设置');
     }
     
-    const url = `${apiBaseUrl}/api/comments/user/${userId}`;
+    const url = `${apiBaseUrl}/api/v1/content/comments/user/${userId}`;
     
     console.log(`通过代理请求URL: ${url}`);
     
@@ -76,7 +76,14 @@ async function fetchUserHistoricalComments(userId) {
     
     const data = await response.json();
     console.log(`成功获取到用户 ${userId} 的历史评论:`, data);
-    return data;
+    
+    // 提取实际的评论数据数组
+    if (data.success && Array.isArray(data.data)) {
+      return data.data;
+    } else {
+      console.warn(`API返回的数据格式不正确:`, data);
+      return [];
+    }
   } catch (error) {
     console.error(`获取用户 ${userId} 的历史评论时出错:`, error);
     throw error;
@@ -273,9 +280,9 @@ async function fetchUserNotesInBatch(userIds) {
       throw new Error('未配置API令牌，请在插件选项中设置');
     }
     
-    // 构建批量请求URL
+    // 构建批量请求URL (使用新的v1 API)
     const userIdsParam = userIds.join(',');
-    const url = `${apiBaseUrl}/api/user-notes/batch?user_ids=${userIdsParam}`;
+    const url = `${apiBaseUrl}/api/v1/user/notes/batch?user_ids=${userIdsParam}`;
     
     // 使用代理请求替代直接fetch
     const response = await proxyFetch(url, {

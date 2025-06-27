@@ -61,7 +61,7 @@ function interceptFetch() {
                     }
                     
                     // 使用多种方式尝试读取响应体
-                    const responseClone = response.clone();
+                const responseClone = response.clone();
                     
                     // 方法1: 尝试使用text()
                     const textPromise = responseClone.text().then(responseText => {

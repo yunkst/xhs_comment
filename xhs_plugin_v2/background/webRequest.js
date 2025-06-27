@@ -15,9 +15,9 @@ export function findMatchingRule(url) {
         for (const rule of globalState.captureRules) {
             if (rule.enabled && rule.pattern && url.includes(rule.pattern)) {
                 console.log(`[Background] URL匹配到规则: ${rule.name}, pattern: ${rule.pattern}, URL: ${url}`);
-                return rule;
-            }
+            return rule;
         }
+    }
     } else {
         console.log(`[Background] 没有可用的抓取规则，当前规则数量: ${globalState.captureRules?.length || 0}`);
     }

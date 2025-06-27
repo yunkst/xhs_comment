@@ -17,7 +17,7 @@ export async function loadCaptureRules() {
         console.log('[Background] 开始从后端加载抓取规则...');
         
         // 获取抓取规则接口无需认证
-        const response = await fetch(`${globalState.apiConfig.host}/api/system/capture-rules`, {
+        const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/capture-rules`, {
             method: 'GET',
             headers: { 'Content-Type': 'application/json' }
         });
@@ -46,7 +46,7 @@ export async function loadCaptureRules() {
         console.error('[Background] 加载抓取规则时出错:', error);
         
         // 无法连接后端时，使用空规则列表，避免插件完全无法工作
-        globalState.captureRules = [];
+            globalState.captureRules = [];
         console.warn('[Background] 无法从后端获取抓取规则，插件将不会拦截任何请求');
         console.warn('[Background] 请检查后端连接或API配置');
         
@@ -120,7 +120,7 @@ export async function uploadNetworkData(details, matchedRule) {
         
         console.log('[Background] 上传 Payload:', payload);
 
-        const response = await fetch(`${globalState.apiConfig.host}/api/system/network-data/upload`, {
+        const response = await fetch(`${globalState.apiConfig.host}/api/v1/system/network-data/upload`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',

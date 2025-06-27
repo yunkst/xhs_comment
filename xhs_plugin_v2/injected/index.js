@@ -103,18 +103,18 @@ async function loadUserNotesModule() {
 
 // 启动初始化流程
 async function initialize() {
-    try {
+try {
         // 首先加载抓取规则
         await loadCaptureRules();
         
         // 然后启动各个拦截器
-        interceptFetch();
-        interceptXHR();
-        observeDOM();
-        console.log('[XHS Plugin] 所有网络请求拦截器已成功初始化');
-    } catch (error) {
-        console.error('[XHS Plugin] 初始化网络拦截器时发生错误:', error);
-    }
+    interceptFetch();
+    interceptXHR();
+    observeDOM();
+    console.log('[XHS Plugin] 所有网络请求拦截器已成功初始化');
+} catch (error) {
+    console.error('[XHS Plugin] 初始化网络拦截器时发生错误:', error);
+}
 }
 
 // 立即执行初始化

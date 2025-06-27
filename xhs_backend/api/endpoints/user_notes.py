@@ -110,15 +110,13 @@ async def get_user_notes_by_id(
 @router.get("/batch", response_model=Dict[str, Any])
 async def get_user_notes_batch(
     user_ids: str = Query(..., description="逗号分隔的用户ID列表"),
-    request: Request = None,
-    current_user: str = Depends(get_current_user_combined)
+    request: Request = None
 ):
     """
     批量获取多个用户的备注
     
     Args:
         user_ids: 逗号分隔的用户ID列表
-        current_user: 当前用户
         
     Returns:
         多个用户的备注数据

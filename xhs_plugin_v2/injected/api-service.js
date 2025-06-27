@@ -81,7 +81,7 @@ async function fetchUserHistoricalComments(userId) {
             throw new Error('未配置API令牌，请先登录');
         }
         
-        const url = `${apiBaseUrl}/api/comments/user/${userId}`;
+        const url = `${apiBaseUrl}/api/v1/content/comments/user/${userId}`;
         
         console.log(`[API Service] 通过代理请求URL: ${url}`);
         
@@ -110,7 +110,14 @@ async function fetchUserHistoricalComments(userId) {
         }
         
         console.log(`[API Service] 成功获取到用户 ${userId} 的历史评论:`, data);
-        return data;
+        
+        // 提取实际的评论数据数组
+        if (data.success && Array.isArray(data.data)) {
+            return data.data;
+        } else {
+            console.warn(`[API Service] API返回的数据格式不正确:`, data);
+            return [];
+        }
     } catch (error) {
         console.error(`[API Service] 获取用户 ${userId} 的历史评论时出错:`, error);
         
@@ -320,9 +327,9 @@ async function fetchUserNotesInBatch(userIds) {
             throw new Error('未配置API令牌，请先登录');
         }
         
-        // 构建批量请求URL
+        // 构建批量请求URL (使用新的v1 API)
         const userIdsParam = userIds.join(',');
-        const url = `${apiBaseUrl}/api/user-notes/batch?user_ids=${userIdsParam}`;
+        const url = `${apiBaseUrl}/api/v1/user/notes/batch?user_ids=${userIdsParam}`;
         
         // 使用代理请求替代直接fetch
         const response = await proxyFetch(url, {
@@ -524,7 +531,7 @@ async function testProxyRequest() {
         console.log('[API Service] 测试 - 获取到配置:', config);
         
         // 测试一个简单的GET请求
-        const testUrl = `${config.apiBaseUrl}/api/system/capture-rules`;
+        const testUrl = `${config.apiBaseUrl}/api/v1/system/capture-rules`;
         console.log('[API Service] 测试 - 发送测试请求到:', testUrl);
         
         const response = await proxyFetch(testUrl, {

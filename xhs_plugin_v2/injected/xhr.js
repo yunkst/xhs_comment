@@ -129,8 +129,8 @@ function interceptXHR() {
                     
                     if (responseError) {
                         responseEvent.response.error = responseError;
-                    }
-                    
+                }
+                
                     console.log(`[XHS Monitor] 发送XHR响应事件:`, {
                         url: responseEvent.url,
                         status: responseEvent.response.status,

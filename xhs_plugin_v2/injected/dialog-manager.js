@@ -539,9 +539,22 @@ function renderHistoricalComments(container, historicalComments) {
             margin-bottom: 10px;
             color: white;
         `;
+        
+        // 优化标题显示逻辑
+        let displayTitle = '无标题笔记';
+        if (noteData.title && noteData.title.trim()) {
+            displayTitle = noteData.title.trim();
+        } else if (noteData.noteContent && noteData.noteContent.trim()) {
+            // 如果没有标题，使用笔记内容的前30个字符作为标题
+            const contentPreview = noteData.noteContent.trim()
+                .replace(/\s+/g, ' ')  // 合并多个空白字符
+                .substring(0, 30);
+            displayTitle = contentPreview + (noteData.noteContent.length > 30 ? '...' : '');
+        }
+        
         noteHeader.innerHTML = `
             <div style="display: flex; justify-content: space-between;">
-                <div>${noteIndex + 1}. ${noteData.title || '无标题笔记'}</div>
+                <div>${noteIndex + 1}. ${displayTitle}</div>
                 <div style="font-size: 0.85em; font-weight: normal; color: #aaa;">${publishTimeDisplay}</div>
             </div>
         `;
