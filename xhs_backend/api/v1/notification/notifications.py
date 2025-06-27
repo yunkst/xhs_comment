@@ -244,38 +244,4 @@ async def get_notification(
             detail=f"获取通知详情失败: {str(e)}"
         )
 
-@router.delete("/{notification_id}", summary="删除通知")
-async def delete_notification(
-    notification_id: str,
-    current_user: str = Depends(get_current_user),
-    db=Depends(get_database)
-):
-    """
-    删除通知
-    """
-    try:
-        from bson import ObjectId
-        
-        collection = db[NOTIFICATIONS_COLLECTION]
-        
-        result = await collection.delete_one({"_id": ObjectId(notification_id)})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"未找到通知: {notification_id}"
-            )
-        
-        return {
-            "success": True,
-            "message": f"成功删除通知: {notification_id}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("删除通知时发生错误")
-        raise HTTPException(
-            status_code=500,
-            detail=f"删除通知失败: {str(e)}"
-        ) 
+ 

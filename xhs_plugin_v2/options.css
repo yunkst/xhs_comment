@@ -114,14 +114,6 @@ body {
 }
 
 /* 按钮特定样式 */
-.btn-primary {
-    background: #ff6b6b;
-    color: white;
-}
-.btn-primary:hover:not(:disabled) {
-    background: #ee5a52;
-}
-
 
 /* 开关特定样式 */
 .switch-container input:checked + .switch-slider {

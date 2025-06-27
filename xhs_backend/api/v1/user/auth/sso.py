@@ -187,11 +187,11 @@ async def get_sso_login_url_old(request: Request):
     pass
 """
 
-# 令牌刷新接口，可以保留，因为插件获取到token后可能需要刷新
+# 令牌刷新接口，插件需要用于刷新token
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
 
-class SSOCallbackResponse(BaseModel): # 用于刷新token的响应
+class SSOCallbackResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     id_token: Optional[str] = None
@@ -202,16 +202,11 @@ class SSOCallbackResponse(BaseModel): # 用于刷新token的响应
 @router.post("/sso-refresh", response_model=SSOCallbackResponse, tags=["SSO认证"])
 async def refresh_sso_token(request_body: RefreshTokenRequest):
     """
-    刷新SSO令牌 (主要指通过后端JWT机制)
-    Keycloak部分可以移除或作为可选，因为新流程更侧重后端JWT
+    刷新SSO令牌
     """
     try:
-        # 简化：直接尝试本地JWT刷新逻辑
-        # 如果需要支持Keycloak刷新，可以保留相关代码并用配置控制
-        
-        # 本地令牌刷新逻辑 (基于api.v1.user.auth.token中的create_access_token)
         try:
-            import jwt as pyjwt # pyjwt是python-jose的依赖, FastAPI常用
+            import jwt as pyjwt
             from api.v1.user.auth.token import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
             
             payload = pyjwt.decode(
@@ -232,13 +227,9 @@ async def refresh_sso_token(request_body: RefreshTokenRequest):
                 data={"sub": username}, expires_delta=new_access_token_expires
             )
             
-            # 通常刷新令牌本身不应在刷新访问令牌时重新生成，除非旧的刷新令牌即将过期
-            # 为简单起见，我们不在此处重新生成刷新令牌
-            
             logger.info(f"用户 {username} 的访问令牌已刷新")
             return SSOCallbackResponse(
                 access_token=new_access_token,
-                # refresh_token=request_body.refresh_token, # 返回旧的刷新令牌
                 expires_in=int(new_access_token_expires.total_seconds())
             )
         except pyjwt.ExpiredSignatureError:
@@ -259,97 +250,8 @@ async def refresh_sso_token(request_body: RefreshTokenRequest):
     except Exception as e:
         logger.error(f"刷新令牌处理失败: {str(e)}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, # 或500，取决于错误性质
+            status_code=status.HTTP_400_BAD_REQUEST,
             detail=f"刷新令牌失败: {str(e)}"
         )
 
-# 辅助函数：创建成功/错误HTML响应 (这些可能不再需要，因为回调由Admin UI处理)
-# 如果Admin UI的 /sso-initiate 页面需要直接给用户展示成功/失败，可以保留或移至Admin UI
-def create_success_page_response(message: str = "操作成功完成"):
-    # ... (HTML内容) ...
-    return Response(content=f"<h1>成功</h1><p>{message}</p><script>setTimeout(window.close, 3000);</script>", media_type="text/html")
-
-def create_error_page_response(error_message: str = "发生错误"):
-    # ... (HTML内容) ...
-    return Response(content=f"<h1>错误</h1><p>{error_message}</p>", media_type="text/html", status_code=400)
-
-# /sso-userinfo 接口，可以用 get_current_user 替代，或者保持用于插件获取用户信息
-# 但通常插件拿到JWT后，可以直接请求受保护的 /users/me 之类的接口
-# 暂且保留，但标记为可能冗余
-@router.get("/sso-userinfo", tags=["SSO认证 (可能冗余)"])
-async def get_sso_userinfo(current_user: User = Depends(get_current_user)):
-    """
-    获取当前认证用户的信息 (通过插件提供的JWT)
-    """
-    logger.info(f"请求用户信息，用户: {current_user.username}")
-    # current_user已经是 User 模型实例
-    return {
-        "success": True,
-        "userinfo": current_user.dict(), # Pydantic模型转dict
-        "source": "local_jwt" 
-    }
-
-# /check-login-status 接口，主要用于调试，可以保留
-@router.get("/check-login-status", tags=["SSO认证 (调试)"])
-async def check_login_status_debug(request: Request, current_user: Optional[str] = Depends(get_current_user)):
-    """
-    检查当前用户的登录状态 (通过请求头中的Bearer Token)
-    """
-    auth_header = request.headers.get("Authorization")
-    token_present = bool(auth_header and auth_header.startswith("Bearer "))
-    
-    if current_user:
-        logger.info(f"检查登录状态: 用户 {current_user} 已登录 (通过 get_current_user)")
-        return {
-            "status": "已登录",
-            "username": current_user,
-            "token_source": "get_current_user"
-        }
-    elif token_present:
-        # 如果 get_current_user 未返回用户，但token存在，说明token可能无效或过期
-        logger.warning("检查登录状态: Authorization Bearer token 存在，但 get_current_user 未能解析用户。")
-        return {
-            "status": "令牌可能无效或已过期",
-            "token_present": True,
-            "headers": dict(request.headers)
-        }
-    else:
-        logger.info("检查登录状态: 未找到认证令牌。")
-        return {
-            "status": "未登录",
-            "token_present": False,
-            "message": "未找到有效的认证令牌",
-            "headers": dict(request.headers)
-        }
-
-# 清理旧模型引用 (如果它们在别处没有用到，这些应在 api.models 中移除)
-# from api.models import SSOLoginResponse, SSOCallbackResponse (旧的)
-# from api.endpoints.keycloak_auth import RefreshTokenRequest (旧的, 现在本地定义了)
-
-# 确保 api.services 中的 create_session 和 update_session_tokens 支持新的 status 参数
-# 并且 tokens 参数可以为 None 或包含 access_token
-
-# 注意: 环境变量 ADMIN_UI_URL 和 ADMIN_SSO_INITIATE_PATH 需要正确配置。
-# ADMIN_UI_URL 应该是 xhs_admin_ui 的访问基地址。
-# ADMIN_SSO_INITIATE_PATH 是 xhs_admin_ui 中用于处理SSO初始化的Vue路由路径。
-
-# 移除旧的keycloak依赖，除非明确需要保留
-# from keycloak import KeycloakOpenID
-# from api.endpoints.keycloak_auth import (
-# keycloak_openid, KEYCLOAK_ENABLED, KEYCLOAK_SERVER_URL, 
-# KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, FRONTEND_REDIRECT_URL, CALLBACK_URL
-# )
-
-# 确保 api.services 中的 create_session 和 update_session_tokens 支持新的 status 参数
-# 并且 tokens 参数可以为 None 或包含 access_token
-
-# 注意: 环境变量 ADMIN_UI_URL 和 ADMIN_SSO_INITIATE_PATH 需要正确配置。
-# ADMIN_UI_URL 应该是 xhs_admin_ui 的访问基地址。
-# ADMIN_SSO_INITIATE_PATH 是 xhs_admin_ui 中用于处理SSO初始化的Vue路由路径。
-
-# 移除旧的keycloak依赖，除非明确需要保留
-# from keycloak import KeycloakOpenID
-# from api.endpoints.keycloak_auth import (
-# keycloak_openid, KEYCLOAK_ENABLED, KEYCLOAK_SERVER_URL, 
-# KEYCLOAK_REALM, KEYCLOAK_CLIENT_ID, FRONTEND_REDIRECT_URL, CALLBACK_URL
-# ) 
+ 

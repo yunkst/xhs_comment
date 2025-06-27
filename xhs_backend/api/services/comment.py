@@ -286,7 +286,7 @@ async def get_user_historical_comments(user_id: str):
     
     # 构建组合查询条件 - 包含互动关系的评论
     query_conditions = [
-        {"authorId": user_id},  # 用户发表的评论
+            {"authorId": user_id},  # 用户发表的评论
     ]
     
     # 回复给该用户的评论

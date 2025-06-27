@@ -67,13 +67,6 @@ body {
     background: white;
 }
 
-.btn-primary {
-    background: #667eea;
-}
-.btn-primary:hover {
-    background: #5a6fd8;
-}
-
 .stats {
     background: white;
     padding: 16px 20px;

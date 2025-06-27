@@ -42,7 +42,6 @@
   "web_accessible_resources": [
     {
       "resources": [
-        "injected.js", 
         "enhanced_interceptor.js",
         "injected/index.js",
         "injected/fetch.js",

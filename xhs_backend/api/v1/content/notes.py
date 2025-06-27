@@ -226,42 +226,4 @@ async def get_note(
             detail=f"获取笔记详情失败: {str(e)}"
         )
 
-@router.delete("/{note_id}", summary="删除笔记")
-async def delete_note(
-    note_id: str,
-    current_user: str = Depends(get_current_user),
-    db=Depends(get_database)
-):
-    """
-    删除笔记
-    """
-    try:
-        collection = db[NOTES_COLLECTION]
-        
-        # 尝试通过MongoDB ObjectId删除
-        try:
-            from bson import ObjectId
-            result = await collection.delete_one({"_id": ObjectId(note_id)})
-        except:
-            # 如果不是有效的ObjectId，尝试按note_id字段删除
-            result = await collection.delete_one({"note_id": note_id})
-        
-        if result.deleted_count == 0:
-            raise HTTPException(
-                status_code=404,
-                detail=f"未找到笔记: {note_id}"
-            )
-        
-        return {
-            "success": True,
-            "message": f"成功删除笔记: {note_id}"
-        }
-        
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.exception("删除笔记时发生错误")
-        raise HTTPException(
-            status_code=500,
-            detail=f"删除笔记失败: {str(e)}"
-        ) 
+ 
