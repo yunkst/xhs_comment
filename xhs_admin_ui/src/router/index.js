@@ -57,12 +57,6 @@ const router = createRouter({
           meta: { title: '小红书通知', icon: 'Bell' }
         },
         {
-          path: 'system',
-          name: 'system',
-          component: () => import('../views/system/SystemView.vue'),
-          meta: { title: '系统设置' }
-        },
-        {
           path: 'system/capture-rules',
           name: 'captureRules',
           component: () => import('../views/system/CaptureRuleView.vue'),

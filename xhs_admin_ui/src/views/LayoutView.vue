@@ -34,7 +34,6 @@
               <el-icon><Setting /></el-icon>
               <span>系统管理</span>
             </template>
-            <el-menu-item index="/system">系统设置</el-menu-item>
             <el-menu-item index="/system/capture-rules">抓取规则管理</el-menu-item>
           </el-sub-menu>
         </el-menu>

@@ -279,49 +279,6 @@ export const userNoteApi = {
   }
 };
 
-// 系统管理接口
-export const systemApi = {
-  getSystemSettings: () => {
-    return api.get('/api/v1/system/monitoring/settings');
-  },
-  updateSystemSettings: (data) => {
-    return api.put('/api/v1/system/monitoring/settings', data);
-  },
-  backupData: () => {
-    return api.post('/api/v1/system/monitoring/backup');
-  },
-  restoreData: (formData) => {
-    return api.post('/api/v1/system/monitoring/restore', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data'
-      }
-    });
-  },
-  getBackupHistory: () => {
-    return api.get('/api/v1/system/monitoring/backup/history');
-  },
-  downloadBackup: (filename) => {
-    return api.get(`/api/v1/system/monitoring/backup/download/${filename}`, {
-      responseType: 'blob'
-    });
-  },
-  deleteBackup: (filename) => {
-    return api.delete(`/api/v1/system/monitoring/backup/${filename}`);
-  },
-  getSystemStatus: () => {
-    return api.get('/api/v1/system/monitoring/status');
-  },
-  getDatabaseStats: () => {
-    return api.get('/api/v1/system/monitoring/database-stats');
-  },
-  getVersionInfo: () => {
-    return api.get('/api/v1/system/monitoring/version');
-  },
-  healthCheck: () => {
-    return api.get('/api/v1/system/monitoring/health');
-  }
-};
-
 // 抓取规则管理接口
 export const captureRuleApi = {
   getAllCaptureRules: () => {
@@ -349,6 +306,5 @@ export default {
   ...notificationApi,
   ...xhsUserApi,
   ...userNoteApi,
-  ...systemApi,
   ...captureRuleApi
 }; 

@@ -405,93 +405,9 @@
   }
   ```
 
-### 8. 系统管理接口 (`systemApi`)
+### 8. 抓取规则管理接口 (`captureRuleApi`)
 
-#### 8.1 获取系统设置
-- **接口**: `GET /api/v1/system/monitoring/settings`
-- **描述**: 获取系统配置设置
-
-#### 8.2 更新系统设置
-- **接口**: `PUT /api/v1/system/monitoring/settings`
-- **描述**: 更新系统配置设置
-
-#### 8.3 备份数据
-- **接口**: `POST /api/v1/system/monitoring/backup`
-- **描述**: 创建系统数据备份
-
-#### 8.4 恢复数据
-- **接口**: `POST /api/v1/system/monitoring/restore`
-- **描述**: 从备份文件恢复数据
-- **Content-Type**: `multipart/form-data`
-
-#### 8.5 获取备份历史
-- **接口**: `GET /api/v1/system/monitoring/backup/history`
-- **描述**: 获取备份文件历史列表
-
-#### 8.6 下载备份文件
-- **接口**: `GET /api/v1/system/monitoring/backup/download/{filename}`
-- **描述**: 下载指定的备份文件
-- **响应类型**: `blob`
-
-#### 8.7 删除备份文件
-- **接口**: `DELETE /api/v1/system/monitoring/backup/{filename}`
-- **描述**: 删除指定的备份文件
-
-#### 8.8 获取系统状态
-- **接口**: `GET /api/v1/system/monitoring/status`
-- **描述**: 获取系统运行状态
-- **响应**:
-  ```json
-  {
-    "data": {
-      "uptime": "string",
-      "cpu_usage": "string",
-      "memory_usage": "string"
-    }
-  }
-  ```
-
-#### 8.9 获取数据库统计
-- **接口**: `GET /api/v1/system/monitoring/database-stats`
-- **描述**: 获取数据库统计信息
-- **响应**:
-  ```json
-  {
-    "total_stats": {
-      "users": 100
-    },
-    "daily_stats": {
-      "users": 5
-    },
-    "data": {
-      "comments_count": 1000,
-      "users_count": 100,
-      "database_size": "10MB"
-    }
-  }
-  ```
-
-#### 8.10 获取版本信息
-- **接口**: `GET /api/v1/system/monitoring/version`
-- **描述**: 获取系统版本信息
-- **响应**:
-  ```json
-  {
-    "data": {
-      "version": "2.1.0",
-      "build_time": "string",
-      "git_commit": "string"
-    }
-  }
-  ```
-
-#### 8.11 健康检查
-- **接口**: `GET /api/v1/system/monitoring/health`
-- **描述**: 检查系统健康状态
-
-### 9. 抓取规则管理接口 (`captureRuleApi`)
-
-#### 9.1 获取所有抓取规则（管理员）
+#### 8.1 获取所有抓取规则（管理员）
 - **接口**: `GET /api/v1/system/capture-rules/all`
 - **描述**: 获取所有抓取规则，包括禁用的
 - **响应**:
@@ -512,11 +428,11 @@
   }
   ```
 
-#### 9.2 获取启用的抓取规则（插件用）
+#### 8.2 获取启用的抓取规则（插件用）
 - **接口**: `GET /api/v1/system/capture-rules`
 - **描述**: 获取启用的抓取规则供插件使用
 
-#### 9.3 创建抓取规则
+#### 8.3 创建抓取规则
 - **接口**: `POST /api/v1/system/capture-rules`
 - **描述**: 创建新的抓取规则
 - **参数**:
@@ -531,11 +447,11 @@
   }
   ```
 
-#### 9.4 更新抓取规则
+#### 8.4 更新抓取规则
 - **接口**: `PUT /api/v1/system/capture-rules/{ruleName}`
 - **描述**: 更新指定的抓取规则
 
-#### 9.5 删除抓取规则
+#### 8.5 删除抓取规则
 - **接口**: `DELETE /api/v1/system/capture-rules/{ruleName}`
 - **描述**: 删除指定的抓取规则
 
