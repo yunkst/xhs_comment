@@ -63,12 +63,6 @@ const router = createRouter({
           meta: { title: '系统设置' }
         },
         {
-          path: 'system/user-list',
-          name: 'systemUserList',
-          component: () => import('../views/user/UserListView.vue'),
-          meta: { title: '用户列表' }
-        },
-        {
           path: 'system/capture-rules',
           name: 'captureRules',
           component: () => import('../views/system/CaptureRuleView.vue'),

@@ -169,7 +169,11 @@ api.interceptors.response.use(
   }
 );
 
-// 用户相关接口 (迁移到新的用户管理域架构)
+// ========================
+// API接口定义
+// ========================
+
+// 用户认证接口
 export const userApi = {
   login: (data) => {
     return api.post('/api/v1/user/auth/login', data);
@@ -180,203 +184,112 @@ export const userApi = {
   getOtpQrcode: (username) => {
     return api.get(`/api/v1/user/auth/otp-qrcode?username=${username}`);
   },
-  // 检查注册状态
   checkRegisterStatus: () => {
     return api.get('/api/v1/user/auth/register-status');
   },
-  // 检查OTP状态
   checkOtpStatus: () => {
     return api.get('/api/v1/user/auth/otp-status');
   },
-  // 检查登录状态
   checkLoginStatus: () => {
     return api.get('/api/v1/user/auth/check-login-status');
   },
-  // 获取当前用户信息
   getCurrentUser: () => {
     return api.get('/api/v1/user/auth/me');
   }
 };
 
-// SSO相关接口 (迁移到新的用户认证域)
+// SSO相关接口
 export const ssoApi = {
-  // 获取SSO登录URL
   getSsoLoginUrl: () => {
     return api.get('/api/v1/user/auth/sso-login-url');
   },
-  // 刷新SSO Token
   refreshSsoToken: (refreshToken) => {
     return api.post('/api/v1/user/auth/sso-refresh', { refresh_token: refreshToken });
   },
-  // 获取SSO用户信息
   getSsoUserInfo: () => {
     return api.get('/api/v1/user/auth/sso-userinfo');
   },
-  // 创建SSO会话
   createSsoSession: (clientType) => {
     return api.post('/api/v1/user/auth/sso-session', { client_type: clientType });
   },
-  // 获取SSO会话状态
   getSsoSessionStatus: (sessionId) => {
     return api.get(`/api/v1/user/auth/sso-session/${sessionId}`);
   },
-  // 批准SSO会话
   approveSsoSession: (sessionId) => {
     return api.post('/api/v1/user/auth/sso-approve-session', { session_id: sessionId });
   }
 };
 
-// 评论相关接口
+// 评论管理接口
 export const commentApi = {
-  // 获取评论列表
   getCommentList: (params) => {
     return api.get('/api/v1/content/comments', { params });
   },
-  // 获取评论统计
   getCommentsStats: () => {
     return api.get('/api/v1/content/comments/stats');
   },
-  // 获取特定用户的评论
   getUserComments: (userId) => {
     return api.get(`/api/v1/content/comments/user/${userId}`);
   },
-  // 获取单条评论详情
-  getComment: (commentId) => {
-    return api.get(`/api/v1/content/comments/${commentId}`);
-  },
-  // 删除评论
   deleteComment: (commentId) => {
     return api.delete(`/api/v1/content/comments/${commentId}`);
   },
-  // 更新评论状态 (使用新的内容管理域)
-  updateCommentStatus: (commentId, status) => {
-    return api.put(`/api/v1/content/comments/${commentId}/status`, { status });
-  },
-  // 批量更新评论状态 (使用新的内容管理域)
-  batchUpdateStatus: (ids, status) => {
-    return api.put('/api/v1/content/comments/batch/status', { ids, status });
-  },
-  // 批量删除评论 (使用新的内容管理域)
   batchDelete: (ids) => {
     return api.post('/api/v1/content/comments/batch/delete', { ids });
   }
 };
 
-// 笔记相关接口
+// 笔记管理接口
 export const noteApi = {
-  // 获取笔记列表
   getNoteList: (params) => {
     return api.get('/api/v1/content/notes', { params });
   },
-  // 获取笔记统计
   getNotesStats: () => {
     return api.get('/api/v1/content/notes/stats');
-  },
-  // 获取单条笔记详情
-  getNote: (noteId) => {
-    return api.get(`/api/v1/content/notes/${noteId}`);
-  },
-  // 删除笔记
-  deleteNote: (noteId) => {
-    return api.delete(`/api/v1/content/notes/${noteId}`);
-  },
-  // 搜索笔记
-  searchNotes: (params) => {
-    return api.get('/api/v1/content/notes', { params });
   }
 };
 
-// 用户管理接口
-export const userManagementApi = {
-  // 获取用户列表
-  getUserList: (params) => {
-    return api.get('/api/v1/user/profile/list', { params });
+// 通知管理接口
+export const notificationApi = {
+  getNotificationList: (params) => {
+    return api.get('/api/v1/notification/notifications', { params });
   },
-  // 获取用户统计
-  getUsersStats: () => {
-    return api.get('/api/v1/user/profile/stats');
+  getNotificationsStats: () => {
+    return api.get('/api/v1/notification/notifications/stats');
   },
-  // 获取用户详情
-  getUserDetail: (userId) => {
-    return api.get(`/api/v1/user/profile/${userId}`);
-  },
-  // 禁言用户 (使用新的用户管理域)
-  muteUser: (userId, data) => {
-    return api.post(`/api/v1/user/profile/${userId}/mute`, data);
-  },
-  // 解除禁言 (使用新的用户管理域)
-  unmuteUser: (userId) => {
-    return api.post(`/api/v1/user/profile/${userId}/unmute`);
-  },
-  // 封禁用户 (使用新的用户管理域)
-  banUser: (userId, data) => {
-    return api.post(`/api/v1/user/profile/${userId}/ban`, data);
-  },
-  // 解除封禁 (使用新的用户管理域)
-  unbanUser: (userId) => {
-    return api.post(`/api/v1/user/profile/${userId}/unban`);
+  getNotificationTypes: () => {
+    return api.get('/api/v1/notification/notifications/types');
   }
 };
 
 // 小红书用户管理接口
 export const xhsUserApi = {
-  // 获取小红书用户列表
   getXhsUserList: (params) => {
     return api.get('/api/v1/user/profile/xhs/list', { params });
-  },
-  // 获取小红书用户详情
-  getXhsUserDetail: (userId) => {
-    return api.get(`/api/v1/user/profile/xhs/${userId}`);
-  },
-  // 批量获取小红书用户信息
-  getXhsUsersBatch: (userIds) => {
-    return api.get(`/api/v1/user/profile/xhs/batch?user_ids=${userIds.join(',')}`);
   }
 };
 
-// 通知相关接口
-export const notificationApi = {
-  // 获取通知列表
-  getNotificationList: (params) => {
-    return api.get('/api/notifications', { params });
+// 用户备注接口
+export const userNoteApi = {
+  addUserNote: (data) => {
+    return api.post('/api/v1/user/notes', data);
   },
-  // 获取通知统计
-  getNotificationsStats: () => {
-    return api.get('/api/notifications/stats');
-  },
-  // 获取通知类型列表
-  getNotificationTypes: () => {
-    return api.get('/api/notifications/types');
-  },
-  // 获取单条通知详情
-  getNotification: (notificationId) => {
-    return api.get(`/api/notifications/${notificationId}`);
-  },
-  // 删除通知
-  deleteNotification: (notificationId) => {
-    return api.delete(`/api/notifications/${notificationId}`);
-  },
-  // 搜索通知
-  searchNotifications: (params) => {
-    return api.get('/api/notifications', { params });
+  getUserNotesBatch: (userIds) => {
+    return api.get(`/api/v1/user/notes/batch?user_ids=${userIds.join(',')}`);
   }
 };
 
-// 系统设置接口
+// 系统管理接口
 export const systemApi = {
-  // 获取系统设置 (使用新的系统管理域)
   getSystemSettings: () => {
     return api.get('/api/v1/system/monitoring/settings');
   },
-  // 更新系统设置 (使用新的系统管理域)
   updateSystemSettings: (data) => {
     return api.put('/api/v1/system/monitoring/settings', data);
   },
-  // 备份数据 (使用新的系统管理域)
   backupData: () => {
     return api.post('/api/v1/system/monitoring/backup');
   },
-  // 恢复数据 (使用新的系统管理域)
   restoreData: (formData) => {
     return api.post('/api/v1/system/monitoring/restore', formData, {
       headers: {
@@ -384,124 +297,48 @@ export const systemApi = {
       }
     });
   },
-  // 获取备份历史 (使用新的系统管理域)
   getBackupHistory: () => {
     return api.get('/api/v1/system/monitoring/backup/history');
   },
-  // 下载备份文件 (使用新的系统管理域)
   downloadBackup: (filename) => {
     return api.get(`/api/v1/system/monitoring/backup/download/${filename}`, {
       responseType: 'blob'
     });
   },
-  // 删除备份文件 (使用新的系统管理域)
   deleteBackup: (filename) => {
     return api.delete(`/api/v1/system/monitoring/backup/${filename}`);
   },
-  // 获取系统状态
   getSystemStatus: () => {
     return api.get('/api/v1/system/monitoring/status');
   },
-  // 获取数据库统计
   getDatabaseStats: () => {
     return api.get('/api/v1/system/monitoring/database-stats');
   },
-  // 获取版本信息
   getVersionInfo: () => {
     return api.get('/api/v1/system/monitoring/version');
   },
-  // 健康检查
   healthCheck: () => {
     return api.get('/api/v1/system/monitoring/health');
-  },
-  // 获取系统度量指标
-  getMetrics: () => {
-    return api.get('/api/v1/system/monitoring/metrics');
   }
 };
 
 // 抓取规则管理接口
 export const captureRuleApi = {
-  // 获取所有抓取规则（管理员）
   getAllCaptureRules: () => {
     return api.get('/api/v1/system/capture-rules/all');
   },
-  // 获取启用的抓取规则（插件用）
   getCaptureRules: () => {
     return api.get('/api/v1/system/capture-rules');
   },
-  // 创建抓取规则
   createCaptureRule: (data) => {
     return api.post('/api/v1/system/capture-rules', data);
   },
-  // 更新抓取规则
   updateCaptureRule: (ruleName, data) => {
     return api.put(`/api/v1/system/capture-rules/${ruleName}`, data);
   },
-  // 删除抓取规则
   deleteCaptureRule: (ruleName) => {
     return api.delete(`/api/v1/system/capture-rules/${ruleName}`);
   }
-};
-
-// 用户备注接口 (迁移到用户管理域)
-export const userNoteApi = {
-  // 添加用户备注
-  addUserNote: (data) => {
-    return api.post('/api/v1/user/profile/notes', data);
-  },
-  // 获取用户备注
-  getUserNotes: (userId) => {
-    return api.get(`/api/v1/user/profile/${userId}/notes`);
-  },
-  // 批量获取用户备注
-  getUserNotesBatch: (userIds) => {
-    return api.get(`/api/v1/user/profile/notes/batch?user_ids=${userIds.join(',')}`);
-  }
-};
-
-// API迁移信息
-export const migrationApi = {
-  // 获取API迁移信息
-  getMigrationInfo: () => {
-    return api.get('/api/migrate-info');
-  }
-};
-
-// ========================
-// 向后兼容API别名 (Backward Compatibility)
-// ========================
-
-// 为向后兼容提供旧API路径的别名
-// 这些将在未来版本中移除，建议使用上面的新API
-
-export const legacyApi = {
-  // 旧的评论接口别名
-  getComments: commentApi.getCommentList,
-  updateCommentStatus: commentApi.updateCommentStatus,
-  batchUpdateCommentStatus: commentApi.batchUpdateStatus,
-  batchDeleteComments: commentApi.batchDelete,
-  
-  // 旧的用户接口别名
-  getUsers: userManagementApi.getUserList,
-  getUserInfo: userManagementApi.getUserDetail,
-  
-  // 旧的系统接口别名
-  getSystemHealth: systemApi.healthCheck,
-  getSystemInfo: systemApi.getSystemStatus,
-  
-  // 旧的抓取规则别名
-  getCaptureRules: captureRuleApi.getCaptureRules,
-  getAllCaptureRules: captureRuleApi.getAllCaptureRules,
-  
-  // 旧的用户备注别名
-  addUserNote: userNoteApi.addUserNote,
-  getUserNotes: userNoteApi.getUserNotes,
-  
-  // 旧的SSO接口别名
-  ssoRefresh: ssoApi.refreshSsoToken,
-  ssoLogin: ssoApi.getSsoLoginUrl,
-  ssoUserInfo: ssoApi.getSsoUserInfo
 };
 
 export default {
@@ -509,12 +346,9 @@ export default {
   ...ssoApi,
   ...commentApi,
   ...noteApi,
-  ...userManagementApi,
-  ...systemApi,
-  ...userNoteApi,
   ...notificationApi,
-  ...captureRuleApi,
-  ...migrationApi,
-  legacyApi,  // 向后兼容层
-  ...xhsUserApi
+  ...xhsUserApi,
+  ...userNoteApi,
+  ...systemApi,
+  ...captureRuleApi
 }; 
