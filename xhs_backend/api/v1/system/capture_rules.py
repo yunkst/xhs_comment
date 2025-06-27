@@ -35,6 +35,14 @@ DEFAULT_CAPTURE_RULES = [
         "description": "抓取笔记评论页面数据",
         "data_type": "comment_page",
         "priority": 10
+    },
+    {
+        "name": "子评论页面接口",
+        "pattern": "/api/sns/web/v2/comment/sub/page",
+        "enabled": True,
+        "description": "抓取笔记子评论（回复）页面数据",
+        "data_type": "sub_comment_page",
+        "priority": 10
     }
 ]
 
