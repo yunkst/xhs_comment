@@ -20,16 +20,17 @@ import pyotp
 logger = logging.getLogger(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# 从环境变量获取MongoDB连接字符串
-MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb://localhost:27017/')
-DB_NAME = os.environ.get('DATABASE_NAME', 'xhs_comments')
-
 # 加载 .env 文件中的环境变量（如果需要）
 try:
     from dotenv import load_dotenv
     load_dotenv()
 except ImportError:
     logger.info("dotenv模块不可用，跳过环境变量加载")
+
+# 从环境变量获取MongoDB连接字符串
+MONGO_URL = os.environ.get('MONGODB_URL', 'mongodb://localhost:27017/')
+DB_NAME = os.environ.get('DATABASE_NAME', 'xhs_comments')
+
 
 # Collection names
 USERS_COLLECTION = 'users'
