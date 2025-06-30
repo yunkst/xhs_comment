@@ -11,6 +11,7 @@ bcrypt>=4.0.1
 pyotp>=2.8.0
 qrcode>=7.4.2
 python-jose>=3.3.0  # JWT备选库
+python-keycloak>=3.3.0 # Keycloak SSO 认证
 
 # 网络请求
 httpx>=0.24.0

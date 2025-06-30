@@ -2,8 +2,8 @@ services:
   mongo:
     image: crpi-v2c8hiamyw0hvcvs.cn-hangzhou.personal.cr.aliyuncs.com/open_ydz/mongo:latest # Use the official MongoDB image
     container_name: mongodb_service
-    # ports:
-    #   - "27017:27017" # Map host port to container port if external access needed
+    ports:
+      - "27018:27017" # Map host port to container port if external access needed
     volumes:
       - mongo_data:/data/db # Persist MongoDB data
     # Optional: Add environment variables for MongoDB authentication if needed

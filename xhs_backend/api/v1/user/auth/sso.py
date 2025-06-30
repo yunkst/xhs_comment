@@ -33,21 +33,14 @@ ADMIN_SSO_INITIATE_PATH = "/#/sso-initiate" # Vue Router使用hash模式
 # 创建路由器
 router = APIRouter()
 
-# --- Pydantic 模型定义 ---
-class SSOSessionRequest(BaseModel):
-    client_type: str = Field(..., example="monitor_plugin")
+# 导入认证相关模型
+from api.models.auth import (
+    SSOSessionRequest, SSOSessionResponse, SSOSessionStatusResponse, SSOCallbackResponse
+)
 
-class SSOSessionResponse(BaseModel):
-    session_id: str
-    initiate_url: str # 指向Admin UI的SSO初始化页面
-    expires_at: datetime
-
+# --- 本地特定模型定义 ---
 class SSOApproveSessionRequest(BaseModel):
     session_id: str
-
-class SSOSessionStatusResponse(BaseModel):
-    status: str
-    tokens: Optional[Dict[str, Any]] = None # 包含 access_token, refresh_token 等
 
 class TokenData(BaseModel): # 假设这是 get_current_user 返回的一部分，或者直接从请求头获取
     access_token: str
@@ -178,25 +171,11 @@ async def sso_callback_old(...):
     pass
 """
 
-# 旧的 /sso-login-url 接口也不再直接由插件使用
-"""
-@router.get("/sso-login-url", response_model=SSOLoginResponse, tags=["SSO认证 (旧)"])
-async def get_sso_login_url_old(request: Request):
-    # ... 旧逻辑 ...
-    logger.warning("旧的 /sso-login-url 接口被调用，这可能不符合新流程。")
-    pass
-"""
+# 旧的 /sso-login-url 接口也不再直接由插件使用，已移除
 
 # 令牌刷新接口，插件需要用于刷新token
 class RefreshTokenRequest(BaseModel):
     refresh_token: str
-
-class SSOCallbackResponse(BaseModel):
-    access_token: str
-    token_type: str = "bearer"
-    id_token: Optional[str] = None
-    refresh_token: Optional[str] = None
-    expires_in: Optional[int] = None
 
 
 @router.post("/sso-refresh", response_model=SSOCallbackResponse, tags=["SSO认证"])

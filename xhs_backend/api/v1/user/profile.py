@@ -10,7 +10,6 @@ from datetime import datetime, timedelta
 
 from database import get_database, USERS_COLLECTION, USER_INFO_COLLECTION
 from api.deps import get_current_user, PaginationParams, get_pagination
-from api.models.user import UserListResponse
 from api.services import get_user_info, batch_get_user_info, get_all_user_info_paginated
 
 # 配置日志

@@ -3,7 +3,7 @@
 
 包含用户认证、用户备注等数据结构
 """
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -29,10 +29,6 @@ class UserInLogin(BaseModel):
     password: str
     otp_code: Optional[str] = None
 
-class UserInDB(User):
-    """数据库中的用户模型"""
-    pass
-
 class TokenResponse(BaseModel):
     """认证令牌响应模型"""
     access_token: str
@@ -48,24 +44,3 @@ class UserNote(BaseModel):
     editor: Optional[str] = None # 编辑人
     updatedAt: datetime = Field(default_factory=datetime.utcnow)  # 更新时间 
     commentId: Optional[str] = None  # 关联的评论ID
-
-class UserPublic(BaseModel):
-    """公开的用户信息模型，用于API响应"""
-    id: str = Field(..., alias="_id")
-    username: str
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        orm_mode = True
-        allow_population_by_field_name = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
-
-class UserListResponse(BaseModel):
-    items: List[UserPublic]
-    total: int
-    page: int
-    page_size: int
-    total_pages: int

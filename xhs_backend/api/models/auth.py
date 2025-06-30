@@ -20,7 +20,7 @@ class SSOSessionResponse(BaseModel):
     SSO会话创建的响应模型
     """
     session_id: str
-    login_url: str
+    initiate_url: str  # 指向Admin UI的SSO初始化页面
     expires_at: datetime
 
 # SSO会话状态响应模型
@@ -30,13 +30,6 @@ class SSOSessionStatusResponse(BaseModel):
     """
     status: str  # "pending" 或 "completed"
     tokens: Optional[Dict[str, str]] = None  # 会话完成时包含令牌
-
-# SSO登录响应模型
-class SSOLoginResponse(BaseModel):
-    """
-    SSO登录URL请求的响应模型
-    """
-    auth_url: str
 
 # SSO回调响应模型
 class SSOCallbackResponse(BaseModel):

@@ -9,7 +9,7 @@ import pyotp
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 
-from ..models.user import User, UserInRegister, UserInDB, TokenResponse
+from ..models.user import User, UserInRegister, TokenResponse
 
 # 配置日志
 logger = logging.getLogger(__name__)
