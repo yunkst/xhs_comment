@@ -39,11 +39,8 @@ from .note import (
     search_notes
 )
 
-# 导出通知相关服务
+# 导出用户备注相关服务
 from .notification import (
-    save_notifications,
-    search_notifications,
-    get_notification_by_id,
     save_user_note,
     get_user_notes
 )

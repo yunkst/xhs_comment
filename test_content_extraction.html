@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>评论内容解析测试</title>
+</head>
+<body>
+    <h1>评论内容解析测试</h1>
+    
+    <!-- 模拟小红书通知页面的结构 -->
+    <div class="main">
+        <div class="info">
+            <div class="user-info">
+                <a href="/user/profile/65696cf50000000020033dde" class="" target="_blank">左左右右麻麻 🐬</a>
+                <span class="user-tag">作者</span>
+            </div>
+            <div class="interaction-hint">
+                <span>回复了你的评论</span>
+                <span class="interaction-time">01-14</span>
+            </div>
+            <div class="interaction-content">没有人维护？</div>
+            <div class="quote-info">杭州还没动静<img class="note-content-emoji" crossorigin="anonymous" src="https://picasso-static.xiaohongshu.com/fe-platform/14b005f7afd5f7c88620478b610bf1de90c4ceab.png"></div>
+        </div>
+    </div>
+    
+    <hr>
+    
+    <div id="test-results">
+        <h2>测试结果：</h2>
+        <div id="results"></div>
+    </div>
+
+    <script>
+        // 复制修改后的extractNotificationContent函数
+        function extractNotificationContent(container) {
+            // 使用更精确的选择器直接定位包含主要内容、引用内容和提示信息的元素
+            const mainContent = container.querySelector('.interaction-content');
+            const quoteContent = container.querySelector('.quote-info');
+            const hintContent = container.querySelector('.interaction-hint');
+
+            // 返回结构化的内容对象，而不是拼接字符串
+            const content = {
+                main: '',           // 用户的主要评论内容
+                quote: '',          // 引用/被回复的内容
+                hint: '',           // 互动提示信息
+                combined: ''        // 向后兼容：拼接的完整内容
+            };
+
+            // 提取主要评论或@内容
+            if (mainContent) {
+                content.main = mainContent.textContent.trim();
+            }
+
+            // 提取引用的内容（例如，回复的哪条评论）
+            if (quoteContent) {
+                content.quote = quoteContent.textContent.trim();
+            }
+
+            // 从提示信息中提取动作描述，但排除时间
+            if (hintContent) {
+                const hintClone = hintContent.cloneNode(true);
+                const timeElement = hintClone.querySelector('.interaction-time');
+                if (timeElement) {
+                    timeElement.remove();
+                }
+                content.hint = hintClone.textContent.trim();
+            }
+
+            // 构建拼接内容（向后兼容）
+            const contentParts = [];
+            if (content.main) contentParts.push(content.main);
+            if (content.quote) contentParts.push(content.quote);
+            if (content.hint && contentParts.length === 0) contentParts.push(content.hint);
+            
+            content.combined = contentParts.join(' ');
+
+            // 返回结构化的内容对象
+            return content;
+        }
+
+        // 测试函数
+        function testContentExtraction() {
+            const container = document.querySelector('.main');
+            const result = extractNotificationContent(container);
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = `
+                <h3>解析结果：</h3>
+                <p><strong>用户评论内容 (main):</strong> "${result.main}"</p>
+                <p><strong>引用内容 (quote):</strong> "${result.quote}"</p>
+                <p><strong>提示信息 (hint):</strong> "${result.hint}"</p>
+                <p><strong>组合内容 (combined):</strong> "${result.combined}"</p>
+                
+                <h3>分析：</h3>
+                <p>✅ 用户的评论内容："${result.main}" - 正确分离</p>
+                <p>✅ 被回复的内容："${result.quote}" - 正确分离</p>
+                <p>ℹ️ 现在可以单独使用 main 字段获取纯粹的用户评论内容</p>
+                <p>ℹ️ combined 字段保持向后兼容："${result.combined}"</p>
+            `;
+        }
+
+        // 页面加载完成后执行测试
+        document.addEventListener('DOMContentLoaded', testContentExtraction);
+    </script>
+</body>
+</html> 

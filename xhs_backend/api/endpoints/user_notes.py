@@ -24,6 +24,10 @@ class UserNoteCreate(BaseModel):
     noteContent: str
     content: Optional[str] = None
 
+# 批量查询请求模型
+class BatchUserNotesRequest(BaseModel):
+    user_ids: List[str]
+
 @router.post("", response_model=Dict[str, Any])
 async def create_user_note(
     note_data: UserNoteCreate,
@@ -107,22 +111,24 @@ async def get_user_notes_by_id(
             detail=f"获取用户备注时出错: {str(e)}"
         )
 
-@router.get("/batch", response_model=Dict[str, Any])
-async def get_user_notes_batch(
-    user_ids: str = Query(..., description="逗号分隔的用户ID列表"),
-    request: Request = None
+@router.post("/batch", response_model=Dict[str, Any])
+async def get_user_notes_batch_post(
+    request_data: BatchUserNotesRequest,
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
 ):
     """
-    批量获取多个用户的备注
+    批量获取多个用户的备注 (POST版本，推荐使用)
     
     Args:
-        user_ids: 逗号分隔的用户ID列表
+        request_data: 包含用户ID列表的请求数据
+        current_user: 当前用户
         
     Returns:
         多个用户的备注数据
     """
-    user_id_list = user_ids.split(',')
-    logger.info(f"批量获取用户备注: userIds={user_id_list}")
+    user_id_list = request_data.user_ids
+    logger.info(f"批量获取用户备注(POST兼容): userIds={user_id_list}, requestUser={current_user}")
     
     if not user_id_list:
         return {
@@ -151,13 +157,79 @@ async def get_user_notes_batch(
             if hash_key:
                 result_data[hash_key] = note.get('noteContent', '')
         
+        logger.info(f"批量获取用户备注成功(POST兼容): 查询{len(user_id_list)}个用户，返回{len(result_data)}条备注")
+        
         return {
             "success": True,
             "message": f"批量获取到 {len(notes)} 条用户备注",
             "data": result_data
         }
     except Exception as e:
-        logger.exception(f"批量获取用户备注时发生错误")
+        logger.exception(f"批量获取用户备注时发生错误(POST兼容)")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"批量获取用户备注时出错: {str(e)}"
+        )
+
+@router.get("/batch", response_model=Dict[str, Any])
+async def get_user_notes_batch(
+    user_ids: str = Query(..., description="逗号分隔的用户ID列表"),
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
+):
+    """
+    批量获取多个用户的备注 (GET版本，向后兼容，建议用户ID较少时使用)
+    
+    Args:
+        user_ids: 逗号分隔的用户ID列表
+        current_user: 当前用户
+        
+    Returns:
+        多个用户的备注数据
+    """
+    user_id_list = user_ids.split(',')
+    logger.info(f"批量获取用户备注(GET兼容): userIds={user_id_list}, requestUser={current_user}")
+    
+    # URL长度检查和警告
+    if len(user_ids) > 1500:  # 保守估计，为其他参数留余量
+        logger.warning(f"GET请求URL可能过长 ({len(user_ids)}字符)，建议使用POST /api/user-notes/batch 接口")
+    
+    if not user_id_list:
+        return {
+            "success": True,
+            "message": "未提供有效的用户ID列表",
+            "data": {}
+        }
+    
+    try:
+        # 获取数据库集合
+        db = await get_database()
+        collection = db[USER_NOTES_COLLECTION]
+        
+        # 构建批量查询
+        query = {"userId": {"$in": user_id_list}}
+        notes = await collection.find(query).to_list(length=None)
+        
+        # 处理结果（特别是将_id转换为字符串）
+        result_data = {}
+        for note in notes:
+            if '_id' in note:
+                note['_id'] = str(note['_id'])
+            
+            # 按照通知哈希组织结果
+            hash_key = note.get('notificationHash')
+            if hash_key:
+                result_data[hash_key] = note.get('noteContent', '')
+        
+        logger.info(f"批量获取用户备注成功(GET兼容): 查询{len(user_id_list)}个用户，返回{len(result_data)}条备注")
+        
+        return {
+            "success": True,
+            "message": f"批量获取到 {len(notes)} 条用户备注",
+            "data": result_data
+        }
+    except Exception as e:
+        logger.exception(f"批量获取用户备注时发生错误(GET兼容)")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"批量获取用户备注时出错: {str(e)}"

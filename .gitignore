@@ -2,3 +2,5 @@
 .env
 素材/
 node_modules/*
+*.pyc
+*.ps1

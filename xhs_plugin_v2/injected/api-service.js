@@ -13,7 +13,7 @@ async function proxyFetch(url, options = {}) {
         options: {
             method: options.method || 'GET',
             headers: options.headers || {},
-            body: options.body ? JSON.stringify(options.body) : undefined
+            body: options.body
         },
         requestId: requestId
     };
@@ -254,18 +254,22 @@ async function saveUserNote(userId, notificationHash, noteContent, content) {
         const url = `${apiBaseUrl}/api/user-notes`;
 
         // 使用代理请求替代直接fetch
+        const requestBody = {
+            userId: userId,
+            notificationHash: finalHash,
+            noteContent: noteContent,
+            content: content
+        };
+        
+        console.log(`[API Service] 发送备注保存请求:`, requestBody);
+        
         const response = await proxyFetch(url, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiToken}`,
                 'Content-Type': 'application/json'
             },
-            body: {
-                userId: userId,
-                notificationHash: finalHash,
-                noteContent: noteContent,
-                content: content
-            }
+            body: JSON.stringify(requestBody)  // 序列化为JSON字符串
         });
         
         if (!response.ok) {
@@ -327,17 +331,20 @@ async function fetchUserNotesInBatch(userIds) {
             throw new Error('未配置API令牌，请先登录');
         }
         
-        // 构建批量请求URL (使用新的v1 API)
-        const userIdsParam = userIds.join(',');
-        const url = `${apiBaseUrl}/api/v1/user/notes/batch?user_ids=${userIdsParam}`;
+        // 使用POST请求避免URL过长问题
+        const url = `${apiBaseUrl}/api/v1/user/notes/batch`;
+        const requestBody = {
+            user_ids: userIds
+        };
         
         // 使用代理请求替代直接fetch
         const response = await proxyFetch(url, {
-            method: 'GET',
+            method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiToken}`,
                 'Content-Type': 'application/json'
-            }
+            },
+            body: JSON.stringify(requestBody)
         });
         
         if (!response.ok) {

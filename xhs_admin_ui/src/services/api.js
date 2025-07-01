@@ -275,6 +275,11 @@ export const userNoteApi = {
     return api.post('/api/v1/user/notes', data);
   },
   getUserNotesBatch: (userIds) => {
+    // 使用POST请求避免URL过长问题
+    return api.post('/api/v1/user/notes/batch', { user_ids: userIds });
+  },
+  getUserNotesBatchGet: (userIds) => {
+    // 保留GET方法作为向后兼容，适用于少量用户ID的场景
     return api.get(`/api/v1/user/notes/batch?user_ids=${userIds.join(',')}`);
   }
 };

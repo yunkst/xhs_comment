@@ -12,11 +12,9 @@ import asyncio
 
 from ..models.network import RawNetworkData, DataProcessingResult
 from ..models.content import CommentItem, Note, IllegalInfo
-from ..models.notification import NotificationItem
 from ..models.common import UserInfo
 from ..services.comment import save_comments_with_upsert
 from ..services.note import save_notes
-from ..services.notification import save_notifications
 from ..services.user import save_user_info
 from database import get_database, NOTES_COLLECTION
 
@@ -215,10 +213,10 @@ class NetworkDataProcessor:
                 if comment_obj:
                     comments.append(comment_obj)
             
-            # 4. Extract Notification Info
-            notification_obj = self._extract_notification_from_mention(message)
-            if notification_obj:
-                notifications.append(notification_obj)
+            # 4. Extract Notification Info - 功能已废弃
+            # notification_obj = self._extract_notification_from_mention(message)
+            # if notification_obj:
+            #     notifications.append(notification_obj)
 
         return {
             "notifications": notifications,
@@ -297,49 +295,32 @@ class NetworkDataProcessor:
         
     def _extract_comment_from_mention(self, message: Dict) -> Optional[CommentItem]:
         comment_info = message.get('comment_info')
-        if not comment_info or not comment_info.get('id'):
+        item_info = message.get('item_info') # 笔记信息
+        if not comment_info or not item_info or not comment_info.get('id'):
             return None
-            
-        note_id = message.get('item_info', {}).get('id')
-        if not note_id:
-            logger.warning(f"无法从 'mentions' 消息中提取到 note_id (item_info.id)，评论ID: {comment_info.get('id')}")
-            # 即使没有note_id，也可能需要保存这条评论，取决于业务逻辑。暂时返回None。
-            return None
+        
+        # 提取用户信息
+        user_info = message.get('user_info', {})
+        author_id = user_info.get('userid') or user_info.get('id')
+        author_name = user_info.get('nickname')
+        author_avatar = user_info.get('image')
 
-        user_info = message.get('user_info', {}) # Correctly sourced from the top-level message object
         return CommentItem(
             id=comment_info.get('id'),
-            noteId=note_id,
+            noteId=item_info.get('id'),
             content=comment_info.get('content'),
-            authorId=user_info.get('userid'),
-            authorName=user_info.get('nickname'),
-            authorAvatar=user_info.get('image'),
-            timestamp=self._safe_ts_to_dt(message.get('time')),
+            authorId=author_id,
+            authorName=author_name,
+            authorAvatar=author_avatar,
+            timestamp=self._safe_ts_to_dt(comment_info.get('create_time')),
             likeCount=str(comment_info.get('like_count', 0)),
             ipLocation=comment_info.get('ip_location'),
-            illegal_info=IllegalInfo(**comment_info['illegal_info']) if 'illegal_info' in comment_info else None,
-            target_comment=comment_info.get('target_comment')
+            parentCommentId=None # mentions API 中的评论通常是顶级评论
         )
 
-    def _extract_notification_from_mention(self, message: Dict) -> Optional[NotificationItem]:
-        if not message or not message.get('id'):
-            return None
-        
-        # 提取用户ID，支持多种字段名
-        user_info = message.get('user_info', {})
-        user_id = user_info.get('userid') or user_info.get('id')
-        
-        return NotificationItem(
-            id=message.get('id'),
-            notification_name=message.get('notification_name'),
-            title=message.get('title'),
-            time=self._safe_ts_to_dt(message.get('time')),
-            user_id=user_id,
-            item_id=message.get('item_info', {}).get('id'),
-            comment_id=message.get('comment_info', {}).get('id'),
-            user_info=self._extract_user_from_dict(message.get('user_info')),
-            item_info=message.get('item_info')
-        )
+    def _extract_notification_from_mention(self, message: Dict) -> Optional[Dict]:
+        # 功能已废弃
+        return None
 
     async def _parse_comment_data(self, response_json: Dict, raw_data: RawNetworkData) -> List[CommentItem]:
         """解析评论数据"""
@@ -563,10 +544,8 @@ class NetworkDataProcessor:
             'notes': notes
         }
     
-    async def _parse_notification_data(self, response_json: Dict, raw_data: RawNetworkData) -> List[NotificationItem]:
-        """解析通知数据"""
-        # This parser might need to be re-evaluated based on its API source.
-        # For now, this is just a placeholder, as the main focus is comment_notification_feed
+    async def _parse_notification_data(self, response_json: Dict, raw_data: RawNetworkData) -> List[Dict]:
+        # 功能已废弃
         return []
 
     async def _parse_note_data(self, response_json: Dict, raw_data: RawNetworkData) -> List[Note]:
@@ -815,8 +794,8 @@ class NetworkDataProcessor:
                 return {'success': True, 'saved_count': result.get('inserted', 0) + result.get('updated', 0)}
             
             elif data_type == 'notification':
-                result = await save_notifications(parsed_data)
-                return {'success': True, 'saved_count': result.get('inserted', 0) + result.get('updated', 0)}
+                # 功能已废弃，不再保存
+                return {'success': True, 'saved_count': 0, 'message': 'notification data saving is deprecated'}
             
             elif data_type == 'comment_notification_feed':
                 if not isinstance(parsed_data, dict):
@@ -871,12 +850,12 @@ class NetworkDataProcessor:
                     res = await save_structured_comments(structured_comments)
                     total_saved += res.get('upserted', 0) + res.get('matched', 0)
 
-                # Save notifications
-                notifications_list = parsed_data.get('notifications', [])
-                if notifications_list:
-                    notifications_dicts = [n.model_dump() for n in notifications_list]
-                    res = await save_notifications(notifications_dicts)
-                    total_saved += res.get('inserted', 0) + res.get('updated', 0)
+                # Save notifications - 功能已废弃，不再保存
+                # notifications_list = parsed_data.get('notifications', [])
+                # if notifications_list:
+                #     notifications_dicts = [n.model_dump() for n in notifications_list]
+                #     res = await save_notifications(notifications_dicts)
+                #     total_saved += res.get('inserted', 0) + res.get('updated', 0)
                 
                 return {'success': True, 'saved_count': total_saved}
             

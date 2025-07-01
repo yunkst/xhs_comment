@@ -162,7 +162,38 @@ function addNoteInputToContainer(container, userId, notification) {
                 statusIndicator.style.animation = 'xhs-note-saving-pulse 1s infinite';
                 
                 // 保存备注
-                const content = notification.content || '';
+                // 构建清晰的内容结构，避免重复
+                let mainContent = '';
+                let interactionType = '';
+                
+                // 提取主要评论内容
+                if (typeof notification.content === 'object') {
+                    // 新格式：直接使用main字段
+                    mainContent = notification.content.main || '';
+                } else {
+                    // 旧格式：尝试处理字符串
+                    mainContent = notification.content || '';
+                }
+                
+                // 提取交互类型
+                const hintElement = notification.element?.querySelector('.interaction-hint');
+                if (hintElement) {
+                    const hintClone = hintElement.cloneNode(true);
+                    const timeElement = hintClone.querySelector('.interaction-time');
+                    if (timeElement) {
+                        timeElement.remove();
+                    }
+                    interactionType = hintClone.textContent.trim();
+                    
+                    // 如果旧格式内容中已包含交互类型，则从主内容中移除
+                    if (typeof notification.content !== 'object' && mainContent.includes(interactionType)) {
+                        mainContent = mainContent.replace(interactionType, '').trim();
+                    }
+                }
+                
+                // 只使用主要评论内容，不包含交互提示信息
+                const content = mainContent;
+                
                 let saveSuccess = false;
                 
                 if (window.xhsApiService && window.xhsApiService.saveUserNote) {
@@ -304,10 +335,41 @@ function generateNotificationHash(notification) {
         return '';
     }
     
-    // 使用用户ID、内容摘要和类型作为哈希基础
+    // 使用用户ID、内容摘要、交互类型作为哈希基础
     const userId = notification.userInfo.id || '';
-    const contentPreview = (notification.content || '').substring(0, 20).replace(/\s+/g, '');
-    const notificationType = notification.type || '';
+    
+    // 获取交互提示信息（如"回复了你的评论"）
+    let interactionType = '';
+    const hintElement = notification.element?.querySelector('.interaction-hint');
+    if (hintElement) {
+        const hintClone = hintElement.cloneNode(true);
+        const timeElement = hintClone.querySelector('.interaction-time');
+        if (timeElement) {
+            timeElement.remove();
+        }
+        interactionType = hintClone.textContent.trim();
+    }
+    
+    // 仅提取主要评论内容，不包含交互提示信息
+    let mainContent = '';
+    if (typeof notification.content === 'object') {
+        // 新格式：仅使用main字段（评论内容）
+        mainContent = notification.content.main || '';
+    } else {
+        // 旧格式：尝试从字符串中提取主要内容
+        const contentStr = notification.content || '';
+        // 如果内容中包含交互类型，则尝试分离
+        if (interactionType && contentStr.includes(interactionType)) {
+            mainContent = contentStr.replace(interactionType, '').trim();
+        } else {
+            mainContent = contentStr;
+        }
+    }
+    
+    // 使用主要评论内容生成预览
+    const contentPreview = mainContent.substring(0, 20).replace(/\s+/g, '');
+    // 使用交互类型作为通知类型
+    const notificationType = interactionType || notification.type || '';
     
     // 组合成哈希字符串，格式: userId_contentPreview_notificationType
     const hash = `${userId}_${contentPreview}_${notificationType}`;

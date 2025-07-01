@@ -129,17 +129,50 @@ function extractUserInfo(container) {
 
 // 提取通知内容
 function extractNotificationContent(container) {
-    const contentElements = container.querySelectorAll('.content, .message, [class*="content"]');
-    const content = [];
-    
-    contentElements.forEach(element => {
-        const text = element.textContent.trim();
-        if (text) {
-            content.push(text);
+    // 使用更精确的选择器直接定位包含主要内容、引用内容和提示信息的元素
+    const mainContent = container.querySelector('.interaction-content');
+    const quoteContent = container.querySelector('.quote-info');
+    const hintContent = container.querySelector('.interaction-hint');
+
+    // 返回结构化的内容对象，而不是拼接字符串
+    const content = {
+        main: '',           // 用户的主要评论内容
+        quote: '',          // 引用/被回复的内容
+        hint: '',           // 互动提示信息
+        combined: ''        // 向后兼容：拼接的完整内容
+    };
+
+    // 提取主要评论或@内容
+    if (mainContent) {
+        content.main = mainContent.textContent.trim();
+    }
+
+    // 提取引用的内容（例如，回复的哪条评论）
+    if (quoteContent) {
+        content.quote = quoteContent.textContent.trim();
+    }
+
+    // 从提示信息中提取动作描述，但排除时间
+    if (hintContent) {
+        const hintClone = hintContent.cloneNode(true);
+        const timeElement = hintClone.querySelector('.interaction-time');
+        if (timeElement) {
+            timeElement.remove();
         }
-    });
+        content.hint = hintClone.textContent.trim();
+    }
+
+    // 构建拼接内容（向后兼容）
+    // 按照特定顺序组合内容：1.主要评论内容 2.不包含引用内容 3.交互提示信息
+    const contentParts = [];
+    if (content.main) contentParts.push(content.main);
+    // 不再添加引用内容 (content.quote)
+    if (content.hint) contentParts.push(content.hint); // 始终添加交互提示信息
     
-    return content.join(' ');
+    content.combined = contentParts.join(' ');
+
+    // 返回结构化的内容对象
+    return content;
 }
 
 // 提取时间信息
