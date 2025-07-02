@@ -17,7 +17,7 @@ alwaysApply: false
 1.  **用户访问后端API**: 用户通过前端登录Keycloak后，前端应用携带从Keycloak获取的JWT Bearer Token访问后端API。
 2.  **插件到后端通信**: Chrome插件可能使用特定的API密钥或服务账户令牌（通过Keycloak或专门配置）进行认证。
     -   如果使用API密钥，需在Header中包含：`Authorization: Bearer <YOUR_API_SECRET_TOKEN>`。
-    -   插件的认证配置（如令牌存储）可能在 [xhs_chrome_plugin/js/options.js](mdc:xhs_chrome_plugin/js/options.js) 或类似脚本中管理。
+    -   插件的认证配置（如令牌存储）在 [xhs_plugin_v2/options/](mdc:xhs_plugin_v2/options) 和 [xhs_plugin_v2/background/storage.js](mdc:xhs_plugin_v2/background/storage.js) 中管理。
 
 ## 旧有/辅助认证机制 (如适用)
 

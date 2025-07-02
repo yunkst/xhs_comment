@@ -7,39 +7,63 @@ alwaysApply: false
 
 ## 1. 后端代码修改流程 (`xhs_backend`)
 
-后端采用三层架构 (API层, 服务层, 数据访问层)。修改时请遵循以下步骤：
+后端采用模块化三层架构 (API层, 服务层, 数据访问层)。详细架构说明见 [xhs_backend/api/ARCHITECTURE.md](mdc:xhs_backend/api/ARCHITECTURE.md)。修改时请遵循以下步骤：
 
 1.  **需求分析与模型定义**: 
-    -   明确需求后，首先考虑数据结构。在 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下定义或修改相关的Pydantic模型 (例如 `user_model.py`, `comment_model.py`)。
+    -   明确需求后，首先考虑数据结构。在 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下定义或修改相关的Pydantic模型 (例如 [xhs_backend/api/models/user.py](mdc:xhs_backend/api/models/user.py), [xhs_backend/api/models/content.py](mdc:xhs_backend/api/models/content.py))。
 2.  **服务层逻辑实现**: 
-    -   在 [xhs_backend/api/services/](mdc:xhs_backend/api/services) 目录下对应服务模块 (例如 `user_service.py`) 中实现核心业务逻辑。
+    -   在 [xhs_backend/api/services/](mdc:xhs_backend/api/services) 目录下对应服务模块 (例如 [xhs_backend/api/services/user.py](mdc:xhs_backend/api/services/user.py)) 中实现核心业务逻辑。
     -   服务函数应是异步的 (`async def`)，并接收必要的参数 (可能包括数据库实例 `db` 和Pydantic模型对象)。
-    -   通过 `database.py` 提供的 `db` 实例与MongoDB进行异步交互。
+    -   通过 [xhs_backend/database.py](mdc:xhs_backend/database.py) 提供的 `db` 实例与MongoDB进行异步交互。
 3.  **API端点暴露**: 
-    -   在 [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints) 目录下对应的路由模块 (例如 `users.py`) 中定义或修改FastAPI路径操作函数。
+    -   **模块化API v1** (推荐): 在 [xhs_backend/api/v1/](mdc:xhs_backend/api/v1/) 目录下对应的模块中定义API端点：
+        - 用户相关: [xhs_backend/api/v1/user/](mdc:xhs_backend/api/v1/user/)
+        - 内容相关: [xhs_backend/api/v1/content/](mdc:xhs_backend/api/v1/content/)
+        - 系统相关: [xhs_backend/api/v1/system/](mdc:xhs_backend/api/v1/system/)
+        - 通知相关: [xhs_backend/api/v1/notification/](mdc:xhs_backend/api/v1/notification/)
+    -   **传统端点**: 在 [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints) 目录下对应的路由模块。
     -   路径操作函数应调用服务层的相应函数来处理业务。
     -   使用Pydantic模型进行请求体验证和响应模型序列化。
     -   通过依赖注入 ([xhs_backend/api/deps.py](mdc:xhs_backend/api/deps.py)) 获取如当前用户、数据库会话等。
 4.  **认证与授权**: 
     -   根据需求在端点上应用认证和授权逻辑，通常通过Keycloak集成或FastAPI依赖项实现。参考 [auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)。
+    -   插件专用端点 (抓取规则、数据提交、健康检查) 通常无需认证。
 5.  **配置更新 (如需)**: 
     -   如果涉及新的配置项 (如环境变量)，确保在相关文档和 `.env.example` 中更新。
-6.  **(可选) `processing.py`**: 
+6.  **(可选) 数据处理**: 
     -   如果修改涉及独立的数据处理脚本，则在 [xhs_backend/processing.py](mdc:xhs_backend/processing.py) 中进行。
 
-## 2. Chrome插件代码修改流程 (`xhs_chrome_plugin`)
+## 2. 浏览器插件代码修改流程 (`xhs_plugin_v2`)
 
-*(以下路径为通用插件结构示例，请根据实际项目调整)*
+浏览器插件采用模块化架构，包含后台脚本、内容脚本、注入脚本等。详细信息见 [xhs_plugin_v2/README.md](mdc:xhs_plugin_v2/README.md)。
 
-1.  **内容脚本 (`content_script.js`)**: 
-    -   修改位于 [xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js) (或类似路径) 的脚本以适配小红书网页结构变化或新的数据抓取需求。
-2.  **后台脚本 (`background.js`)**: 
-    -   如果涉及事件处理、消息传递或长期运行的任务，修改 [xhs_chrome_plugin/js/background.js](mdc:xhs_chrome_plugin/js/background.js)。
-3.  **UI (Popup/Options)**: 
-    -   Popup界面修改涉及 [xhs_chrome_plugin/popup.html](mdc:xhs_chrome_plugin/popup.html) 和 [xhs_chrome_plugin/js/popup.js](mdc:xhs_chrome_plugin/js/popup.js)。
-    -   配置页面修改涉及 [xhs_chrome_plugin/options.html](mdc:xhs_chrome_plugin/options.html) 和 [xhs_chrome_plugin/js/options.js](mdc:xhs_chrome_plugin/js/options.js)。
-4.  **清单文件 (`manifest.json`)**: 
-    -   如果权限、脚本或资源有变动，务必更新 [xhs_chrome_plugin/manifest.json](mdc:xhs_chrome_plugin/manifest.json)。
+1.  **后台脚本修改**:
+    -   主入口: [xhs_plugin_v2/background/index.js](mdc:xhs_plugin_v2/background/index.js)
+    -   存储管理: [xhs_plugin_v2/background/storage.js](mdc:xhs_plugin_v2/background/storage.js)
+    -   API通信: [xhs_plugin_v2/background/api.js](mdc:xhs_plugin_v2/background/api.js)
+    -   网络请求处理: [xhs_plugin_v2/background/webRequest.js](mdc:xhs_plugin_v2/background/webRequest.js)
+
+2.  **内容脚本修改**:
+    -   页面注入管理: [xhs_plugin_v2/content/index.js](mdc:xhs_plugin_v2/content/index.js)
+
+3.  **注入脚本修改** (页面级功能):
+    -   主入口: [xhs_plugin_v2/injected/index.js](mdc:xhs_plugin_v2/injected/index.js)
+    -   网络拦截: [xhs_plugin_v2/injected/fetch.js](mdc:xhs_plugin_v2/injected/fetch.js), [xhs_plugin_v2/injected/xhr.js](mdc:xhs_plugin_v2/injected/xhr.js)
+    -   API服务: [xhs_plugin_v2/injected/api-service.js](mdc:xhs_plugin_v2/injected/api-service.js)
+    -   通知处理: [xhs_plugin_v2/injected/notification-handler.js](mdc:xhs_plugin_v2/injected/notification-handler.js)
+    -   用户备注: [xhs_plugin_v2/injected/user-notes.js](mdc:xhs_plugin_v2/injected/user-notes.js)
+    -   对话框管理: [xhs_plugin_v2/injected/dialog-manager.js](mdc:xhs_plugin_v2/injected/dialog-manager.js)
+
+4.  **UI界面修改**:
+    -   弹窗页面: [xhs_plugin_v2/popup.html](mdc:xhs_plugin_v2/popup.html) 和 [xhs_plugin_v2/popup/](mdc:xhs_plugin_v2/popup/)
+    -   配置页面: [xhs_plugin_v2/options.html](mdc:xhs_plugin_v2/options.html) 和 [xhs_plugin_v2/options/](mdc:xhs_plugin_v2/options/)
+    -   日志页面: [xhs_plugin_v2/logs.html](mdc:xhs_plugin_v2/logs.html) 和 [xhs_plugin_v2/logs/](mdc:xhs_plugin_v2/logs/)
+
+5.  **清单文件**: 
+    -   如果权限、脚本或资源有变动，务必更新 [xhs_plugin_v2/manifest.json](mdc:xhs_plugin_v2/manifest.json)。
+
+6.  **增强拦截器**:
+    -   高级网络监控: [xhs_plugin_v2/enhanced_interceptor.js](mdc:xhs_plugin_v2/enhanced_interceptor.js)
 
 ## 3. 版本控制规范 (Git)
 
@@ -51,6 +75,7 @@ alwaysApply: false
     -   格式: `<type>[optional scope]: <description>`
     -   示例: `feat(api): add endpoint for user notes`
     -   示例: `fix(plugin): resolve comment parsing issue for new layout`
+    -   示例: `refactor(backend): migrate to v1 modular API structure`
 -   **重要变更**: 伴随重要代码变更，应更新相关文档，如 [README.md](mdc:README.md) 或规则文件。
 
 ## 4. 测试
@@ -58,21 +83,41 @@ alwaysApply: false
 1.  **后端测试**: 
     -   **单元/集成测试**: (如果项目包含) 运行 `pytest` 或相应测试框架的命令。
     -   **API接口测试**: 使用 `docker-compose -f docker-compose.dev.yml up --build` 启动开发环境服务后，通过FastAPI自动生成的API文档 (`/docs` 或 `/redoc`) 或API调试工具 (如Postman, Insomnia) 进行接口功能验证。
-2.  **Chrome插件测试**: 
+    -   **模块化测试**: 分别测试各个v1模块的端点功能。
+
+2.  **浏览器插件测试**: 
     -   在Chrome浏览器中，进入 `chrome://extensions/`。
-    -   启用“开发者模式”。
-    -   点击“加载已解压的扩展程序”，选择 `xhs_chrome_plugin` 目录进行加载和测试。
+    -   启用"开发者模式"。
+    -   点击"加载已解压的扩展程序"，选择 [xhs_plugin_v2](mdc:xhs_plugin_v2) 目录进行加载和测试。
+    -   测试网络监控、用户备注、历史评论等功能。
+    -   检查插件日志页面和浏览器控制台输出。
+
 3.  **前端Admin UI测试**: 
-    -   本地启动开发服务器 (通常是 `npm run dev` 或 `yarn dev` 在 `xhs_admin_ui` 目录)。
+    -   本地启动开发服务器 (通常是 `npm run dev` 或 `yarn dev` 在 [xhs_admin_ui](mdc:xhs_admin_ui) 目录)。
     -   进行手动功能测试和UI检查。
     -   (如果项目包含) 运行单元测试 (e.g., Vitest, Jest) 和端到端测试 (e.g., Cypress, Playwright)。
 
 ## 5. 部署
 
--   **开发环境**: 使用 [xhs_backend/docker-compose.dev.yml](mdc:xhs_backend/docker-compose.dev.yml) 和 [xhs_admin_ui](mdc:xhs_admin_ui) 的开发服务器。
+-   **开发环境**: 
+    -   后端: 使用 [xhs_backend/docker-compose.dev.yml](mdc:xhs_backend/docker-compose.dev.yml)
+    -   前端: 使用 [xhs_admin_ui](mdc:xhs_admin_ui) 的开发服务器
+    -   插件: 直接加载到Chrome开发者模式
 -   **生产环境**: 
-    -   构建生产Docker镜像 (参考 [xhs_backend/Dockerfile](mdc:xhs_backend/Dockerfile))。
-    -   使用 [xhs_backend/docker-compose.yml](mdc:xhs_backend/docker-compose.yml) 部署后端服务。
-    -   前端Admin UI需要先构建静态文件 (`npm run build` 在 `xhs_admin_ui` 目录)，然后部署到Web服务器 (如Nginx)。
-    -   确保所有生产环境变量 (数据库凭据, Keycloak配置, API密钥等) 已在服务器上正确配置且安全。
+    -   **后端**:
+        - 构建生产Docker镜像 (参考 [xhs_backend/Dockerfile](mdc:xhs_backend/Dockerfile))
+        - 使用 [xhs_backend/docker-compose.yml](mdc:xhs_backend/docker-compose.yml) 部署后端服务
+        - 确保所有生产环境变量 (数据库凭据, Keycloak配置, API密钥等) 已在服务器上正确配置且安全
+    -   **前端**: 
+        - 前端Admin UI需要先构建静态文件 (`npm run build` 在 [xhs_admin_ui](mdc:xhs_admin_ui) 目录)
+        - 然后部署到Web服务器 (如Nginx) 或集成到后端静态资源目录
+    -   **插件**: 
+        - 打包插件目录为.zip文件
+        - 上传到Chrome Web Store或企业内部分发
+
+## 6. API文档管理
+
+-   **OpenAPI导出**: [xhs_backend/export_openapi.py](mdc:xhs_backend/export_openapi.py)
+-   **文档生成**: [xhs_backend/generate_api_docs.py](mdc:xhs_backend/generate_api_docs.py)
+-   **文档输出**: [xhs_backend/api_docs/](mdc:xhs_backend/api_docs)
 

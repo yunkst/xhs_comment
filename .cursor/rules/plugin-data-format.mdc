@@ -5,14 +5,14 @@ alwaysApply: false
 ---
 # 插件数据格式与API交互规范
 
-本文档定义了浏览器插件 ([xhs_chrome_plugin](mdc:xhs_chrome_plugin)) 与后端API交互时使用的数据格式、API端点模式以及相关处理流程。
+本文档定义了浏览器插件 ([xhs_plugin_v2](mdc:xhs_plugin_v2)) 与后端API交互时使用的数据格式、API端点模式以及相关处理流程。
 
 ## 数据模型定义
 
-所有数据模型均使用Pydantic在后端定义，位于 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下的相应模块中 (例如 `comment_model.py`, `notification_model.py`, `note_model.py`)。
+所有数据模型均使用Pydantic在后端定义，位于 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下的相应模块中。
 
 ### 1. 通知数据 (示例结构)
--   对应模型如 `NotificationItem` (在 `xhs_backend/api/models/notification_model.py` 中查找)。
+-   对应模型如 `NotificationItem` (在 [xhs_backend/api/models/notification.py](mdc:xhs_backend/api/models/notification.py) 中查找)。
 ```json
 {
   "id": "通知唯一ID",
@@ -36,7 +36,7 @@ alwaysApply: false
 ```
 
 ### 2. 评论数据 (示例结构)
--   对应模型如 `CommentItem` / `CommentCreate` (在 `xhs_backend/api/models/comment_model.py` 中查找)。
+-   对应模型如 `CommentItem` / `CommentCreate` (在 [xhs_backend/api/models/content.py](mdc:xhs_backend/api/models/content.py) 中查找)。
 ```json
 {
   "id": "评论唯一ID (由插件生成或为空，后端可能重新生成)",
@@ -55,108 +55,167 @@ alwaysApply: false
 ```
 
 ### 3. 笔记数据 (示例结构)
--   对应模型如 `NoteItem` (在 `xhs_backend/api/models/note_model.py` 中查找)。
+-   对应模型如 `NoteItem` (在 [xhs_backend/api/models/content.py](mdc:xhs_backend/api/models/content.py) 中查找)。
 -   包含笔记的详细信息，如标题、内容、作者、发布时间等。
 
-### 4. 结构化评论 (后端处理)
--   后端服务 (如 `CommentService`) 会将原始评论（包括嵌套回复）处理成扁平化的结构化评论记录 (例如 `StructuredComment` 模型)。
--   可能添加字段如 `parentId` (父评论ID), `depth` (嵌套深度), `status` (评论状态)。
+### 4. 网络数据 (插件数据提交格式)
+-   对应模型如 `NetworkDataItem` (在 [xhs_backend/api/models/network.py](mdc:xhs_backend/api/models/network.py) 中查找)。
+```json
+{
+  "url": "请求URL",
+  "method": "HTTP方法 (GET/POST等)",
+  "headers": "请求头对象",
+  "requestData": "请求体数据",
+  "responseData": "响应数据",
+  "timestamp": "请求时间戳 (ISO格式)",
+  "source": "数据来源标识 (如 'xhs_plugin_v2')",
+  "ruleMatched": "匹配的抓取规则名称"
+}
+```
 
 ## API请求格式与端点
 
 -   **权威API参考**: 请始终参考后端FastAPI自动生成的OpenAPI文档 (通常位于 `/docs` 或 `/redoc`) 获取最新的API端点、请求/响应模型和参数。
--   **认证**: API调用通常需要Bearer Token认证。参考 [.cursor/rules/auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)。
+-   **认证**: 插件专用端点无需认证，管理端点需要Bearer Token认证。参考 [.cursor/rules/auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)。
 
-### 数据提交端点 (通用模式示例)
+### 插件专用端点 (无需认证)
 
-插件向后端提交抓取的数据，后端可能提供按类型划分的端点，或一个统一的数据摄入端点。
+**抓取规则获取**:
+- **端点**: `GET /api/v1/system/capture-rules`
+- **描述**: 获取启用的抓取规则，供插件动态配置
+- **响应**: 抓取规则数组
 
-**示例：按类型划分的端点 (具体路径参考OpenAPI文档)**
+**网络数据提交**:
+- **端点**: `POST /api/v1/system/network-data`
+- **描述**: 插件提交抓取的网络请求数据
+- **请求体**: 网络数据对象或数组
 
--   **评论数据**: `POST /api/v1/plugin/comments`
--   **通知数据**: `POST /api/v1/plugin/notifications`
--   **笔记数据**: `POST /api/v1/plugin/notes`
+**健康检查**:
+- **端点**: `GET /api/v1/system/health`
+- **描述**: 检查API服务状态
 
-**请求体 (示例)**:
-```json
-// POST /api/v1/plugin/comments
-[
-  { /* CommentItem 1 */ },
-  { /* CommentItem 2 */ }
-]
-```
-或者，如果采用包装类型：
-```json
-// POST /api/v1/plugin/data (假设有这样一个通用端点)
-{
-  "type": "comment", // "notification", "note"
-  "payload": [
-    { /* Item 1 */ },
-    { /* Item 2 */ }
-  ]
-}
-```
+### 管理端点 (需要认证)
+
+**获取所有规则**:
+- **端点**: `GET /api/v1/system/capture-rules/all`
+- **描述**: 获取所有抓取规则（包括禁用的）
+
+**查询网络数据**:
+- **端点**: `GET /api/v1/system/network-data`
+- **描述**: 查询已收集的网络数据，支持分页和过滤
 
 ## 数据处理流程 (概览)
 
-1.  **插件抓取**: 插件内容脚本 ([xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js) 等) 从小红书网页提取数据。
-2.  **插件发送**: 插件通过其UI脚本 ([xhs_chrome_plugin/js/popup.js](mdc:xhs_chrome_plugin/js/popup.js) 或后台脚本 `background.js`) 将数据异步发送到后端API的相应端点。
-3.  **后端API接收**: 后端 `api/endpoints/` 中的相应路由模块接收请求，并使用 `api/models/` 中的Pydantic模型校验数据。
-4.  **后端服务处理**: API端点调用 `api/services/` 中的服务函数。例如，`CommentService` 会处理评论数据：
-    -   数据清洗与转换。
-    -   将嵌套评论扁平化为结构化评论。
-    -   执行业务规则 (如状态更新、通知生成等)。
-5.  **数据存储**: 服务层通过 `database.py` 提供的异步数据库实例 (`db`) 将处理后的数据保存到MongoDB的相应集合中。
+1.  **插件抓取**: 插件内容脚本 ([xhs_plugin_v2/content/index.js](mdc:xhs_plugin_v2/content/index.js)) 注入监控脚本到小红书网页。
+2.  **网络拦截**: 注入脚本 ([xhs_plugin_v2/injected/](mdc:xhs_plugin_v2/injected)) 拦截网络请求：
+    -   Fetch拦截: [xhs_plugin_v2/injected/fetch.js](mdc:xhs_plugin_v2/injected/fetch.js)
+    -   XHR拦截: [xhs_plugin_v2/injected/xhr.js](mdc:xhs_plugin_v2/injected/xhr.js)
+    -   增强拦截器: [xhs_plugin_v2/enhanced_interceptor.js](mdc:xhs_plugin_v2/enhanced_interceptor.js)
+3.  **规则匹配**: 后台脚本 ([xhs_plugin_v2/background/](mdc:xhs_plugin_v2/background)) 根据抓取规则过滤和处理数据。
+4.  **数据发送**: 插件通过API服务 ([xhs_plugin_v2/injected/api-service.js](mdc:xhs_plugin_v2/injected/api-service.js)) 将数据发送到后端。
+5.  **后端处理**: 后端API接收数据并通过服务层 ([xhs_backend/api/services/](mdc:xhs_backend/api/services)) 进行处理和存储。
 
 ## 插件API配置与更新指南
 
-由于后端API可能演进，插件需要能够配置和适应API端点变化。
-
 ### 1. API端点配置
--   插件应允许用户在配置页面 ([xhs_chrome_plugin/options.html](mdc:xhs_chrome_plugin/options.html)) 中设置后端API的基础URL。
--   具体的API路径 (如 `/api/v1/plugin/comments`) 应基于基础URL拼接，或从后端获取配置 (如果后端支持)。
+-   插件允许用户在配置页面 ([xhs_plugin_v2/options.html](mdc:xhs_plugin_v2/options.html)) 中设置后端API的基础URL。
+-   配置管理由选项脚本 ([xhs_plugin_v2/options/](mdc:xhs_plugin_v2/options)) 处理。
+-   具体的API路径基于基础URL拼接，遵循模块化API结构。
 
-### 2. 更新插件发送逻辑
--   插件中的数据发送函数 (示例见下方) 应灵活处理API端点和认证。
--   参考OpenAPI文档来确定正确的请求格式和端点。
+### 2. 插件数据发送逻辑
+
+插件中的数据发送功能主要由以下模块实现：
 
 ```javascript
-// 示例：插件中的数据发送函数 (位于 popup.js 或 background.js)
-async function sendDataToBackend(endpointPath, dataPayload) {
-  // 从存储中获取API基础URL和认证Token
-  const baseApiUrl = await getStorage('baseApiUrl'); // Implement getStorage
-  const authToken = await getStorage('authToken');    // Implement getStorage
-
-  if (!baseApiUrl) {
-    console.error('API Base URL not configured in plugin settings.');
-    return { success: false, error: 'API Base URL not configured.' };
+// 示例：插件中的数据发送函数 (位于 api-service.js)
+async function sendNetworkDataToBackend(networkData) {
+  // 从存储中获取API配置
+  const apiConfig = await getApiConfig();
+  
+  if (!apiConfig || !apiConfig.baseUrl) {
+    console.error('[API Service] API基础URL未配置');
+    return { success: false, error: 'API基础URL未配置' };
   }
 
-  const apiUrl = `${baseApiUrl.replace(/\/$/, '')}${endpointPath}`;
+  const apiUrl = `${apiConfig.baseUrl}/api/v1/system/network-data`;
 
   try {
     const response = await fetch(apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${authToken || ''}`
+        // 插件专用端点无需认证
       },
-      body: JSON.stringify(dataPayload)
+      body: JSON.stringify(networkData)
     });
 
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ detail: response.statusText }));
-      console.error(`API Error (${response.status}):`, errorData);
-      return { success: false, status: response.status, error: errorData.detail || 'Unknown API error' };
+      const errorData = await response.json().catch(() => ({ 
+        detail: response.statusText 
+      }));
+      console.error(`[API Service] API错误 (${response.status}):`, errorData);
+      return { 
+        success: false, 
+        status: response.status, 
+        error: errorData.detail || '未知API错误' 
+      };
     }
 
     return { success: true, data: await response.json() };
   } catch (error) {
-    console.error('Network or other error sending data:', error);
-    return { success: false, error: error.message || 'Network error' };
+    console.error('[API Service] 网络错误:', error);
+    return { success: false, error: error.message || '网络错误' };
   }
 }
-
-// 调用示例:
-// sendDataToBackend('/api/v1/plugin/comments', [commentObject1, commentObject2]);
 ```
+
+### 3. 抓取规则动态获取
+
+```javascript
+// 示例：获取抓取规则 (位于 background/api.js)
+async function loadCaptureRules() {
+  const apiConfig = globalState.apiConfig;
+  
+  if (!apiConfig || !apiConfig.baseUrl) {
+    console.warn('[Background] API未配置，使用默认抓取规则');
+    return;
+  }
+
+  try {
+    const response = await fetch(`${apiConfig.baseUrl}/api/v1/system/capture-rules`);
+    
+    if (response.ok) {
+      const rules = await response.json();
+      globalState.captureRules = rules.filter(rule => rule.enabled);
+      console.log(`[Background] 已加载 ${globalState.captureRules.length} 条抓取规则`);
+    } else {
+      console.error('[Background] 加载抓取规则失败:', response.status);
+    }
+  } catch (error) {
+    console.error('[Background] 加载抓取规则时发生网络错误:', error);
+  }
+}
+```
+
+## 用户界面功能
+
+### 1. 通知页面功能
+-   **通知处理器**: [xhs_plugin_v2/injected/notification-handler.js](mdc:xhs_plugin_v2/injected/notification-handler.js) 处理小红书通知页面的交互。
+-   **用户备注**: [xhs_plugin_v2/injected/user-notes.js](mdc:xhs_plugin_v2/injected/user-notes.js) 提供用户备注功能。
+-   **对话框管理**: [xhs_plugin_v2/injected/dialog-manager.js](mdc:xhs_plugin_v2/injected/dialog-manager.js) 管理弹窗和历史评论显示。
+
+### 2. 插件UI界面
+-   **弹窗界面**: [xhs_plugin_v2/popup.html](mdc:xhs_plugin_v2/popup.html) 和相关脚本提供插件主界面。
+-   **配置界面**: [xhs_plugin_v2/options.html](mdc:xhs_plugin_v2/options.html) 提供API配置和SSO登录。
+-   **日志界面**: [xhs_plugin_v2/logs.html](mdc:xhs_plugin_v2/logs.html) 显示请求日志和调试信息。
+
+## 版本信息
+
+当前插件版本: **v2.4.0** (见 [xhs_plugin_v2/manifest.json](mdc:xhs_plugin_v2/manifest.json))
+
+主要特性:
+- 网络请求监控和数据抓取
+- 用户备注功能
+- 历史评论查看
+- SSO单点登录支持
+- 动态抓取规则配置

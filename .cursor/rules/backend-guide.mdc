@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 # 小红书评论维护系统后端开发指南
 
-后端部分使用FastAPI + MongoDB (Motor驱动) 构建，提供异步RESTful API服务，并采用三层架构设计。
+后端部分使用FastAPI + MongoDB (Motor驱动) 构建，提供异步RESTful API服务，并采用模块化三层架构设计。详细架构说明见 [xhs_backend/api/ARCHITECTURE.md](mdc:xhs_backend/api/ARCHITECTURE.md)。
 
 ## 技术栈
 
@@ -22,21 +22,39 @@ alwaysApply: false
 xhs_backend/
   ├── main.py                 # FastAPI应用入口, 中间件, APIRouter挂载
   ├── database.py             # MongoDB异步连接管理, 数据库实例提供
-  ├── models.py               # 可能包含一些共享的或基础的Pydantic模型
+  ├── processing.py           # 数据处理逻辑
   ├── requirements.txt        # Python依赖
   ├── Dockerfile              # 生产环境Docker配置
   ├── Dockerfile.dev          # 开发环境Docker配置
   ├── docker-compose.yml      # 生产环境多容器应用配置
   ├── docker-compose.dev.yml  # 开发环境多容器应用配置
   ├── KEYCLOAK_SETUP.md       # Keycloak配置指南
+  ├── migrations/             # 数据库迁移脚本
+  ├── static_frontend/        # 静态前端资源（构建输出）
+  ├── api_docs/               # OpenAPI文档输出
   ├── api/
   │   ├── __init__.py
-  │   ├── endpoints/            # API层: HTTP请求处理, 调用服务层 (e.g., users.py, comments.py)
-  │   ├── services/             # 服务层: 核心业务逻辑, 数据处理 (e.g., user_service.py)
-  │   ├── models/               # 数据模型层: Pydantic模型定义 (e.g., user_models.py)
-  │   ├── auth/                 # 认证逻辑, Keycloak集成, JWT工具
-  │   └── deps.py               # FastAPI依赖项注入 (e.g., 获取当前用户, 数据库会话)
-  └── processing.py           # (可能包含遗留的或辅助的数据处理脚本, 主要业务逻辑在services层)
+  │   ├── ARCHITECTURE.md     # API架构详细说明
+  │   ├── deps.py             # FastAPI依赖项注入
+  │   ├── auth/               # 认证逻辑, Keycloak集成, JWT工具
+  │   ├── models/             # 数据模型层: Pydantic模型定义
+  │   ├── services/           # 服务层: 核心业务逻辑, 数据处理
+  │   ├── endpoints/          # 传统API端点 (用户笔记等)
+  │   └── v1/                 # 模块化API v1版本
+  │       ├── compatibility.py    # 向后兼容支持
+  │       ├── user/               # 用户管理模块
+  │       │   ├── auth/           # 认证子模块
+  │       │   ├── profile.py      # 用户配置
+  │       │   └── notes.py        # 用户笔记
+  │       ├── content/            # 内容管理模块
+  │       │   ├── comments.py     # 评论管理
+  │       │   └── notes.py        # 笔记管理
+  │       ├── system/             # 系统管理模块
+  │       │   ├── capture_rules.py    # 抓取规则
+  │       │   └── network_data.py     # 网络数据处理
+  │       └── notification/       # 通知管理模块
+  │           └── notifications.py
+  └── (其他配置文件)
 ```
 
 ## 核心模块说明
@@ -44,44 +62,97 @@ xhs_backend/
 ### 1. 应用入口 (`main.py`)
 - 初始化FastAPI应用实例。
 - 配置中间件 (如CORS)。
-- 挂载来自 `api/endpoints/` 的各个APIRouter。
+- 挂载来自 `api/endpoints/` 和 `api/v1/` 的各个APIRouter。
 - 管理应用生命周期事件 (如数据库连接的启动和关闭)。
 
-### 2. API层 (`api/endpoints/`)
-- 包含各个功能的路由模块 (如 `users.py`, `comments.py`)。
-- 定义具体的API路径操作 (GET, POST, PUT, DELETE等)。
-- 使用 `api/models/` 中的Pydantic模型进行请求体验证和响应模型序列化。
-- 调用 `api/services/` 中的服务函数来执行业务逻辑。
-- 处理HTTP相关的异常和响应。
+### 2. 模块化API层 (`api/v1/`)
 
-### 3. 服务层 (`api/services/`)
+#### 2.1 用户管理模块 (`v1/user/`)
+- **认证子模块** (`v1/user/auth/`):
+  - [xhs_backend/api/v1/user/auth/login.py](mdc:xhs_backend/api/v1/user/auth/login.py) - 用户登录处理
+  - [xhs_backend/api/v1/user/auth/sso.py](mdc:xhs_backend/api/v1/user/auth/sso.py) - SSO单点登录
+  - [xhs_backend/api/v1/user/auth/token.py](mdc:xhs_backend/api/v1/user/auth/token.py) - 令牌管理
+- **用户功能**:
+  - [xhs_backend/api/v1/user/profile.py](mdc:xhs_backend/api/v1/user/profile.py) - 用户配置管理
+  - [xhs_backend/api/v1/user/notes.py](mdc:xhs_backend/api/v1/user/notes.py) - 用户笔记功能
+
+#### 2.2 内容管理模块 (`v1/content/`)
+- [xhs_backend/api/v1/content/comments.py](mdc:xhs_backend/api/v1/content/comments.py) - 评论管理API
+- [xhs_backend/api/v1/content/notes.py](mdc:xhs_backend/api/v1/content/notes.py) - 笔记管理API
+
+#### 2.3 系统管理模块 (`v1/system/`)
+- [xhs_backend/api/v1/system/capture_rules.py](mdc:xhs_backend/api/v1/system/capture_rules.py) - 抓取规则管理
+- [xhs_backend/api/v1/system/network_data.py](mdc:xhs_backend/api/v1/system/network_data.py) - 网络数据处理
+
+#### 2.4 通知管理模块 (`v1/notification/`)
+- [xhs_backend/api/v1/notification/notifications.py](mdc:xhs_backend/api/v1/notification/notifications.py) - 通知处理API
+
+#### 2.5 兼容层 (`v1/compatibility.py`)
+- [xhs_backend/api/v1/compatibility.py](mdc:xhs_backend/api/v1/compatibility.py) - 确保旧API路径的向后兼容性
+
+### 3. 传统API层 (`api/endpoints/`)
+- [xhs_backend/api/endpoints/user_notes.py](mdc:xhs_backend/api/endpoints/user_notes.py) - 传统用户笔记API端点
+- 逐步迁移到模块化v1结构
+
+### 4. 服务层 (`api/services/`)
 - 封装核心业务逻辑，保持API层的简洁性。
+- 主要服务模块:
+  - [xhs_backend/api/services/comment.py](mdc:xhs_backend/api/services/comment.py) - 评论服务
+  - [xhs_backend/api/services/note.py](mdc:xhs_backend/api/services/note.py) - 笔记服务
+  - [xhs_backend/api/services/notification.py](mdc:xhs_backend/api/services/notification.py) - 通知服务
+  - [xhs_backend/api/services/user.py](mdc:xhs_backend/api/services/user.py) - 用户服务
+  - [xhs_backend/api/services/session.py](mdc:xhs_backend/api/services/session.py) - 会话管理
+  - [xhs_backend/api/services/network_data_processor.py](mdc:xhs_backend/api/services/network_data_processor.py) - 网络数据处理
 - 与数据访问层 (通过 `database.py` 提供的 `db` 实例) 交互，执行数据库操作。
-- 可能调用其他服务或外部API。
 - 实现数据转换、校验和业务规则。
 
-### 4. 数据模型层 (`api/models/` & `models.py`)
+### 5. 数据模型层 (`api/models/`)
 - 使用Pydantic定义请求体、响应体以及数据库实体的数据结构。
-- 提供数据验证、序列化和文档生成的基础。
-- `api/models/` 通常按功能模块组织模型文件。
+- 主要模型模块:
+  - [xhs_backend/api/models/auth.py](mdc:xhs_backend/api/models/auth.py) - 认证相关模型
+  - [xhs_backend/api/models/common.py](mdc:xhs_backend/api/models/common.py) - 通用模型
+  - [xhs_backend/api/models/content.py](mdc:xhs_backend/api/models/content.py) - 内容相关模型
+  - [xhs_backend/api/models/network.py](mdc:xhs_backend/api/models/network.py) - 网络数据模型
+  - [xhs_backend/api/models/notification.py](mdc:xhs_backend/api/models/notification.py) - 通知模型
+  - [xhs_backend/api/models/user.py](mdc:xhs_backend/api/models/user.py) - 用户模型
 
-### 5. 数据访问层 (`database.py`)
+### 6. 数据访问层 (`database.py`)
 - 初始化并管理与MongoDB的异步连接 (使用Motor)。
 - 提供获取数据库实例 (`db`) 的函数，供服务层使用。
-- 定义数据库集合名称常量 (如 `USERS_COLLECTION`, `COMMENTS_COLLECTION`)。
+- 定义数据库集合名称常量。
 
-### 6. 认证与授权 (`api/auth/` & `api/deps.py`)
-- 集成Keycloak进行用户认证和授权。
+### 7. 认证与授权 (`api/auth/` & `api/deps.py`)
+- 集成Keycloak进行用户认证和授权: [xhs_backend/api/auth/keycloak.py](mdc:xhs_backend/api/auth/keycloak.py)
 - 处理JWT令牌的验证和解码。
-- `deps.py` 可能包含用于保护端点的依赖项，如获取已认证用户。
+- [xhs_backend/api/deps.py](mdc:xhs_backend/api/deps.py) 包含用于保护端点的依赖项，如获取已认证用户。
 
-### 7. 数据处理 (`processing.py`)
-- 此文件可能包含一些独立的数据批处理脚本或遗留的数据转换逻辑。
-- 新的主要业务数据处理应在相应的服务模块中实现。
+### 8. 数据处理 (`processing.py`)
+- [xhs_backend/processing.py](mdc:xhs_backend/processing.py) 包含数据批处理脚本或辅助的数据转换逻辑。
+- 新的主要业务数据处理在相应的服务模块中实现。
+
+## 模块化架构设计原则
+
+### 1. 单一职责原则
+每个模块只负责一个特定的业务领域：
+- `user/` - 专注用户管理和认证
+- `content/` - 专注内容管理（评论、笔记）
+- `system/` - 专注系统管理和配置
+- `notification/` - 专注通知处理
+
+### 2. 向后兼容性
+- 保留原有API路径，确保现有代码无需修改
+- 通过兼容层自动重定向到新模块
+- 渐进式迁移策略
+
+### 3. 插件友好设计
+- 无认证端点：抓取规则获取、数据提交、健康检查
+- 简化的数据提交格式
+- 动态配置支持
 
 ## API认证与安全
 
 - 主要通过Keycloak进行认证，客户端获取JWT后通过Bearer Token方式访问API。
+- 插件专用端点无需认证，便于快速访问。
 - 详细规范见 [.cursor/rules/auth-security.mdc](mdc:.cursor/rules/auth-security.mdc)。
 
 ## 数据库设计
@@ -94,10 +165,41 @@ MongoDB集合在 `database.py` 中定义常量名，例如：
 - `RAW_COMMENTS_COLLECTION`
 - `STRUCTURED_COMMENTS_COLLECTION`
 - `USER_INFO_COLLECTION`
+- `NETWORK_DATA_COLLECTION` (新增，用于插件数据)
+
 具体的数据结构由服务层逻辑和 `api/models/` 中的Pydantic模型决定。
+
+## 开发最佳实践
+
+### 1. 新功能开发
+- 优先使用模块化v1 API结构
+- 遵循单一职责原则
+- 每个模块独立测试
+
+### 2. API端点设计
+- 无认证端点：系统状态、插件数据提交、抓取规则获取
+- 认证端点：管理功能、用户数据操作
+- 遵循RESTful设计原则
+
+### 3. 错误处理
+- 模块级别的日志记录
+- 统一的异常处理机制
+- 详细的错误信息返回
 
 ## 部署指南
 
-- 使用 `docker-compose.yml` (生产) 或 `docker-compose.dev.yml` (开发) 进行快速部署。
+### Docker部署
+- **开发环境**: `docker-compose -f docker-compose.dev.yml up`
+- **生产环境**: `docker-compose -f docker-compose.yml up`
 - 环境变量用于配置数据库连接、密钥等敏感信息。
-- 详细的Docker配置见 [.cursor/rules/docker-configuration.mdc](mdc:.cursor/rules/docker-configuration.mdc)。
+
+### API文档生成
+- [xhs_backend/export_openapi.py](mdc:xhs_backend/export_openapi.py) - 导出OpenAPI规范
+- [xhs_backend/generate_api_docs.py](mdc:xhs_backend/generate_api_docs.py) - 生成API文档
+- 输出到 [xhs_backend/api_docs/](mdc:xhs_backend/api_docs) 目录
+
+### 数据库迁移
+- [xhs_backend/migrations/](mdc:xhs_backend/migrations) - 数据库迁移脚本
+- 示例: [xhs_backend/migrations/add_comment_id_to_user_notes.py](mdc:xhs_backend/migrations/add_comment_id_to_user_notes.py)
+
+详细的Docker配置见 [.cursor/rules/docker-configuration.mdc](mdc:.cursor/rules/docker-configuration.mdc)。

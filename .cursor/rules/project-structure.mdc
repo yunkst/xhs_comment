@@ -5,7 +5,7 @@ alwaysApply: false
 ---
 # 小红书评论维护系统项目结构
 
-这是一个用于管理小红书评论的全栈系统，采用前后端分离架构，并包含一个Uniapp移动应用和一个浏览器插件。
+这是一个用于管理小红书评论的全栈系统，采用前后端分离架构，并包含一个浏览器插件。
 
 ## 后端部分 (`xhs_backend`)
 
@@ -13,15 +13,32 @@ alwaysApply: false
 
 - **主应用入口**: [xhs_backend/main.py](mdc:xhs_backend/main.py) 是FastAPI应用的启动文件。
 - **数据库连接管理**: [xhs_backend/database.py](mdc:xhs_backend/database.py) 负责MongoDB数据库的连接、关闭以及提供基础的异步数据库实例。
-- **API层 (Endpoints)**: API路由定义在 [xhs_backend/api/endpoints/](mdc:xhs_backend/api/endpoints) 目录下，例如 `users.py`, `comments.py` 等，负责处理HTTP请求和响应。
-- **服务层 (Services)**: 核心业务逻辑封装在 [xhs_backend/api/services/](mdc:xhs_backend/api/services) 目录下的各个模块中 (如 `user_service.py`, `comment_service.py`)。服务层协调数据访问和业务规则。
-- **数据模型 (Models)**: Pydantic模型定义在 [xhs_backend/api/models/](mdc:xhs_backend/api/models) (针对API数据) 和 [xhs_backend/models.py](mdc:xhs_backend/models.py) (可能包含数据库或其他内部模型)。
+- **API架构说明**: [xhs_backend/api/ARCHITECTURE.md](mdc:xhs_backend/api/ARCHITECTURE.md) 详细说明了模块化API架构重构。
+
+### API层结构
+
+#### 传统端点 (api/endpoints/)
+- **用户笔记管理**: [xhs_backend/api/endpoints/user_notes.py](mdc:xhs_backend/api/endpoints/user_notes.py) - 用户笔记相关的API端点
+
+#### 模块化API (api/v1/)
+- **用户管理**: [xhs_backend/api/v1/user/](mdc:xhs_backend/api/v1/user) - 用户认证、配置文件、笔记管理
+  - **认证模块**: [xhs_backend/api/v1/user/auth/](mdc:xhs_backend/api/v1/user/auth) - 登录、SSO、令牌管理
+- **内容管理**: [xhs_backend/api/v1/content/](mdc:xhs_backend/api/v1/content) - 评论和笔记内容管理
+- **系统管理**: [xhs_backend/api/v1/system/](mdc:xhs_backend/api/v1/system) - 抓取规则、网络数据处理
+- **通知管理**: [xhs_backend/api/v1/notification/](mdc:xhs_backend/api/v1/notification) - 通知相关功能
+- **兼容层**: [xhs_backend/api/v1/compatibility.py](mdc:xhs_backend/api/v1/compatibility.py) - 向后兼容支持
+
+### 其他核心模块
+- **服务层 (Services)**: 核心业务逻辑封装在 [xhs_backend/api/services/](mdc:xhs_backend/api/services) 目录下的各个模块中。
+- **数据模型 (Models)**: Pydantic模型定义在 [xhs_backend/api/models/](mdc:xhs_backend/api/models) 目录下。
 - **认证与授权 (Auth)**: 认证相关逻辑位于 [xhs_backend/api/auth/](mdc:xhs_backend/api/auth)。
-- **依赖管理**: Python项目依赖项在 [xhs_backend/requirements.txt](mdc:xhs_backend/requirements.txt) 中定义。
-- **数据处理**: [xhs_backend/processing.py](mdc:xhs_backend/processing.py) 可能包含一些遗留的或辅助的数据处理逻辑。
-- **Docker配置**:
-    - [xhs_backend/Dockerfile](mdc:xhs_backend/Dockerfile) 和 [xhs_backend/Dockerfile.dev](mdc:xhs_backend/Dockerfile.dev)
-    - [xhs_backend/docker-compose.yml](mdc:xhs_backend/docker-compose.yml) 和 [xhs_backend/docker-compose.dev.yml](mdc:xhs_backend/docker-compose.dev.yml)
+- **依赖管理**: [xhs_backend/api/deps.py](mdc:xhs_backend/api/deps.py) 提供FastAPI依赖项注入。
+- **数据处理**: [xhs_backend/processing.py](mdc:xhs_backend/processing.py) 包含数据处理逻辑。
+- **依赖配置**: [xhs_backend/requirements.txt](mdc:xhs_backend/requirements.txt) 定义Python项目依赖项。
+
+### Docker配置
+- **生产环境**: [xhs_backend/Dockerfile](mdc:xhs_backend/Dockerfile) 和 [xhs_backend/docker-compose.yml](mdc:xhs_backend/docker-compose.yml)
+- **开发环境**: [xhs_backend/Dockerfile.dev](mdc:xhs_backend/Dockerfile.dev) 和 [xhs_backend/docker-compose.dev.yml](mdc:xhs_backend/docker-compose.dev.yml)
 
 ## 前端管理界面 (`xhs_admin_ui`)
 
@@ -31,32 +48,50 @@ alwaysApply: false
 - **JavaScript主入口**: [xhs_admin_ui/src/main.js](mdc:xhs_admin_ui/src/main.js)
 - **根Vue组件**: [xhs_admin_ui/src/App.vue](mdc:xhs_admin_ui/src/App.vue)
 - **路由配置**: [xhs_admin_ui/src/router/index.js](mdc:xhs_admin_ui/src/router/index.js)
-- **视图组件 (Views)**: 页面级组件位于 [xhs_admin_ui/src/views/](mdc:xhs_admin_ui/src/views) (例如 `LayoutView.vue`, `DashboardView.vue`, `comment/CommentListView.vue`, `system/SystemView.vue`)。
-- **可复用组件 (Components)**: 通用UI组件位于 [xhs_admin_ui/src/components/](mdc:xhs_admin_ui/src/components)。
-- **状态管理 (Stores)**: 全局状态管理 (如Pinia) 在 [xhs_admin_ui/src/stores/](mdc:xhs_admin_ui/src/stores)。
-- **API服务调用**: 前端API请求逻辑封装在 [xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js)。
-- **Vite配置**: [xhs_admin_ui/vite.config.js](mdc:xhs_admin_ui/vite.config.js)
+- **视图组件 (Views)**: 页面级组件位于 [xhs_admin_ui/src/views/](mdc:xhs_admin_ui/src/views)
+  - 布局视图: [xhs_admin_ui/src/views/LayoutView.vue](mdc:xhs_admin_ui/src/views/LayoutView.vue)
+  - 仪表板: [xhs_admin_ui/src/views/DashboardView.vue](mdc:xhs_admin_ui/src/views/DashboardView.vue)
+  - 评论管理: [xhs_admin_ui/src/views/comment/CommentListView.vue](mdc:xhs_admin_ui/src/views/comment/CommentListView.vue)
+  - 内容管理: [xhs_admin_ui/src/views/content/](mdc:xhs_admin_ui/src/views/content)
+- **可复用组件**: [xhs_admin_ui/src/components/](mdc:xhs_admin_ui/src/components) 通用UI组件
+- **状态管理**: [xhs_admin_ui/src/stores/](mdc:xhs_admin_ui/src/stores) Pinia状态管理
+- **API服务调用**: [xhs_admin_ui/src/services/api.js](mdc:xhs_admin_ui/src/services/api.js) 前端API请求逻辑
+- **工具函数**: [xhs_admin_ui/src/utils/](mdc:xhs_admin_ui/src/utils) 包含认证等工具
+- **构建配置**: [xhs_admin_ui/vite.config.js](mdc:xhs_admin_ui/vite.config.js)
 - **包管理**: [xhs_admin_ui/package.json](mdc:xhs_admin_ui/package.json)
 
-## Uniapp 移动应用 (`uniapp`)
+## 浏览器插件 (`xhs_plugin_v2`)
 
-此目录包含基于Uniapp框架开发的移动应用。
+用于从小红书网站抓取评论数据的Chrome浏览器插件 v2.4.0。
 
-- **页面 (Pages)**: 应用的主要页面位于 [uniapp/pages/](mdc:uniapp/pages)。
-- **静态资源 (Static)**: 图片、字体等静态资源位于 [uniapp/static/](mdc:uniapp/static)。
-
-## 浏览器插件 (`xhs_chrome_plugin`)
-
-用于从小红书网站抓取评论数据的Chrome浏览器插件。
-*(具体内部结构待进一步确认)*
-
-- **主要脚本**: 可能在 `js/` 目录下，如 [xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js) 或 [xhs_chrome_plugin/js/background.js](mdc:xhs_chrome_plugin/js/background.js)
-- **清单文件**: [xhs_chrome_plugin/manifest.json](mdc:xhs_chrome_plugin/manifest.json)
+- **插件清单**: [xhs_plugin_v2/manifest.json](mdc:xhs_plugin_v2/manifest.json) - 插件配置和权限
+- **后台脚本**: [xhs_plugin_v2/background/](mdc:xhs_plugin_v2/background) - 后台服务和API通信
+  - 主入口: [xhs_plugin_v2/background/index.js](mdc:xhs_plugin_v2/background/index.js)
+  - 存储管理: [xhs_plugin_v2/background/storage.js](mdc:xhs_plugin_v2/background/storage.js)
+  - API服务: [xhs_plugin_v2/background/api.js](mdc:xhs_plugin_v2/background/api.js)
+  - 网络请求: [xhs_plugin_v2/background/webRequest.js](mdc:xhs_plugin_v2/background/webRequest.js)
+- **内容脚本**: [xhs_plugin_v2/content/index.js](mdc:xhs_plugin_v2/content/index.js) - 页面注入管理
+- **注入脚本**: [xhs_plugin_v2/injected/](mdc:xhs_plugin_v2/injected) - 页面级功能实现
+  - 主入口: [xhs_plugin_v2/injected/index.js](mdc:xhs_plugin_v2/injected/index.js)
+  - 网络拦截: [xhs_plugin_v2/injected/fetch.js](mdc:xhs_plugin_v2/injected/fetch.js) 和 [xhs_plugin_v2/injected/xhr.js](mdc:xhs_plugin_v2/injected/xhr.js)
+  - API服务: [xhs_plugin_v2/injected/api-service.js](mdc:xhs_plugin_v2/injected/api-service.js)
+  - 通知处理: [xhs_plugin_v2/injected/notification-handler.js](mdc:xhs_plugin_v2/injected/notification-handler.js)
+  - 用户备注: [xhs_plugin_v2/injected/user-notes.js](mdc:xhs_plugin_v2/injected/user-notes.js)
+  - 对话框管理: [xhs_plugin_v2/injected/dialog-manager.js](mdc:xhs_plugin_v2/injected/dialog-manager.js)
+- **UI界面**:
+  - 弹窗页面: [xhs_plugin_v2/popup.html](mdc:xhs_plugin_v2/popup.html) 和 [xhs_plugin_v2/popup/](mdc:xhs_plugin_v2/popup)
+  - 配置页面: [xhs_plugin_v2/options.html](mdc:xhs_plugin_v2/options.html) 和 [xhs_plugin_v2/options/](mdc:xhs_plugin_v2/options)
+  - 日志页面: [xhs_plugin_v2/logs.html](mdc:xhs_plugin_v2/logs.html) 和 [xhs_plugin_v2/logs/](mdc:xhs_plugin_v2/logs)
+- **增强拦截器**: [xhs_plugin_v2/enhanced_interceptor.js](mdc:xhs_plugin_v2/enhanced_interceptor.js) - 高级网络监控
+- **共享资源**: [xhs_plugin_v2/shared/](mdc:xhs_plugin_v2/shared) - 公共常量和状态
+- **图标资源**: [xhs_plugin_v2/icons/](mdc:xhs_plugin_v2/icons) - 插件图标
 
 ## 根目录重要文件
 
 - **Git忽略配置**: [`.gitignore`](mdc:.gitignore)
 - **项目许可证**: [`LICENSE`](mdc:LICENSE)
+- **项目说明**: [`README.md`](mdc:README.md)
 - **系统启动脚本**: [`start_system.sh`](mdc:start_system.sh)
 - **开发模式监视脚本**: [`dev_watch.sh`](mdc:dev_watch.sh)
-- **插件数据格式说明**: [`plugin-data-format.mdc`](mdc:plugin-data-format.mdc) (此为另一个规则文件，提供了插件数据的格式信息)
+- **测试页面**: [`test_content_extraction.html`](mdc:test_content_extraction.html)
+- **包管理**: [`package.json`](mdc:package.json) - 根目录Node.js依赖

@@ -270,8 +270,10 @@ worker.onmessage = (event) => {
 ```
 
 **相关文件**:
-- 内容脚本: [xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js)
-- 后台脚本: [xhs_chrome_plugin/js/background.js](mdc:xhs_chrome_plugin/js/background.js)
+- 内容脚本: [xhs_plugin_v2/content/index.js](mdc:xhs_plugin_v2/content/index.js)
+- 注入脚本: [xhs_plugin_v2/injected/](mdc:xhs_plugin_v2/injected)
+- 后台脚本: [xhs_plugin_v2/background/](mdc:xhs_plugin_v2/background)
+- 网络拦截器: [xhs_plugin_v2/injected/fetch.js](mdc:xhs_plugin_v2/injected/fetch.js), [xhs_plugin_v2/injected/xhr.js](mdc:xhs_plugin_v2/injected/xhr.js)
 
 ### 2. 内存和存储优化
 

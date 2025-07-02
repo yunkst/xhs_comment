@@ -142,14 +142,16 @@ alwaysApply: false
 - 控制台有错误信息
 
 **排查步骤**:
-1. 检查插件清单文件: [xhs_chrome_plugin/manifest.json](mdc:xhs_chrome_plugin/manifest.json)
+1. 检查插件清单文件: [xhs_plugin_v2/manifest.json](mdc:xhs_plugin_v2/manifest.json)
 2. 验证插件文件完整性
 3. 查看Chrome扩展管理页面的错误信息
 4. 检查浏览器版本兼容性
 
 **相关文件**:
-- 插件清单: [xhs_chrome_plugin/manifest.json](mdc:xhs_chrome_plugin/manifest.json)
-- 内容脚本: [xhs_chrome_plugin/js/](mdc:xhs_chrome_plugin/js)
+- 插件清单: [xhs_plugin_v2/manifest.json](mdc:xhs_plugin_v2/manifest.json)
+- 内容脚本: [xhs_plugin_v2/content/](mdc:xhs_plugin_v2/content)
+- 注入脚本: [xhs_plugin_v2/injected/](mdc:xhs_plugin_v2/injected)
+- 后台脚本: [xhs_plugin_v2/background/](mdc:xhs_plugin_v2/background)
 
 ### 2. 数据抓取失败
 
@@ -165,7 +167,8 @@ alwaysApply: false
 4. 测试不同页面类型的兼容性
 
 **相关文件**:
-- 数据解析脚本: [xhs_chrome_plugin/js/content_script.js](mdc:xhs_chrome_plugin/js/content_script.js)
+- 数据解析脚本: [xhs_plugin_v2/injected/index.js](mdc:xhs_plugin_v2/injected/index.js)
+- 网络拦截器: [xhs_plugin_v2/injected/fetch.js](mdc:xhs_plugin_v2/injected/fetch.js), [xhs_plugin_v2/injected/xhr.js](mdc:xhs_plugin_v2/injected/xhr.js)
 - 数据格式规范: [plugin-data-format.mdc](mdc:plugin-data-format.mdc)
 
 ### 3. API通信问题
@@ -182,8 +185,9 @@ alwaysApply: false
 4. 测试网络连接
 
 **相关文件**:
-- 插件配置: [xhs_chrome_plugin/js/options.js](mdc:xhs_chrome_plugin/js/options.js)
-- API调用逻辑: [xhs_chrome_plugin/js/background.js](mdc:xhs_chrome_plugin/js/background.js)
+- 插件配置: [xhs_plugin_v2/options/](mdc:xhs_plugin_v2/options)
+- API调用逻辑: [xhs_plugin_v2/background/](mdc:xhs_plugin_v2/background)
+- API服务: [xhs_plugin_v2/injected/api-service.js](mdc:xhs_plugin_v2/injected/api-service.js)
 
 ## 系统整体诊断
 
