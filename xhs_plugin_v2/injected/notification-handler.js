@@ -153,7 +153,7 @@ function extractNotificationContent(container) {
     }
 
     // 从提示信息中提取动作描述，但排除时间
-    if (hintContent) {
+    if (hintContent) { 
         const hintClone = hintContent.cloneNode(true);
         const timeElement = hintClone.querySelector('.interaction-time');
         if (timeElement) {

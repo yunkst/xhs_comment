@@ -6,6 +6,7 @@ from pydantic import BaseModel
 
 from database import (
     USER_NOTES_COLLECTION,
+    STRUCTURED_COMMENTS_COLLECTION,
     get_database
 )
 from api.deps import get_current_user, get_current_user_combined
@@ -23,6 +24,7 @@ class UserNoteCreate(BaseModel):
     notificationHash: str
     noteContent: str
     content: Optional[str] = None
+    commentId: Optional[str] = None
 
 # 批量查询请求模型
 class BatchUserNotesRequest(BaseModel):
@@ -233,4 +235,108 @@ async def get_user_notes_batch(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"批量获取用户备注时出错: {str(e)}"
+        )
+
+@router.get("/with-comments", response_model=Dict[str, Any])
+async def get_user_notes_with_comments(
+    user_id: Optional[str] = Query(None, description="用户ID，为空则查询所有"),
+    page: int = Query(1, ge=1, description="页码"),
+    page_size: int = Query(20, ge=1, le=100, description="每页数量"),
+    request: Request = None,
+    current_user: str = Depends(get_current_user_combined)
+):
+    """
+    获取关联了评论的用户备注信息
+    
+    Args:
+        user_id: 可选的用户ID过滤
+        page: 页码
+        page_size: 每页数量
+        current_user: 当前用户
+        
+    Returns:
+        包含用户备注和关联评论信息的结果
+    """
+    logger.info(f"查询关联评论的用户备注: userId={user_id}, page={page}, pageSize={page_size}")
+    
+    try:
+        # 获取数据库集合
+        db = await get_database()
+        user_notes_collection = db[USER_NOTES_COLLECTION]
+        comments_collection = db[STRUCTURED_COMMENTS_COLLECTION]
+        
+        # 构建查询条件
+        query = {"commentId": {"$exists": True, "$ne": None}}
+        if user_id:
+            query["userId"] = user_id
+        
+        # 计算总数
+        total_count = await user_notes_collection.count_documents(query)
+        
+        # 分页查询用户备注
+        skip = (page - 1) * page_size
+        user_notes = await user_notes_collection.find(query)\
+            .sort("updatedAt", -1)\
+            .skip(skip)\
+            .limit(page_size)\
+            .to_list(length=None)
+        
+        # 处理结果（转换_id为字符串）
+        for note in user_notes:
+            if '_id' in note:
+                note['_id'] = str(note['_id'])
+        
+        # 获取关联的评论信息
+        comment_ids = [note.get('commentId') for note in user_notes if note.get('commentId')]
+        comments_data = {}
+        
+        if comment_ids:
+            comments = await comments_collection.find(
+                {"commentId": {"$in": comment_ids}}
+            ).to_list(length=None)
+            
+            for comment in comments:
+                if '_id' in comment:
+                    comment['_id'] = str(comment['_id'])
+                comment_id = comment.get('commentId')
+                if comment_id:
+                    comments_data[comment_id] = comment
+        
+        # 组合结果
+        result_data = []
+        for note in user_notes:
+            comment_id = note.get('commentId')
+            note_with_comment = note.copy()
+            
+            if comment_id and comment_id in comments_data:
+                note_with_comment['relatedComment'] = comments_data[comment_id]
+            else:
+                note_with_comment['relatedComment'] = None
+            
+            result_data.append(note_with_comment)
+        
+        # 计算分页信息
+        total_pages = (total_count + page_size - 1) // page_size
+        
+        return {
+            "success": True,
+            "message": f"获取到 {len(result_data)} 条关联评论的用户备注",
+            "data": {
+                "items": result_data,
+                "pagination": {
+                    "page": page,
+                    "pageSize": page_size,
+                    "totalCount": total_count,
+                    "totalPages": total_pages,
+                    "hasNext": page < total_pages,
+                    "hasPrev": page > 1
+                }
+            }
+        }
+        
+    except Exception as e:
+        logger.exception(f"查询关联评论的用户备注时发生错误")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"查询关联评论的用户备注时出错: {str(e)}"
         ) 
