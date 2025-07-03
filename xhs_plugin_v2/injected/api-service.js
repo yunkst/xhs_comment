@@ -81,7 +81,7 @@ async function fetchUserHistoricalComments(userId) {
             throw new Error('未配置API令牌，请先登录');
         }
         
-        const url = `${apiBaseUrl}/api/v1/content/comments/user/${userId}`;
+        const url = `/api/v1/content/comments/user/${userId}`;
         
         console.log(`[API Service] 通过代理请求URL: ${url}`);
         
@@ -148,7 +148,7 @@ async function fetchUserNotes(userId) {
             throw new Error('未配置API令牌，请先登录');
         }
         
-        const url = `${apiBaseUrl}/api/user-notes?user_id=${userId}`;
+        const url = `/api/user-notes?user_id=${userId}`;
         
         console.log(`[API Service] 通过代理请求备注URL: ${url}`);
         
@@ -226,42 +226,18 @@ async function fetchUserNotes(userId) {
 // 保存用户备注到后端
 async function saveUserNote(userId, notificationHash, noteContent, content) {
     try {
-        console.log(`[API Service] 开始保存用户 ${userId} 的备注数据`, { notificationHash, noteContent, content });
+        console.log(`[API Service] 开始保存用户备注:`, { userId, notificationHash, noteContent });
         
-        // 检查是否是旧格式哈希，如果是则转换为新格式
-        let finalHash = notificationHash;
-        if (notificationHash.split('_').length > 3) {
-            const hashParts = notificationHash.split('_');
-            const userIdFromHash = hashParts[0];
-            const contentPart = hashParts.length > 1 ? hashParts[1] : '';
-            const typePart = hashParts.length > 2 ? hashParts[2] : '';
-
-            finalHash = `${userIdFromHash}_${contentPart}_${typePart}`;
-            console.log(`[API Service] 保存备注时将旧格式哈希 ${notificationHash} 转换为新格式 ${finalHash}`);
-        }
-
         // 从storage获取API地址和令牌
-        const { apiBaseUrl, apiToken } = await getApiConfig();
-
-        if (!apiBaseUrl) {
-            throw new Error('未配置API地址，请在插件选项中设置');
-        }
-
+        const { apiToken } = await getApiConfig();
+        
         if (!apiToken) {
             throw new Error('未配置API令牌，请先登录');
         }
-
-        const url = `${apiBaseUrl}/api/user-notes`;
-
-        // 使用代理请求替代直接fetch
-        const requestBody = {
-            userId: userId,
-            notificationHash: finalHash,
-            noteContent: noteContent,
-            content: content
-        };
         
-        console.log(`[API Service] 发送备注保存请求:`, requestBody);
+        const url = `/api/v1/user/notes`;
+        
+        console.log(`[API Service] 通过代理保存备注URL: ${url}`);
         
         const response = await proxyFetch(url, {
             method: 'POST',
@@ -269,7 +245,12 @@ async function saveUserNote(userId, notificationHash, noteContent, content) {
                 'Authorization': `Bearer ${apiToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)  // 序列化为JSON字符串
+            body: JSON.stringify({
+                userId: userId,
+                notificationHash: notificationHash,
+                noteContent: noteContent,
+                content: content
+            })
         });
         
         if (!response.ok) {
@@ -290,12 +271,7 @@ async function saveUserNote(userId, notificationHash, noteContent, content) {
         console.log(`[API Service] 成功保存用户 ${userId} 的备注数据:`, data);
 
         // 更新全局备注数据
-        userNotes[finalHash] = noteContent;
-
-        // 如果使用的是转换后的哈希值，也更新原始哈希对应的备注（向后兼容）
-        if (finalHash !== notificationHash) {
-            userNotes[notificationHash] = noteContent;
-        }
+        userNotes[notificationHash] = noteContent;
 
         return true;
     } catch (error) {
@@ -318,33 +294,27 @@ async function fetchUserNotesInBatch(userIds) {
     }
     
     try {
-        console.log(`[API Service] 开始批量获取 ${userIds.length} 个用户的备注数据`);
+        console.log(`[API Service] 开始批量获取用户备注数据，用户数量:`, userIds.length);
         
         // 从storage获取API地址和令牌
-        const { apiBaseUrl, apiToken } = await getApiConfig();
-        
-        if (!apiBaseUrl) {
-            throw new Error('未配置API地址，请在插件选项中设置');
-        }
+        const { apiToken } = await getApiConfig();
         
         if (!apiToken) {
-            throw new Error('未配置API令牌，请先登录');
+            console.warn('[API Service] 未配置API令牌，跳过批量备注获取');
+            return {};
         }
+
+        const url = `/api/v1/user/notes/batch`;
+
+        console.log(`[API Service] 通过代理请求批量备注URL: ${url}`);
         
-        // 使用POST请求避免URL过长问题
-        const url = `${apiBaseUrl}/api/v1/user/notes/batch`;
-        const requestBody = {
-            user_ids: userIds
-        };
-        
-        // 使用代理请求替代直接fetch
         const response = await proxyFetch(url, {
             method: 'POST',
             headers: {
                 'Authorization': `Bearer ${apiToken}`,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify({ user_ids: userIds })
         });
         
         if (!response.ok) {

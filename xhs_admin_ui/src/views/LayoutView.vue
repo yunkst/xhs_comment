@@ -27,6 +27,7 @@
             <el-menu-item index="/comment/list">评论列表</el-menu-item>
             <el-menu-item index="/xiaohongshu/users">小红书用户</el-menu-item>
             <el-menu-item index="/content/notes">小红书笔记</el-menu-item>
+            <el-menu-item index="/content/note-details">笔记详情数据</el-menu-item>
             <el-menu-item index="/content/notifications">小红书通知</el-menu-item>
           </el-sub-menu>
         </el-menu>

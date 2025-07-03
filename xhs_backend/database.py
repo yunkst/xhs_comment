@@ -41,6 +41,7 @@ USER_NOTES_COLLECTION = 'user_notes'
 RAW_COMMENTS_COLLECTION = "raw_comments" # 存放原始合并后的评论数据
 STRUCTURED_COMMENTS_COLLECTION = "structured_comments" # 存放结构化评论数据
 USER_INFO_COLLECTION = "user_info" # 存放小红书用户信息数据
+NOTE_DETAILS_COLLECTION = "note_details" # 存放小红书笔记详情数据
 
 # 初始化全局变量
 client = None

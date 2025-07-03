@@ -6,6 +6,7 @@ import { observeDOM } from './observer.js';
 import { fetchUserHistoricalComments, getApiConfig } from './api-service.js';
 import { showNotificationDialog, loadDialogContent, renderHistoricalComments, createCommentElement } from './dialog-manager.js';
 import { extractNotificationsFromDOM, addButtonsToNotifications, getActiveTabType, navigateToNotificationPage, initializeNotificationHandler } from './notification-handler.js';
+import { NoteDetailExtractor } from './note-detail-extractor.js';
 
 console.log('[XHS Plugin] 小红书网络请求拦截器模块已注入');
 
@@ -19,6 +20,9 @@ window.globalState = window.globalState || {
 let userNotesModule = null;
 let userNotesLoaded = false;
 let notificationHandlerInitialized = false;
+
+// 笔记详情提取器实例
+let noteDetailExtractor = null;
 
 // 从background script获取抓取规则
 async function loadCaptureRules() {
@@ -101,6 +105,42 @@ async function loadUserNotesModule() {
     }
 }
 
+// 初始化笔记详情提取器
+function initializeNoteDetailExtractor() {
+    try {
+        console.log('[XHS Plugin] 初始化笔记详情提取器...');
+        
+        // 检查是否在小红书页面
+        if (!window.location.hostname.includes('xiaohongshu.com')) {
+            console.log('[XHS Plugin] 非小红书页面，跳过笔记详情提取器初始化');
+            return;
+        }
+        
+        // 创建实例
+        noteDetailExtractor = new NoteDetailExtractor();
+        
+        // 延迟启动，确保页面完全加载
+        setTimeout(() => {
+            if (noteDetailExtractor) {
+                noteDetailExtractor.start();
+                console.log('[XHS Plugin] 笔记详情提取器启动成功');
+            }
+        }, 3000);
+        
+        // 暴露全局调试接口
+        window.xhsNoteDetailExtractor = {
+            start: () => noteDetailExtractor?.start(),
+            stop: () => noteDetailExtractor?.stop(),
+            extract: () => noteDetailExtractor?.manualExtract(),
+            status: () => noteDetailExtractor?.getStatus(),
+            clearCache: () => noteDetailExtractor?.clearExtractedCache()
+        };
+        
+    } catch (error) {
+        console.error('[XHS Plugin] 初始化笔记详情提取器失败:', error);
+    }
+}
+
 // 启动初始化流程
 async function initialize() {
 try {
@@ -112,6 +152,10 @@ try {
     interceptXHR();
     observeDOM();
     console.log('[XHS Plugin] 所有网络请求拦截器已成功初始化');
+        
+        // 初始化笔记详情提取器
+        initializeNoteDetailExtractor();
+        
 } catch (error) {
     console.error('[XHS Plugin] 初始化网络拦截器时发生错误:', error);
 }

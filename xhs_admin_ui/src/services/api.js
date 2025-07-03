@@ -246,6 +246,15 @@ export const noteApi = {
   },
   getNotesStats: () => {
     return api.get('/api/v1/content/notes/stats');
+  },
+  getNoteDetailsList: (params) => {
+    return api.get('/api/v1/content/notes/details/list', { params });
+  },
+  getNoteDetail: (noteId) => {
+    return api.get(`/api/v1/content/notes/details/${noteId}`);
+  },
+  uploadNoteDetails: (data) => {
+    return api.post('/api/v1/content/notes/details/upload', data);
   }
 };
 

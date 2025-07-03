@@ -227,6 +227,17 @@ function handleMessage(request, sender, sendResponse) {
 async function handleProxyRequest(requestData) {
     try {
         console.log('[Background] 处理代理请求:', requestData);
+
+        // 从全局状态获取API主机地址
+        const apiHost = globalState.apiConfig?.host;
+        if (!apiHost) {
+            const errorMsg = 'API host not configured. Please set it in the plugin options.';
+            console.error(`[Background] ${errorMsg}`);
+            return { success: false, status: 500, error: errorMsg };
+        }
+
+        // 构建完整的请求URL
+        const fullUrl = `${apiHost}${requestData.url}`;
         
         // 构建fetch选项
         const fetchOptions = {
@@ -239,10 +250,10 @@ async function handleProxyRequest(requestData) {
             fetchOptions.body = requestData.options.body;
         }
         
-        console.log('[Background] 发送fetch请求:', requestData.url, fetchOptions);
+        console.log('[Background] 发送fetch请求:', fullUrl, fetchOptions);
         
         // 发送请求
-        const response = await fetch(requestData.url, fetchOptions);
+        const response = await fetch(fullUrl, fetchOptions);
         
         console.log('[Background] 收到响应:', response.status, response.statusText);
         
@@ -281,7 +292,7 @@ async function handleProxyRequest(requestData) {
                     console.log('[Background] 已更新Authorization头，重试请求');
                     
                     // 重新发送请求
-                    const retryResponse = await fetch(requestData.url, fetchOptions);
+                    const retryResponse = await fetch(fullUrl, fetchOptions);
                     console.log('[Background] 重试请求响应:', retryResponse.status, retryResponse.statusText);
                     
                     // 如果重试后还是401，说明token彻底失效

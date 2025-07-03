@@ -51,7 +51,8 @@
         "injected/api-service.js",
         "injected/dialog-manager.js",
         "injected/notification-handler.js",
-        "injected/user-notes.js"
+        "injected/user-notes.js",
+        "injected/note-detail-extractor.js"
     ],
       "matches": ["<all_urls>"]
     }
